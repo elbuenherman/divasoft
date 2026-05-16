@@ -1,0 +1,32 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<?php
+include("css.php");
+?>
+
+    <title>Divasoft</title>
+</head>
+<body class="metro">
+<div class="slide">
+        <div style="background: url(images/b1.jpg) top left no-repeat; background-size: cover; height: 300px;">
+            
+            <div class="container" style="padding: 30px 10px; position: absolute">
+                    <img src="images/divalogo.png" class="span3">
+            </div>
+            <div class="container" style="padding: 50px 250px; margin-top: 0px; position: absolute">
+
+                <h1 class="fg-white">Divasoft Ver. 1.0</h1>
+                <h2 class="fg-white">
+                    Sistema informático para comercialización de flor<br /> Quito - Ecuador - 2015
+                </h2>
+
+                <a href="login.php"
+                   class="place-left button bg-darkRed bg-hover-red fg-white fg-hover-white bd-orange" style="margin-top: 10px; margin-left:200">
+                    <h3 style="margin: 10px 40px">Ingresar</h3>
+                </a>
+            </div>
+        </div>
+</div>
+</body>
+</html>

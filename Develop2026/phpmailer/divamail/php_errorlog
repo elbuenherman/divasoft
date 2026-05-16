@@ -1,0 +1,266 @@
+[24-Jun-2020 10:09:02 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:09:11 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:09:12 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:09:13 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:11:24 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:11:41 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:63
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 63
+[24-Jun-2020 10:12:43 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:67
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 67
+[24-Jun-2020 10:14:54 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:67
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 67
+[24-Jun-2020 10:15:54 America/Guayaquil] PHP Warning:  preg_match(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 67
+[24-Jun-2020 10:15:54 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:17:12 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function pregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:67
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 67
+[24-Jun-2020 10:17:32 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 67
+[24-Jun-2020 10:17:32 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:20:46 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:20:46 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:20:54 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:20:54 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:12 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:23:12 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:14 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:23:14 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:22 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:23:22 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:24 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:23:24 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:30 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 68
+[24-Jun-2020 10:23:30 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:86
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 86
+[24-Jun-2020 10:23:32 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 10:23:37 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:18:01 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:18:15 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:19:06 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:19:06 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:19:24 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:19:24 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:19:27 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:27:29 America/Guayaquil] PHP Warning:  preg_split(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:27:29 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:28:09 America/Guayaquil] PHP Warning:  preg_split(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:28:09 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:28:12 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:34:01 America/Guayaquil] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function PHPMailer::IsHTML(), 0 passed in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1793 and exactly 1 expected in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:273
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1793): PHPMailer->IsHTML()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#2 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 273
+[24-Jun-2020 11:34:54 America/Guayaquil] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function PHPMailer::IsHTML(), 0 passed in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1793 and exactly 1 expected in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:273
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1793): PHPMailer->IsHTML()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#2 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 273
+[24-Jun-2020 11:36:12 America/Guayaquil] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function PHPMailer::IsHTML(), 0 passed in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1793 and exactly 1 expected in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:273
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1793): PHPMailer->IsHTML()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#2 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 273
+[24-Jun-2020 11:36:14 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined method PHPMailer::normalizeBreaks() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1795
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1795
+[24-Jun-2020 11:37:01 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:38:05 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'PHPMailer' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:43
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 43
+[24-Jun-2020 11:38:09 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'PHPMailer' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:43
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 43
+[24-Jun-2020 11:38:23 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'PHPMailer' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php:43
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php on line 43
+[24-Jun-2020 11:38:25 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function split() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1723
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(83): PHPMailer->MsgHTML('<!DOCTYPE html ...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:39:52 America/Guayaquil] PHP Warning:  str_split() expects parameter 2 to be int, string given in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1723
+[24-Jun-2020 11:39:52 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:45:00 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:45:00 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1218
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1218
+[24-Jun-2020 11:46:39 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1726
+[24-Jun-2020 11:46:39 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1220
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1220
+[24-Jun-2020 11:46:41 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1726
+[24-Jun-2020 11:46:41 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1220
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1220
+[24-Jun-2020 11:46:42 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1726
+[24-Jun-2020 11:46:42 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function set_magic_quotes_runtime() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:1220
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1193): PHPMailer->EncodeFile('divasoft_recibo...', 'base64')
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(1007): PHPMailer->AttachAll()
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(398): PHPMailer->CreateBody()
+#3 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#4 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1220
+[24-Jun-2020 11:47:34 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:47:34 America/Guayaquil] PHP Deprecated:  Methods with the same name as their class will not be constructors in a future version of PHP; SMTP has a deprecated constructor in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.smtp.php on line 36
+[24-Jun-2020 11:47:34 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:592
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(517): PHPMailer->SmtpConnect()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(410): PHPMailer->SmtpSend('Date: Wed, 24 J...', '--b1_50088cef1f...')
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#3 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 592
+[24-Jun-2020 11:48:04 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:48:04 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function pregi() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:592
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(517): PHPMailer->SmtpConnect()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(410): PHPMailer->SmtpSend('Date: Wed, 24 J...', '--b1_3622aa5ea4...')
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#3 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 592
+[24-Jun-2020 11:49:23 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:49:23 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php:592
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(517): PHPMailer->SmtpConnect()
+#1 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php(410): PHPMailer->SmtpSend('Date: Wed, 24 J...', '--b1_c0aab8e617...')
+#2 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/divamail/mail.php(97): PHPMailer->Send()
+#3 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 592
+[24-Jun-2020 11:50:14 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:50:14 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter '^' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 592
+[24-Jun-2020 11:51:55 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724
+[24-Jun-2020 11:52:51 America/Guayaquil] PHP Notice:  Undefined offset: 1 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/phpmailer/class.phpmailer.php on line 1724

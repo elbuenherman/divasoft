@@ -1,0 +1,303 @@
+[24-Jun-2020 11:58:16 America/Guayaquil] PHP Fatal error:  require_once(): Failed opening required '../class.phpmailer.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 5
+[24-Jun-2020 11:59:27 America/Guayaquil] PHP Warning:  require_once(../class.phpmailer.php): failed to open stream: No such file or directory in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 11:59:27 America/Guayaquil] PHP Fatal error:  require_once(): Failed opening required '../class.phpmailer.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 12:01:47 America/Guayaquil] PHP Warning:  require_once(../class.phpmailer.php): failed to open stream: No such file or directory in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 12:01:47 America/Guayaquil] PHP Fatal error:  require_once(): Failed opening required '../class.phpmailer.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 12:01:49 America/Guayaquil] PHP Warning:  require_once(../class.phpmailer.php): failed to open stream: No such file or directory in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 12:01:49 America/Guayaquil] PHP Fatal error:  require_once(): Failed opening required '../class.phpmailer.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 8
+[24-Jun-2020 12:02:53 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'PHPMailer\PHPMailer\PHPMailer' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:43
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 43
+[24-Jun-2020 12:08:53 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:73
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:09:55 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:09:55 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:10:04 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:10:04 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:10:05 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:10:05 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:10:16 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:11:49 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:11:49 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:12:00 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:12:14 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:12:14 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:12:29 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter '/' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:12:29 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:12:40 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:12:40 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:12:41 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:12:41 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:13:18 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:13:54 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:13:56 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:73
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:14:10 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:73
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:14:11 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:13 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:29 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:29 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:14:29 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:14:31 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:31 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:14:31 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:14:37 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:37 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:14:37 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:14:38 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:38 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:14:38 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:14:39 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:14:39 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:14:39 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:15:25 America/Guayaquil] PHP Notice:  Undefined variable: address in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:15:25 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:15:25 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:15:27 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:73
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:15:39 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:16:08 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:16:09 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function eregi_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:73
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:16:48 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:16:48 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:16:55 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:16:55 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:16:56 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:16:56 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:01 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:01 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:03 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:04 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:32 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:32 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:41 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:41 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:42 America/Guayaquil] PHP Warning:  preg_replace(): No ending delimiter '/' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:42 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:50 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:50 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:51 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:51 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:55 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:55 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:17:57 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:17:57 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:18:57 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:18:57 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:18:59 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:18:59 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:19:00 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:19:00 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:19:44 America/Guayaquil] PHP Warning:  preg_replace(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:19:44 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:19:45 America/Guayaquil] PHP Warning:  preg_replace(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:19:45 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:19:46 America/Guayaquil] PHP Warning:  preg_replace(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:19:46 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:19:51 America/Guayaquil] PHP Warning:  preg_replace(): Delimiter must not be alphanumeric or backslash in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:19:51 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:20:02 America/Guayaquil] PHP Warning:  preg_replace(): No ending matching delimiter ']' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:20:02 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:20:38 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:20:38 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:20:39 America/Guayaquil] PHP Warning:  preg_replace(): Compilation failed: missing terminating ] for character class at offset 3 in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 73
+[24-Jun-2020 12:20:39 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:21:27 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:21:31 America/Guayaquil] PHP Fatal error:  Uncaught Error: Call to undefined function ereg_replace() in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:91
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 91
+[24-Jun-2020 12:21:50 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:21:50 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:22:02 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:22:02 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:22:03 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:22:14 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:22:15 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 92
+[24-Jun-2020 12:22:15 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:22:54 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:22:55 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:22:57 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:23:09 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:27:18 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:27:18 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:27:35 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:27:35 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:27:36 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 93
+[24-Jun-2020 12:27:36 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:27:38 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 94
+[24-Jun-2020 12:27:38 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:28:48 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:28:48 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 97
+[24-Jun-2020 12:28:50 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:28:50 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 97
+[24-Jun-2020 12:29:44 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:29:44 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 97
+[24-Jun-2020 12:29:46 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:29:46 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:31:43 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:31:43 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:31:45 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:31:45 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:31:55 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter '/' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:31:55 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:31:56 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter '/' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:31:56 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:32:05 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:33:03 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:33:03 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:33:13 America/Guayaquil] PHP Warning:  preg_match(): No ending delimiter ';' found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:33:13 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:33:14 America/Guayaquil] PHP Warning:  preg_match(): Unknown modifier ';' in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 95
+[24-Jun-2020 12:33:14 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:33:20 America/Guayaquil] PHP Warning:  count(): Parameter must be an array or an object that implements Countable in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 99
+[24-Jun-2020 12:37:46 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'SMTP' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:76
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 76
+[24-Jun-2020 12:38:19 America/Guayaquil] PHP Warning:  require(../src/SMTP2.php): failed to open stream: No such file or directory in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 14
+[24-Jun-2020 12:38:19 America/Guayaquil] PHP Fatal error:  require(): Failed opening required '../src/SMTP2.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 14
+[24-Jun-2020 12:38:23 America/Guayaquil] PHP Warning:  require(../src/SMTP2.php): failed to open stream: No such file or directory in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 14
+[24-Jun-2020 12:38:23 America/Guayaquil] PHP Fatal error:  require(): Failed opening required '../src/SMTP2.php' (include_path='.:/usr/local/php73/pear') in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 14
+[24-Jun-2020 12:38:24 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'SMTP' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:76
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 76
+[24-Jun-2020 12:39:29 America/Guayaquil] PHP Fatal error:  Uncaught Error: Class 'SMTP' not found in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:76
+Stack trace:
+#0 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 76
+[07-Feb-2023 07:48:40 America/Guayaquil] PHP Warning:  mysqli_fetch_array() expects parameter 1 to be mysqli_result, bool given in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 27
+[07-Feb-2023 07:48:40 America/Guayaquil] PHP Notice:  Trying to access array offset on value of type null in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 29
+[07-Feb-2023 07:48:40 America/Guayaquil] PHP Notice:  Undefined variable: tipo_pago in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 63
+[07-Feb-2023 07:49:35 America/Guayaquil] PHP Warning:  mysqli_fetch_array() expects parameter 1 to be mysqli_result, bool given in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 27
+[07-Feb-2023 07:49:35 America/Guayaquil] PHP Notice:  Trying to access array offset on value of type null in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 29
+[07-Feb-2023 07:49:35 America/Guayaquil] PHP Notice:  Undefined variable: tipo_pago in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 63
+[07-Feb-2023 07:50:02 America/Guayaquil] PHP Warning:  mysqli_fetch_array() expects parameter 1 to be mysqli_result, bool given in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 27
+[07-Feb-2023 07:50:02 America/Guayaquil] PHP Notice:  Trying to access array offset on value of type null in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 29
+[07-Feb-2023 07:50:02 America/Guayaquil] PHP Notice:  Undefined variable: tipo_pago in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 63
+[31-Oct-2025 09:16:21 America/Guayaquil] PHP Fatal error:  Uncaught mysqli_sql_exception: MySQL server has gone away in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:26
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php(26): mysqli_query(Object(mysqli), 'SELECT fecha_pr...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 26
+[31-Oct-2025 09:16:21 America/Guayaquil] PHP Fatal error:  Uncaught mysqli_sql_exception: MySQL server has gone away in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php:26
+Stack trace:
+#0 /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php(26): mysqli_query(Object(mysqli), 'SELECT fecha_pr...')
+#1 {main}
+  thrown in /home/customer/www/dienersoft.com/public_html/carpeta/divasoft1/Develop/PHPMailer-master/divamail/mail.php on line 26
