@@ -1,0 +1,245 @@
+/* 
+   ============================================================================
+   dienersoft_comun.css
+   ----------------------------------------------------------------------------
+   Estilos comunes para TODOS los modulos migrados a jQuery 4.
+   ============================================================================
+*/
+
+
+/* ===== CONTAINER DEL DIALOG ===== */
+
+.ui-dialog {
+    background: white !important;
+    border: 1px solid #aaa !important;
+    border-radius: 4px !important;
+    padding: 0 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    z-index: 1000 !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.ui-dialog:not([style*="display: none"]) {
+    display: flex !important;
+}
+
+
+/* ===== TITLEBAR (HEADER DEL DIALOG) ===== */
+
+.ui-dialog .ui-dialog-titlebar {
+    padding: 8px 36px 8px 12px !important;
+    position: relative !important;
+    background: #e9e9e9;
+    border-bottom: 1px solid #ddd;
+    display: block !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.ui-dialog .ui-dialog-title {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-weight: bold !important;
+    float: none !important;
+    width: auto !important;
+}
+
+
+/* ===== BOTON CERRAR (X) ===== */
+
+.ui-dialog .ui-dialog-titlebar-close {
+    position: absolute !important;
+    right: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 24px !important;
+    height: 24px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    overflow: hidden !important;
+    color: transparent !important;
+    font-size: 0 !important;
+}
+
+.ui-dialog .ui-dialog-titlebar-close span,
+.ui-dialog .ui-dialog-titlebar-close .ui-icon {
+    display: none !important;
+}
+
+.ui-dialog .ui-dialog-titlebar-close::before {
+    content: "X" !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    color: white !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    font-family: Arial, sans-serif !important;
+}
+
+
+/* ===== CONTENIDO DEL DIALOG ===== */
+
+.ui-dialog .ui-dialog-content {
+    padding: 16px 12px !important;
+    background: white !important;
+    overflow: auto !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    text-align: left !important;
+}
+
+
+/* ===== BOTONERA INFERIOR ===== */
+
+.ui-dialog .ui-dialog-buttonpane {
+    background: #f5f5f5 !important;
+    padding: 10px 12px !important;
+    border-top: 1px solid #ddd !important;
+    text-align: right !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+.ui-dialog .ui-dialog-buttonpane .ui-dialog-buttonset {
+    float: right !important;
+}
+
+.ui-dialog .ui-dialog-buttonpane button {
+    margin: 0 4px !important;
+    padding: 6px 14px !important;
+    cursor: pointer !important;
+    border-radius: 3px !important;
+    border: 1px solid #aaa !important;
+    background: #f0f0f0 !important;
+    color: #333 !important;
+    font-size: 13px !important;
+}
+
+
+/* ===== OVERLAY DE FONDO ===== */
+
+.ui-widget-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.4) !important;
+    z-index: 99 !important;
+}
+
+
+/* ===== TITULO CRIMSON (myTitleClass) ===== */
+
+.myTitleClass .ui-dialog-titlebar {
+    background: #88010e !important;
+    color: #FFFFFF !important;
+    border: none !important;
+}
+
+.myTitleClass .ui-dialog-titlebar .ui-dialog-title {
+    color: #FFFFFF !important;
+}
+
+
+/* ===== BOTONES CRIMSON (cancelButton) ===== */
+
+.ui-button.cancelButton,
+.ui-dialog .ui-dialog-buttonpane button.cancelButton,
+.ui-dialog .ui-dialog-buttonpane button.ui-button.cancelButton {
+    background: #88010e !important;
+    color: #FFFFFF !important;
+    border: 1px solid #88010e !important;
+}
+
+.ui-button.cancelButton:hover,
+.ui-dialog .ui-dialog-buttonpane button.cancelButton:hover {
+    background: #a00210 !important;
+    color: #FFFFFF !important;
+    border-color: #a00210 !important;
+}
+
+
+/* ===== OVERLAY DE ESPERA ===== */
+
+#id_espera {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: rgba( 255, 255, 255, .8) url('../images/FhHRx.gif') 50% 50% no-repeat;
+}
+
+
+/* ===== ENCABEZADOS Y CELDAS DE TABLAS ===== */
+
+.columnas-ordenables {
+    font-size: 15px;
+    font-weight: bold;
+    text-decoration-line: underline;
+    color: #660000;
+}
+
+.columnas {
+    font-size: 15px;
+    font-weight: bold;
+    color: black;
+}
+
+.celdas {
+    font-size: 10px;
+}
+
+.celdas-resaltadas {
+    font-size: 13px;
+}
+
+.celdas-opciones {
+    font-size: 25px;
+}
+
+.celdas-numero-guia {
+    font-size: 12px;
+}
+
+
+/* ===== TITULOS DE VUELOS FACTURACION ===== */
+
+.titulo_vuelos_facturacion {
+    width: 20%;
+    background-color: #88010e;
+    color: white;
+}
+
+.titulo_vuelos_facturacion_documentacion {
+    width: 20%;
+    background-color: #6699CC;
+    color: white;
+}
+
+.fila_vuelos_facturacion_ya_transmitido {
+    vertical-align: top;
+    font-size: 15px;
+    background: #e6e7e4;
+}
+
+.fila_vuelos_facturacion_documentacion_ya_transmitido {
+    vertical-align: top;
+    font-size: 15px;
+    background: #e6e7e4;
+}

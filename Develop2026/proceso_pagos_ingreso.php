@@ -25,7 +25,8 @@ global $url_sitio;
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <?php
-        include("css.php");
+        // include("css.php");
+        include("css_v4.php");
         ?>
         <title>Divasoft - Registro y Proceso de Pagos</title>
         <meta http-equiv=”refresh” content=”10; URL=http://www.blogodisea.com” />
