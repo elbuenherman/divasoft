@@ -1,13 +1,13 @@
 <?php
-exit;
-// ============================================================================
-//  verificar_adjunto.php  -  TEMPORAL (borrar tras verificar).
-//  Sirve un adjunto guardado en archivo_correo para comprobar que no este
-//  corrupto.  Uso:  verificar_adjunto.php?codigo=123
-// ============================================================================
-  
-include(__DIR__ . "/../variables_globales.php");
 
+// ============================================================================
+//  ver_adjunto.php
+//  Sirve un adjunto guardado en archivo_correo (inline) para verlo/descargarlo.
+//  Uso:  ver_adjunto.php?codigo=123
+// ============================================================================
+
+include("variables_globales.php");
+ 
 // variables_globales.php solo define $link = NULL; abrir la conexion aqui
 // con las mismas credenciales (igual que funciones.php).
 $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);

@@ -6,7 +6,7 @@ include("valida_sesion.php");
 $permiso[] = NULL;
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
-
+ 
 // ===== SOLO GUI / MAQUETA - sin consultas de negocio, sin AJAX funcional todavia =====
 // Los catalogos de FINCA y CONSOLIDADO, el listado real y el grabado se haran en la fase de funcionalidad.
 $fecha_hoy      = date("Y-m-d");
@@ -128,6 +128,16 @@ textarea, input[type="text"] {
     }
 .grid_correos tbody .grupo_correo_seleccionado td:first-child {
     box-shadow: inset 4px 0 0 #88010e !important;
+    }
+.grid_correos tbody .fila_adjunto td {
+    background-color: #f4f4f4;
+    font-size: 10px;
+    color: #555;
+    padding: 3px 6px;
+    border-bottom: 1px dotted #ddd !important;
+    }
+.grid_correos tbody .fila_adjunto td:first-child {
+    box-shadow: inset 3px 0 0 #cfa3a3;
     }
 
 .input_pequeno {
