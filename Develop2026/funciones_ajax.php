@@ -298,6 +298,11 @@ if($funcion == 'check_email')
 //// 
 if($funcion == 'extraer_correos_facturas')
     echo extraer_correos_facturas($parametro1,$parametro2); 
+if($funcion == 'lista_correos_facturas')
+    echo lista_correos_facturas();
+
+
+
 mysqli_close($link);
 
 ?>

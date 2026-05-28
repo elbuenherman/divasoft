@@ -347,7 +347,7 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
             return "ERROR: No existe token.json. Autorice primero con oauth_callback.php";
         $token = json_decode(file_get_contents($ruta_token), true);
         $client->setAccessToken($token);
-
+ 
         if($client->isAccessTokenExpired())
             {
             $refresh_token = $client->getRefreshToken();
@@ -429,4 +429,98 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
         {
         return "ERROR: " . $e->getMessage();
         }
+    }
+
+
+// Lista los correos de correo_facturas_fincas de los ultimos 5 dias (HTML de la tabla).
+function lista_correos_facturas()
+    {
+    global $link;
+
+    $sql = "SELECT
+        CODIGO AS CODIGO,
+        CODIGOFINCA AS CODIGOFINCA,
+        CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
+        IDCORREO AS IDCORREO,
+        FECHAHORA AS FECHAHORA,
+        DE AS DE,
+        PARA AS PARA,
+        ASUNTO AS ASUNTO,
+        ESTADO AS ESTADO,
+        OBSERVACIONES AS OBSERVACIONES
+        FROM correo_facturas_fincas
+        WHERE FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)
+        ORDER BY FECHAHORA DESC";
+    $resultado = mysqli_query($link, $sql);
+    $numero_correos = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=1; $i<=$numero_correos; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']            = $fila['CODIGO'];
+        $arreglo[$i]['CODIGOFINCA']       = $fila['CODIGOFINCA'];
+        $arreglo[$i]['CODIGOCONSOLIDADO'] = $fila['CODIGOCONSOLIDADO'];
+        $arreglo[$i]['IDCORREO']          = $fila['IDCORREO'];
+        $arreglo[$i]['FECHAHORA']         = $fila['FECHAHORA'];
+        $arreglo[$i]['DE']                = $fila['DE'];
+        $arreglo[$i]['PARA']              = $fila['PARA'];
+        $arreglo[$i]['ASUNTO']            = $fila['ASUNTO'];
+        $arreglo[$i]['ESTADO']            = $fila['ESTADO'];
+        $arreglo[$i]['OBSERVACIONES']     = $fila['OBSERVACIONES'];
+        }
+
+    $html = '<table class="grid_correos">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 5%;">COD</th>';
+    $html .= '<th style="width: 12%;">FINCA</th>';
+    $html .= '<th style="width: 8%;">CONS</th>';
+    $html .= '<th style="width: 6%;">ID</th>';
+    $html .= '<th style="width: 14%;">FH REC</th>';
+    $html .= '<th style="width: 18%;">DE</th>';
+    $html .= '<th style="width: 15%;">PARA</th>';
+    $html .= '<th style="width: 9%;">EST</th>';
+    $html .= '<th style="width: 13%;">OPC</th>';
+    $html .= '</tr></thead>';
+
+    for($i=1; $i<=$numero_correos; $i++)
+        {
+        $codigo    = $arreglo[$i]['CODIGO'];
+        $finca     = ($arreglo[$i]['CODIGOFINCA'] === null || $arreglo[$i]['CODIGOFINCA'] === '') ? '&mdash;' : htmlspecialchars($arreglo[$i]['CODIGOFINCA'], ENT_QUOTES, 'UTF-8');
+        $cons      = ($arreglo[$i]['CODIGOCONSOLIDADO'] === null || $arreglo[$i]['CODIGOCONSOLIDADO'] === '') ? '&mdash;' : htmlspecialchars($arreglo[$i]['CODIGOCONSOLIDADO'], ENT_QUOTES, 'UTF-8');
+        $idcorreo  = htmlspecialchars((string)$arreglo[$i]['IDCORREO'], ENT_QUOTES, 'UTF-8');
+        $fechahora = htmlspecialchars((string)$arreglo[$i]['FECHAHORA'], ENT_QUOTES, 'UTF-8');
+        $de        = htmlspecialchars((string)$arreglo[$i]['DE'], ENT_QUOTES, 'UTF-8');
+        $para      = htmlspecialchars((string)$arreglo[$i]['PARA'], ENT_QUOTES, 'UTF-8');
+        $asunto    = htmlspecialchars((string)$arreglo[$i]['ASUNTO'], ENT_QUOTES, 'UTF-8');
+        $estado    = htmlspecialchars((string)$arreglo[$i]['ESTADO'], ENT_QUOTES, 'UTF-8');
+        $obs       = ($arreglo[$i]['OBSERVACIONES'] === null || $arreglo[$i]['OBSERVACIONES'] === '') ? '&mdash;' : htmlspecialchars($arreglo[$i]['OBSERVACIONES'], ENT_QUOTES, 'UTF-8');
+
+        $html .= '<tbody id="id_grupo_correo_'.$codigo.'" class="grupo_correo" onclick="devuelve_correo('.$codigo.');">';
+        $html .= '<tr>';
+        $html .= '<td class="td_centro"><strong>'.$codigo.'</strong></td>';
+        $html .= '<td>'.$finca.'</td>';
+        $html .= '<td class="td_centro">'.$cons.'</td>';
+        $html .= '<td class="td_centro">'.$idcorreo.'</td>';
+        $html .= '<td class="td_centro">'.$fechahora.'</td>';
+        $html .= '<td>'.$de.'</td>';
+        $html .= '<td>'.$para.'</td>';
+        $html .= '<td class="td_centro">'.$estado.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: devuelve_correo('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: muestra_trazabilidad_correo('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
+        $html .= '<a href="javascript: ver_adjunto_correo('.$codigo.');" title="Ver adjunto PDF/Excel"><i class="icon-clipboard-2 fg-darkRed"></i></a>';
+        $html .= '<a href="javascript: ver_cuerpo_correo('.$codigo.');" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        $html .= '<tr class="fila_asunto">';
+        $html .= '<td colspan="6"><span class="etiqueta_asunto">SUBJ:</span>'.$asunto.'</td>';
+        $html .= '<td colspan="3"><span class="etiqueta_asunto">OBS:</span>'.$obs.'</td>';
+        $html .= '</tr>';
+        $html .= '</tbody>';
+        }
+
+    $html .= '</table>';
+    $html .= '<div style="text-align:right; font-size:11px; color:#666; padding:5px;">Total: '.$numero_correos.' correos (ultimos 5 dias)</div>';
+    return $html;
     }

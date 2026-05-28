@@ -315,9 +315,17 @@ function extraer_correos()
         });
     }
 
-// ===== Actualizar listado (placeholder; mas adelante leera de la base) =====
+// ===== Actualizar listado: trae los correos reales (ultimos 5 dias) por AJAX =====
 function actualiza_listado()
     {
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=lista_correos_facturas";
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        $("#id_espera").hide();
+        $("#id_listado_correos").html(data);
+        });
     }
 
 // ===== boton_nuevo: limpia el formulario =====
@@ -384,6 +392,7 @@ $(document).ready(function()
         });
 
     boton_nuevo();
+    actualiza_listado();
     });
 </script>
 </head>
@@ -427,103 +436,7 @@ $(document).ready(function()
                             <th style="width: 13%;">OPC</th>
                         </tr>
                     </thead>
-                        <!-- ===== CORREO 1 ===== -->
-                        <tbody id="id_grupo_correo_1" class="grupo_correo" onclick="devuelve_correo(1);">
-                            <tr>
-                                <td class="td_centro"><strong>1</strong></td>
-                                <td>&mdash;</td>
-                                <td class="td_centro">&mdash;</td>
-                                <td class="td_centro">18f3a1</td>
-                                <td class="td_centro">2026-05-27 08:14</td>
-                                <td>facturacion@proveedor1.com</td>
-                                <td>compras@divaflor.com</td>
-                                <td class="td_centro">PENDIENTE</td>
-                                <td class="td_opc">
-                                    <a href="javascript: devuelve_correo(1);" title="Editar"><i class="icon-pencil fg-brown"></i></a>
-                                    <a href="javascript: muestra_trazabilidad_correo(1);" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>
-                                    <a href="javascript: ver_adjunto_correo(1);" title="Ver adjunto PDF/Excel"><i class="icon-clipboard-2 fg-darkRed"></i></a>
-                                    <a href="javascript: ver_cuerpo_correo(1);" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>
-                                </td>
-                            </tr>
-                            <tr class="fila_asunto">
-                                <td colspan="6"><span class="etiqueta_asunto">SUBJ:</span>Factura electronica No. 001-002-000012345</td>
-                                <td colspan="3"><span class="etiqueta_asunto">OBS:</span>&mdash;</td>
-                            </tr>
-                        </tbody>
-
-                        <!-- ===== CORREO 2 ===== -->
-                        <tbody id="id_grupo_correo_2" class="grupo_correo" onclick="devuelve_correo(2);">
-                            <tr>
-                                <td class="td_centro"><strong>2</strong></td>
-                                <td>FINCA NORTE</td>
-                                <td class="td_centro">C-0420</td>
-                                <td class="td_centro">18f3b2</td>
-                                <td class="td_centro">2026-05-27 09:02</td>
-                                <td>ventas@proveedor2.com</td>
-                                <td>compras@divaflor.com</td>
-                                <td class="td_centro">PROCESADO</td>
-                                <td class="td_opc">
-                                    <a href="javascript: devuelve_correo(2);" title="Editar"><i class="icon-pencil fg-brown"></i></a>
-                                    <a href="javascript: muestra_trazabilidad_correo(2);" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>
-                                    <a href="javascript: ver_adjunto_correo(2);" title="Ver adjunto PDF/Excel"><i class="icon-clipboard-2 fg-darkRed"></i></a>
-                                    <a href="javascript: ver_cuerpo_correo(2);" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>
-                                </td>
-                            </tr>
-                            <tr class="fila_asunto">
-                                <td colspan="6"><span class="etiqueta_asunto">SUBJ:</span>Invoice attached - Order 99812 - Roses Premium</td>
-                                <td colspan="3"><span class="etiqueta_asunto">OBS:</span>OK</td>
-                            </tr>
-                        </tbody>
-
-                        <!-- ===== CORREO 3 ===== -->
-                        <tbody id="id_grupo_correo_3" class="grupo_correo" onclick="devuelve_correo(3);">
-                            <tr>
-                                <td class="td_centro"><strong>3</strong></td>
-                                <td>&mdash;</td>
-                                <td class="td_centro">&mdash;</td>
-                                <td class="td_centro">18f3c3</td>
-                                <td class="td_centro">2026-05-27 11:47</td>
-                                <td>cobranzas@proveedor3.com</td>
-                                <td>compras@divaflor.com</td>
-                                <td class="td_centro">IGNORADO</td>
-                                <td class="td_opc">
-                                    <a href="javascript: devuelve_correo(3);" title="Editar"><i class="icon-pencil fg-brown"></i></a>
-                                    <a href="javascript: muestra_trazabilidad_correo(3);" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>
-                                    <a href="javascript: ver_adjunto_correo(3);" title="Ver adjunto PDF/Excel"><i class="icon-clipboard-2 fg-darkRed"></i></a>
-                                    <a href="javascript: ver_cuerpo_correo(3);" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>
-                                </td>
-                            </tr>
-                            <tr class="fila_asunto">
-                                <td colspan="6"><span class="etiqueta_asunto">SUBJ:</span>Recordatorio de pago - Factura 0078</td>
-                                <td colspan="3"><span class="etiqueta_asunto">OBS:</span>&mdash;</td>
-                            </tr>
-                        </tbody>
-
-                        <!-- ===== CORREO 4 ===== -->
-                        <tbody id="id_grupo_correo_4" class="grupo_correo" onclick="devuelve_correo(4);">
-                            <tr>
-                                <td class="td_centro"><strong>4</strong></td>
-                                <td>FINCA SUR</td>
-                                <td class="td_centro">C-0421</td>
-                                <td class="td_centro">18f3d4</td>
-                                <td class="td_centro">2026-05-27 14:20</td>
-                                <td>facturas@proveedor4.com</td>
-                                <td>compras@divaflor.com</td>
-                                <td class="td_centro">ERROR</td>
-                                <td class="td_opc">
-                                    <a href="javascript: devuelve_correo(4);" title="Editar"><i class="icon-pencil fg-brown"></i></a>
-                                    <a href="javascript: muestra_trazabilidad_correo(4);" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>
-                                    <a href="javascript: ver_adjunto_correo(4);" title="Ver adjunto PDF/Excel"><i class="icon-clipboard-2 fg-darkRed"></i></a>
-                                    <a href="javascript: ver_cuerpo_correo(4);" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>
-                                </td>
-                            </tr>
-                            <tr class="fila_asunto">
-                                <td colspan="6"><span class="etiqueta_asunto">SUBJ:</span>Factura y guia de remision - despacho 5521</td>
-                                <td colspan="3"><span class="etiqueta_asunto">OBS:</span>REV</td>
-                            </tr>
-                        </tbody>
                 </table>
-                <div style="text-align:right; font-size:11px; color:#666; padding:5px;">Total: 4 correos (datos de ejemplo)</div>
             </div>
         </div>
 
@@ -668,4 +581,5 @@ $(document).ready(function()
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
 </body> 
-</html>
+</html> 
+ 
