@@ -432,6 +432,29 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
     }
 
 
+// Extrae solo el/los email(s) de un campo De/Para (quita nombres, comillas y < >).
+function limpia_email($texto)
+    {
+    $texto = (string)$texto;
+    if(trim($texto) == "")
+        return "";
+    $partes = explode(',', $texto);
+    $emails = array();
+    $total = count($partes);
+    for($i=1; $i<=$total; $i++)
+        {
+        $parte = trim($partes[$i-1]);
+        if($parte == "")
+            continue;
+        if(preg_match('/<([^>]+)>/', $parte, $m))
+            $emails[] = trim($m[1]);
+        else if(preg_match('/[^\s<>,"\']+@[^\s<>,"\']+/', $parte, $m))
+            $emails[] = $m[0];
+        }
+    return implode(', ', $emails);
+    }
+
+
 // Lista los correos de correo_facturas_fincas de los ultimos 5 dias (HTML de la tabla).
 // Debajo de cada correo agrega una fila por cada adjunto guardado en archivo_correo.
 function lista_correos_facturas()
@@ -514,46 +537,58 @@ function lista_correos_facturas()
     $html .= '<th style="width: 5%;">COD</th>';
     $html .= '<th style="width: 12%;">FINCA</th>';
     $html .= '<th style="width: 8%;">CONS</th>';
-    $html .= '<th style="width: 6%;">ID</th>';
     $html .= '<th style="width: 14%;">FH REC</th>';
     $html .= '<th style="width: 18%;">DE</th>';
     $html .= '<th style="width: 15%;">PARA</th>';
     $html .= '<th style="width: 9%;">EST</th>';
-    $html .= '<th style="width: 13%; text-align:right;">OPC</th>';
+    $html .= '<th style="width: 13%; text-align:center;">OPC</th>';
     $html .= '</tr></thead>';
-
+  
     for($i=1; $i<=$numero_correos; $i++)
         {
         $codigo    = $arreglo_correos[$i]['CODIGO'];
         $finca     = ($arreglo_correos[$i]['CODIGOFINCA'] === null || $arreglo_correos[$i]['CODIGOFINCA'] === '') ? '&mdash;' : htmlspecialchars($arreglo_correos[$i]['CODIGOFINCA'], ENT_QUOTES, 'UTF-8');
         $cons      = ($arreglo_correos[$i]['CODIGOCONSOLIDADO'] === null || $arreglo_correos[$i]['CODIGOCONSOLIDADO'] === '') ? '&mdash;' : htmlspecialchars($arreglo_correos[$i]['CODIGOCONSOLIDADO'], ENT_QUOTES, 'UTF-8');
-        $idcorreo  = htmlspecialchars((string)$arreglo_correos[$i]['IDCORREO'], ENT_QUOTES, 'UTF-8');
-        $fechahora = htmlspecialchars((string)$arreglo_correos[$i]['FECHAHORA'], ENT_QUOTES, 'UTF-8');
-        $de        = htmlspecialchars((string)$arreglo_correos[$i]['DE'], ENT_QUOTES, 'UTF-8');
-        $para      = htmlspecialchars((string)$arreglo_correos[$i]['PARA'], ENT_QUOTES, 'UTF-8');
+        $meses_abr = array(1=>'ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC');
+        $fechahora = '&mdash;';
+        $fh_raw    = (string)$arreglo_correos[$i]['FECHAHORA'];
+        if($fh_raw != "" && $fh_raw != "0000-00-00 00:00:00")
+            {
+            $fh_ts = strtotime($fh_raw);
+            if($fh_ts !== false)
+                $fechahora = $meses_abr[(int)date('n', $fh_ts)].'-'.date('d', $fh_ts).' '.date('H:i:s', $fh_ts);
+            }
+        $de        = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['DE']), ENT_QUOTES, 'UTF-8');
+        $para      = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['PARA']), ENT_QUOTES, 'UTF-8');
         $asunto    = htmlspecialchars((string)$arreglo_correos[$i]['ASUNTO'], ENT_QUOTES, 'UTF-8');
+        $asunto_js = htmlspecialchars(addslashes((string)$arreglo_correos[$i]['ASUNTO']), ENT_QUOTES, 'UTF-8');
         $estado    = htmlspecialchars((string)$arreglo_correos[$i]['ESTADO'], ENT_QUOTES, 'UTF-8');
         $obs       = ($arreglo_correos[$i]['OBSERVACIONES'] === null || $arreglo_correos[$i]['OBSERVACIONES'] === '') ? '&mdash;' : htmlspecialchars($arreglo_correos[$i]['OBSERVACIONES'], ENT_QUOTES, 'UTF-8');
+  
+        $est_14   = 'background-color:#f2f2f2; font-size:14px;';
+        $est_12   = 'background-color:#f2f2f2; font-size:12px;';
+        $est_11   = 'background-color:#f2f2f2; font-size:11px;';
+        $est_asun = 'background-color:#f2f2f2; font-size:14px; font-weight:normal; font-style:italic; color:#333;';
+        $est_obs  = 'background-color:#f2f2f2; font-size:14px; font-weight:normal; font-style:normal; color:#333;';
 
         $html .= '<tbody id="id_grupo_correo_'.$codigo.'" class="grupo_correo" onclick="devuelve_correo('.$codigo.');">';
         $html .= '<tr>';
-        $html .= '<td class="td_centro" style="background-color:#f6f3f3; border-left:3px solid #88010e !important;"><strong>'.$codigo.'</strong></td>';
-        $html .= '<td style="background-color:#f6f3f3;">'.$finca.'</td>';
-        $html .= '<td class="td_centro" style="background-color:#f6f3f3;">'.$cons.'</td>';
-        $html .= '<td class="td_centro" style="background-color:#f6f3f3;">'.$idcorreo.'</td>';
-        $html .= '<td class="td_centro" style="background-color:#f6f3f3;">'.$fechahora.'</td>';
-        $html .= '<td style="background-color:#f6f3f3;">'.$de.'</td>';
-        $html .= '<td style="background-color:#f6f3f3;">'.$para.'</td>';
-        $html .= '<td class="td_centro" style="background-color:#f6f3f3;">'.$estado.'</td>';
-        $html .= '<td class="td_opc" style="background-color:#f6f3f3; text-align:right;">';
+        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$codigo.'</strong></td>';
+        $html .= '<td style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
+        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$cons.'</strong></td>';
+        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
+        $html .= '<td style="'.$est_11.'">'.$de.'</td>';
+        $html .= '<td style="'.$est_11.'">'.$para.'</td>';
+        $html .= '<td class="td_centro" style="'.$est_12.'">'.$estado.'</td>';
+        $html .= '<td class="td_opc" style="'.$est_14.' text-align:right;">';
         $html .= '<a href="javascript: devuelve_correo('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_correo('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
-        $html .= '<a href="javascript: ver_cuerpo_correo('.$codigo.');" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>';
+        $html .= '<a href="#" onclick="ver_cuerpo_correo('.$codigo.', \''.$asunto_js.'\'); return false;" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>';
         $html .= '</td>';
         $html .= '</tr>';
         $html .= '<tr class="fila_asunto">';
-        $html .= '<td colspan="6" style="background-color:#f6f3f3; font-style:normal; font-weight:500; color:#333;">'.$asunto.'</td>';
-        $html .= '<td colspan="3" style="background-color:#f6f3f3;"><span style="font-weight:bold; color:#000; font-style:normal;">OBS:</span>'.$obs.'</td>';
+        $html .= '<td colspan="5" style="'.$est_asun.'">'.$asunto.'</td>';
+        $html .= '<td colspan="3" style="'.$est_obs.'">'.$obs.'</td>';
         $html .= '</tr>';
 
         // Filas de adjuntos del correo (si tiene).
@@ -569,39 +604,41 @@ function lista_correos_facturas()
                 $adj_finca  = ($adj['CODIGOFINCA'] === null || $adj['CODIGOFINCA'] === '') ? '&mdash;' : htmlspecialchars($adj['CODIGOFINCA'], ENT_QUOTES, 'UTF-8');
                 $adj_cons   = ($adj['CODIGOCONSOLIDADO'] === null || $adj['CODIGOCONSOLIDADO'] === '') ? '&mdash;' : htmlspecialchars($adj['CODIGOCONSOLIDADO'], ENT_QUOTES, 'UTF-8');
                 $adj_nombre = htmlspecialchars((string)$adj['NOMBREARCHIVO'], ENT_QUOTES, 'UTF-8');
+                $adj_nombre_js = htmlspecialchars(addslashes((string)$adj['NOMBREARCHIVO']), ENT_QUOTES, 'UTF-8');
                 $adj_mime   = (string)$adj['MIMETYPE'];
                 $adj_ext    = strtolower(pathinfo((string)$adj['NOMBREARCHIVO'], PATHINFO_EXTENSION));
 
                 if(stripos($adj_mime, 'pdf') !== false || $adj_ext == 'pdf')
                     {
                     $adj_tipo  = 'PDF';
-                    $adj_icono = '<i class="icon-file-pdf" style="color:#88010e; background:#fff;"></i>';
+                    $adj_visor = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="Ver adjunto"><i class="icon-file-pdf" style="color:#88010e; background:#fff;"></i></a>';
                     }
                 else if(stripos($adj_mime, 'spreadsheet') !== false || $adj_ext == 'xlsx' || $adj_ext == 'xls')
                     {
                     $adj_tipo  = 'EXCEL';
-                    $adj_icono = '<i class="icon-file-excel" style="color:#006400; background:#fff;"></i>';
+                    $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Descargar adjunto"><i class="icon-file-excel" style="color:#006400; background:#fff;"></i></a>';
                     }
                 else
                     {
                     $adj_tipo  = strtoupper($adj_ext);
-                    $adj_icono = '<i class="icon-file" style="color:#666; background:#fff;"></i>';
+                    $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Ver adjunto"><i class="icon-file" style="color:#666; background:#fff;"></i></a>';
                     }
                 $adj_tamano = number_format(((float)$adj['TAMANOBYTES']) / 1024, 1) . ' KB';
 
+                $est_adj = 'background-color:rgba(195,195,195,0.4); color:#000; font-size:13px; font-weight:normal;';
+
                 $html .= '<tr class="fila_adjunto">';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;">'.$adj_codigo.'</td>';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;">'.$adj_finca.'</td>';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;">'.$adj_cons.'</td>';
-                $html .= '<td colspan="3" style="background-color:#ffffff;">'.$adj_nombre.'</td>';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;">'.$adj_tipo.'</td>';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;">'.$adj_tamano.'</td>';
-                $html .= '<td class="td_centro" style="background-color:#ffffff;"><a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Ver adjunto">'.$adj_icono.'</a></td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;">'.$adj_codigo.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_finca.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_cons.'</td>';
+                $html .= '<td colspan="2" style="'.$est_adj.'">'.$adj_nombre.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tipo.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tamano.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">'.$adj_visor.'</td>';
                 $html .= '</tr>';
                 }
             }
 
-        $html .= '<tr><td colspan="9" style="height:3px; line-height:3px; font-size:0; padding:0; border:none !important; background-color:transparent;"></td></tr>';
         $html .= '</tbody>';
         }
 

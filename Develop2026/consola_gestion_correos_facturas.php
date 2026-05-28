@@ -6,7 +6,7 @@ include("valida_sesion.php");
 $permiso[] = NULL;
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
- 
+   
 // ===== SOLO GUI / MAQUETA - sin consultas de negocio, sin AJAX funcional todavia =====
 // Los catalogos de FINCA y CONSOLIDADO, el listado real y el grabado se haran en la fase de funcionalidad.
 $fecha_hoy      = date("Y-m-d");
@@ -291,10 +291,30 @@ function ver_adjunto_correo(codigo)
     messageBox("Visor de adjunto del correo " + codigo + " - pendiente implementar");
     }
 
-// ===== Placeholder: ver cuerpo del correo completo (siguiente fase) =====
-function ver_cuerpo_correo(codigo)
+// ===== Ver cuerpo del correo en modal (iframe a ver_cuerpo.php) =====
+function ver_cuerpo_correo(codigo_correo, asunto)
     {
-    messageBox("Cuerpo del correo " + codigo + " - pendiente implementar");
+    var titulo = "Cuerpo del correo";
+    if(asunto && asunto.length > 0)
+        {
+        titulo = titulo + " - " + asunto;
+        }
+    $("#id_dialog_cuerpo").dialog("option", "title", titulo);
+    $("#id_dialog_cuerpo").html('<iframe src="ver_cuerpo.php?codigo=' + codigo_correo + '" style="width:100%; height:100%; border:none;"></iframe>');
+    $("#id_dialog_cuerpo").dialog("open");
+    }
+
+// ===== Ver adjunto PDF en modal (iframe a ver_adjunto.php) =====
+function ver_adjunto_pdf(codigo_adjunto, nombre_archivo)
+    {
+    var titulo = "Adjunto";
+    if(nombre_archivo && nombre_archivo.length > 0)
+        {
+        titulo = titulo + ": " + nombre_archivo;
+        }
+    $("#id_dialog_pdf").dialog("option", "title", titulo);
+    $("#id_dialog_pdf").html('<iframe src="ver_adjunto.php?codigo=' + codigo_adjunto + '" style="width:100%; height:100%; border:none;"></iframe>');
+    $("#id_dialog_pdf").dialog("open");
     }
 
 // ===== Placeholder: grabar (siguiente fase) =====
@@ -364,6 +384,18 @@ $(document).ready(function()
         buttons: [{text: "Aceptar", class: 'cancelButton', click: function() {$(this).dialog("close");}}],
         autoOpen: false,
         dialogClass: 'myTitleClass'
+        });
+    $("#id_dialog_cuerpo").dialog(
+        {
+        autoOpen: false, modal: true, width: 700, height: 800, resizable: true,
+        dialogClass: 'myTitleClass',
+        buttons: [{text: "Cerrar", class: 'cancelButton', click: function() {$(this).dialog("close");}}]
+        });
+    $("#id_dialog_pdf").dialog(
+        {
+        autoOpen: false, modal: true, width: 600, height: 800, resizable: true,
+        dialogClass: 'myTitleClass',
+        buttons: [{text: "Cerrar", class: 'cancelButton', click: function() {$(this).dialog("close");}}]
         });
 
     // Select2 en los selects editables del formulario
@@ -588,6 +620,8 @@ $(document).ready(function()
  
     <!-- DIALOGOS -->
     <div id="dialog" title="Alerta"></div>
+    <div id="id_dialog_cuerpo" title=""></div>
+    <div id="id_dialog_pdf" title=""></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
 </body> 
