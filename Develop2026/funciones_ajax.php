@@ -294,6 +294,10 @@ if($funcion == 'inserta_suscripcion')
     echo inserta_suscripcion($parametro1,$parametro2,$parametro3,$parametro4,$parametro5,$parametro6);
 if($funcion == 'check_email')
     echo check_email($parametro1,$parametro2);
+
+//// 
+if($funcion == 'extraer_correos_facturas')
+    echo extraer_correos_facturas($parametro1,$parametro2); 
 mysqli_close($link);
 
 ?>

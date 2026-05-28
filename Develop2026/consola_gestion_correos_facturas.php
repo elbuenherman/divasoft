@@ -293,10 +293,31 @@ function grabar_correo()
     messageBox("Grabado - pendiente implementar (maqueta)");
     }
 
-// ===== Placeholder: extraer correos por rango de fechas (siguiente fase) =====
+// ===== Extraer correos desde Gmail por rango de fechas =====
 function extraer_correos()
     {
-    messageBox("Extraccion de correos - pendiente implementar (maqueta)");
+    var rango = $("#id_rango_fechas").val();
+    var fechas = rango.match(/\d{4}-\d{2}-\d{2}/g);
+    if(fechas == null || fechas.length < 2)
+        {
+        messageBox("Por favor seleccione un rango de fechas (desde y hasta)");
+        return;
+        }
+    var fecha_desde = fechas[0];
+    var fecha_hasta = fechas[1];
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=extraer_correos_facturas&parametro1="+fecha_desde+"&parametro2="+fecha_hasta;
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        $("#id_espera").hide();
+        messageBox(data);
+        });
+    }
+
+// ===== Actualizar listado (placeholder; mas adelante leera de la base) =====
+function actualiza_listado()
+    {
     }
 
 // ===== boton_nuevo: limpia el formulario =====
@@ -380,7 +401,7 @@ $(document).ready(function()
             <!-- Buscador -->
             <div style="padding: 5px 8px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9; overflow: hidden;">
                 <div style="float: left;">
-                    <button type="button" onclick="extraer_correos();" style="background-color: #ffffff; color: #000000; border: 1px solid #c0c0c0; padding: 4px 12px; cursor: pointer; font-size: 12px; font-weight: bold; vertical-align: middle;">ACTUALIZAR</button>
+                    <button type="button" onclick="actualiza_listado();" style="background-color: #ffffff; color: #000000; border: 1px solid #c0c0c0; padding: 4px 12px; cursor: pointer; font-size: 12px; font-weight: bold; vertical-align: middle;">ACTUALIZAR</button>
                 </div>
                 <div style="float: right;">
                     <i class="icon-calendar" style="color: #88010e; vertical-align: middle;" title="Filtrar por rango de fechas"></i>
@@ -619,7 +640,7 @@ $(document).ready(function()
                 <div style="padding: 12px;">
                     <table style="width: 100%; font-size: 13px;">
                         <colgroup>
-                            <col style="width: 30%;">
+                            <col style="width: 30%;"> 
                             <col style="width: 70%;">
                         </colgroup> 
                         <!-- RANGO DE FECHAS (un solo campo) -->
