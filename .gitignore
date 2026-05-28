@@ -1,0 +1,6 @@
+# Composer (modulo de correos en Develop2026)
+Develop2026/vendor/
+
+# Credenciales (seguro extra; las reales viven fuera del proyecto)
+Develop2026/**/client_secret*.json
+Develop2026/**/token.json
