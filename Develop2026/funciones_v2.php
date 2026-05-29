@@ -297,8 +297,8 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
             {
             $fechahora = date('Y-m-d H:i:s');
             }
-        }
-
+        } 
+ 
     // Escapar texto e insertar.
     $threadid     = mysqli_real_escape_string($link, $detalle->getThreadId());
     $messageid    = mysqli_real_escape_string($link, $messageid);
@@ -424,14 +424,14 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
         $tiempo_total = round(microtime(true) - $tiempo_inicio, 2);
         $total_procesados = $total_guardados + $total_saltados;
         return "Se procesaron ".$total_procesados." correos, se guardaron ".$total_guardados." nuevos, se saltaron ".$total_saltados." ya existentes. Adjuntos guardados: ".$total_adjuntos.". Tiempo: ".$tiempo_total." segundos";
-        }
+        } 
     catch(Throwable $e)
         {
         return "ERROR: " . $e->getMessage();
         }
     }
 
-
+ 
 // Extrae solo el/los email(s) de un campo De/Para (quita nombres, comillas y < >).
 function limpia_email($texto)
     {
@@ -455,11 +455,34 @@ function limpia_email($texto)
     }
 
 
+// Devuelve el indicador (triangulo) de ordenamiento para una columna.
+function indicador_orden($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+
 // Lista los correos de correo_facturas_fincas de los ultimos 5 dias (HTML de la tabla).
 // Debajo de cada correo agrega una fila por cada adjunto guardado en archivo_correo.
-function lista_correos_facturas()
+function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "DESC")
     {
     global $link;
+
+    // Validar campo y direccion de ordenamiento.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"FECHAHORA", 5=>"DE", 6=>"PARA", 7=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "FECHAHORA";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "ASC") ? "ASC" : "DESC";
 
     $sql = "SELECT
         CODIGO AS CODIGO,
@@ -474,7 +497,7 @@ function lista_correos_facturas()
         OBSERVACIONES AS OBSERVACIONES
         FROM correo_facturas_fincas
         WHERE FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)
-        ORDER BY FECHAHORA DESC";
+        ORDER BY ".$orden_valido." ".$direccion_valida;
     $resultado = mysqli_query($link, $sql);
     $numero_correos = mysqli_num_rows($resultado);
 
@@ -534,16 +557,16 @@ function lista_correos_facturas()
 
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
-    $html .= '<th style="width: 5%;">COD</th>';
-    $html .= '<th style="width: 12%;">FINCA</th>';
-    $html .= '<th style="width: 8%;">CONS</th>';
-    $html .= '<th style="width: 14%;">FH REC</th>';
-    $html .= '<th style="width: 18%;">DE</th>';
-    $html .= '<th style="width: 15%;">PARA</th>';
-    $html .= '<th style="width: 9%;">EST</th>';
-    $html .= '<th style="width: 13%; text-align:center;">OPC</th>';
+    $html .= '<th style="width: 5%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 12%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">FINCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 8%; cursor:pointer;" onclick="ordenar_por(\'CODIGOCONSOLIDADO\')">CONS'.indicador_orden("CODIGOCONSOLIDADO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 120px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 18%; cursor:pointer;" onclick="ordenar_por(\'DE\')">DE'.indicador_orden("DE", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 11%; cursor:pointer;" onclick="ordenar_por(\'PARA\')">PARA'.indicador_orden("PARA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 70px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 70px; text-align:center;">OPC</th>';
     $html .= '</tr></thead>';
-  
+   
     for($i=1; $i<=$numero_correos; $i++)
         {
         $codigo    = $arreglo_correos[$i]['CODIGO'];
@@ -560,6 +583,8 @@ function lista_correos_facturas()
             }
         $de        = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['DE']), ENT_QUOTES, 'UTF-8');
         $para      = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['PARA']), ENT_QUOTES, 'UTF-8');
+        $de_full   = htmlspecialchars((string)$arreglo_correos[$i]['DE'], ENT_QUOTES, 'UTF-8');
+        $para_full = htmlspecialchars((string)$arreglo_correos[$i]['PARA'], ENT_QUOTES, 'UTF-8');
         $asunto    = htmlspecialchars((string)$arreglo_correos[$i]['ASUNTO'], ENT_QUOTES, 'UTF-8');
         $asunto_js = htmlspecialchars(addslashes((string)$arreglo_correos[$i]['ASUNTO']), ENT_QUOTES, 'UTF-8');
         $estado    = htmlspecialchars((string)$arreglo_correos[$i]['ESTADO'], ENT_QUOTES, 'UTF-8');
@@ -574,11 +599,11 @@ function lista_correos_facturas()
         $html .= '<tbody id="id_grupo_correo_'.$codigo.'" class="grupo_correo" onclick="devuelve_correo('.$codigo.');">';
         $html .= '<tr>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$codigo.'</strong></td>';
-        $html .= '<td style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
+        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$cons.'</strong></td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
-        $html .= '<td style="'.$est_11.'">'.$de.'</td>';
-        $html .= '<td style="'.$est_11.'">'.$para.'</td>';
+        $html .= '<td class="tooltip_correo" style="'.$est_11.'" data-tooltip="'.$de_full.'">'.$de.'</td>';
+        $html .= '<td class="tooltip_correo" style="'.$est_11.'" data-tooltip="'.$para_full.'">'.$para.'</td>';
         $html .= '<td class="td_centro" style="'.$est_12.'">'.$estado.'</td>';
         $html .= '<td class="td_opc" style="'.$est_14.' text-align:right;">';
         $html .= '<a href="javascript: devuelve_correo('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
@@ -612,16 +637,19 @@ function lista_correos_facturas()
                     {
                     $adj_tipo  = 'PDF';
                     $adj_visor = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="Ver adjunto"><i class="icon-file-pdf" style="color:#88010e; background:#fff;"></i></a>';
+                    $adj_nombre_link = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 else if(stripos($adj_mime, 'spreadsheet') !== false || $adj_ext == 'xlsx' || $adj_ext == 'xls')
                     {
                     $adj_tipo  = 'EXCEL';
                     $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Descargar adjunto"><i class="icon-file-excel" style="color:#006400; background:#fff;"></i></a>';
+                    $adj_nombre_link = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 else
                     {
                     $adj_tipo  = strtoupper($adj_ext);
                     $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Ver adjunto"><i class="icon-file" style="color:#666; background:#fff;"></i></a>';
+                    $adj_nombre_link = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 $adj_tamano = number_format(((float)$adj['TAMANOBYTES']) / 1024, 1) . ' KB';
 
@@ -631,7 +659,7 @@ function lista_correos_facturas()
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;">'.$adj_codigo.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_cons.'</td>';
-                $html .= '<td colspan="2" style="'.$est_adj.'">'.$adj_nombre.'</td>';
+                $html .= '<td colspan="2" style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tipo.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tamano.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">'.$adj_visor.'</td>';

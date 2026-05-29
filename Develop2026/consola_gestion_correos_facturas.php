@@ -2,20 +2,20 @@
 include("variables_globales.php");
 include("funciones.php");
 include("valida_sesion.php");
-// CHEQUEO PERMISOS
+// CHEQUEO PERMISOS   
 $permiso[] = NULL;
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
-   
+
 // ===== SOLO GUI / MAQUETA - sin consultas de negocio, sin AJAX funcional todavia =====
 // Los catalogos de FINCA y CONSOLIDADO, el listado real y el grabado se haran en la fase de funcionalidad.
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
-?>
+?> 
 <!DOCTYPE html>
-<html>
+<html> 
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8" /> 
 <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0">
 <title><?php echo $titulo_hoja;?> - Correos / Facturas</title>
 <?php include("css_v4.php"); ?>
@@ -238,9 +238,28 @@ textarea, input[type="text"] {
     border-color: #88010e !important;
     color: #fff !important;
     }
+.ui-tooltip {
+    background: #fff;
+    color: #333;
+    border: 1px solid #88010e;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    max-width: 400px;
+    }
+.ui-helper-hidden-accessible,
+div[id^="ui-tooltip"] {
+    visibility: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    }
 </style>
 <script language="javascript">
 var global_codigo_correo_seleccionado = 0;
+var global_ordenamiento = "FECHAHORA";
+var global_direccion = "DESC";
 
 function messageBox(texto)
     {
@@ -345,11 +364,29 @@ function extraer_correos()
         });
     }
 
+// ===== Ordenar el listado por una columna (alterna ASC/DESC) =====
+function ordenar_por(campo)
+    {
+    if(global_ordenamiento == campo)
+        {
+        if(global_direccion == "ASC")
+            global_direccion = "DESC";
+        else
+            global_direccion = "ASC";
+        }
+    else
+        {
+        global_ordenamiento = campo;
+        global_direccion = "ASC";
+        }
+    actualiza_listado();
+    }
+
 // ===== Actualizar listado: trae los correos reales (ultimos 5 dias) por AJAX =====
 function actualiza_listado()
     {
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=lista_correos_facturas";
+    var url = "funciones_ajax.php?funcion=lista_correos_facturas&parametro1="+global_ordenamiento+"&parametro2="+global_direccion;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -396,6 +433,26 @@ $(document).ready(function()
         autoOpen: false, modal: true, width: 600, height: 800, resizable: true,
         dialogClass: 'myTitleClass',
         buttons: [{text: "Cerrar", class: 'cancelButton', click: function() {$(this).dialog("close");}}]
+        });
+
+    // Tooltip de jQuery UI para las celdas DE / PARA (delegado, sirve para el listado cargado por AJAX)
+    $(document).tooltip({
+        items: "[data-tooltip]",
+        content: function() {
+            var raw = $(this).attr("data-tooltip");
+            if(!raw) return "";
+            var t = document.createElement("textarea");
+            t.innerHTML = raw;
+            var decoded = t.value;
+            // Re-escapar para mostrar como texto plano (< y > visibles, no como HTML)
+            return decoded
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            },
+        track: true,
+        hide: { effect: "fadeOut", duration: 100 },
+        show: { effect: "fadeIn", duration: 150 }
         });
 
     // Select2 en los selects editables del formulario
