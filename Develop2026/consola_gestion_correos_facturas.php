@@ -237,8 +237,8 @@ textarea, input[type="text"] {
     background: #DC143C !important;
     border-color: #88010e !important;
     color: #fff !important;
-    }
-.ui-tooltip {
+    } 
+.ui-tooltip { 
     background: #fff;
     color: #333;
     border: 1px solid #88010e;
@@ -246,8 +246,9 @@ textarea, input[type="text"] {
     padding: 6px 10px;
     font-size: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    max-width: 400px;
-    }
+    max-width: 400px; 
+    white-space: pre-line;
+    }  
 .ui-helper-hidden-accessible,
 div[id^="ui-tooltip"] {
     visibility: hidden !important;
@@ -287,9 +288,9 @@ function marca_correo_seleccionado()
     {
     $("#id_listado_correos .grupo_correo").removeClass("grupo_correo_seleccionado");
     if(global_codigo_correo_seleccionado > 0)
-        $("#id_grupo_correo_"+global_codigo_correo_seleccionado).addClass("grupo_correo_seleccionado");
+       $("#id_grupo_correo_"+global_codigo_correo_seleccionado).addClass("grupo_correo_seleccionado");
     }
-
+ 
 // ===== Placeholder: cargar el detalle del correo en el formulario (siguiente fase) =====
 function devuelve_correo(codigo)
     {
@@ -297,7 +298,7 @@ function devuelve_correo(codigo)
     marca_correo_seleccionado();
     // TODO: AJAX a devuelve_correo para llenar el formulario
     }
-
+    
 // ===== Placeholder: trazabilidad del correo (siguiente fase) =====
 function muestra_trazabilidad_correo(codigo)
     {
@@ -444,11 +445,7 @@ $(document).ready(function()
             var t = document.createElement("textarea");
             t.innerHTML = raw;
             var decoded = t.value;
-            // Re-escapar para mostrar como texto plano (< y > visibles, no como HTML)
-            return decoded
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
+            return decoded.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             },
         track: true,
         hide: { effect: "fadeOut", duration: 100 },

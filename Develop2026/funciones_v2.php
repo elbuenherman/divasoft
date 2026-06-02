@@ -296,9 +296,9 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
         catch(Throwable $e)
             {
             $fechahora = date('Y-m-d H:i:s');
-            }
-        } 
- 
+            } 
+        }
+    
     // Escapar texto e insertar.
     $threadid     = mysqli_real_escape_string($link, $detalle->getThreadId());
     $messageid    = mysqli_real_escape_string($link, $messageid);
@@ -471,7 +471,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
     global $link;
 
     // Validar campo y direccion de ordenamiento.
-    $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"FECHAHORA", 5=>"DE", 6=>"PARA", 7=>"ESTADO");
+    $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"ASUNTO", 5=>"FECHAHORA", 6=>"DE", 7=>"PARA", 8=>"ESTADO");
     $total_campos = count($campos_permitidos);
     $orden_valido = "FECHAHORA";
     for($c=1; $c<=$total_campos; $c++)
@@ -557,14 +557,13 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
-    $html .= '<th style="width: 5%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 12%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">FINCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 8%; cursor:pointer;" onclick="ordenar_por(\'CODIGOCONSOLIDADO\')">CONS'.indicador_orden("CODIGOCONSOLIDADO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 120px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 18%; cursor:pointer;" onclick="ordenar_por(\'DE\')">DE'.indicador_orden("DE", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 11%; cursor:pointer;" onclick="ordenar_por(\'PARA\')">PARA'.indicador_orden("PARA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 70px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 70px; text-align:center;">OPC</th>';
+    $html .= '<th style="width: 6%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 18%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">FINCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 10%;">CONS</th>';
+    $html .= '<th style="width: 34%; cursor:pointer;" onclick="ordenar_por(\'ASUNTO\')">ASUNTO'.indicador_orden("ASUNTO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 108px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 30px; font-size:10px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">E'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 95px; text-align:center;">OPC</th>';
     $html .= '</tr></thead>';
    
     for($i=1; $i<=$numero_correos; $i++)
@@ -572,19 +571,18 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         $codigo    = $arreglo_correos[$i]['CODIGO'];
         $finca     = ($arreglo_correos[$i]['CODIGOFINCA'] === null || $arreglo_correos[$i]['CODIGOFINCA'] === '') ? '&mdash;' : htmlspecialchars($arreglo_correos[$i]['CODIGOFINCA'], ENT_QUOTES, 'UTF-8');
         $cons      = ($arreglo_correos[$i]['CODIGOCONSOLIDADO'] === null || $arreglo_correos[$i]['CODIGOCONSOLIDADO'] === '') ? '&mdash;' : htmlspecialchars($arreglo_correos[$i]['CODIGOCONSOLIDADO'], ENT_QUOTES, 'UTF-8');
-        $meses_abr = array(1=>'ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC');
         $fechahora = '&mdash;';
         $fh_raw    = (string)$arreglo_correos[$i]['FECHAHORA'];
         if($fh_raw != "" && $fh_raw != "0000-00-00 00:00:00")
             {
             $fh_ts = strtotime($fh_raw);
             if($fh_ts !== false)
-                $fechahora = $meses_abr[(int)date('n', $fh_ts)].'-'.date('d', $fh_ts).' '.date('H:i:s', $fh_ts);
+                $fechahora = date('m', $fh_ts).'-'.date('d', $fh_ts).' '.date('H:i:s', $fh_ts);
             }
-        $de        = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['DE']), ENT_QUOTES, 'UTF-8');
-        $para      = htmlspecialchars(limpia_email((string)$arreglo_correos[$i]['PARA']), ENT_QUOTES, 'UTF-8');
-        $de_full   = htmlspecialchars((string)$arreglo_correos[$i]['DE'], ENT_QUOTES, 'UTF-8');
-        $para_full = htmlspecialchars((string)$arreglo_correos[$i]['PARA'], ENT_QUOTES, 'UTF-8');
+        $de_limpio   = limpia_email((string)$arreglo_correos[$i]['DE']);
+        $para_limpio = limpia_email((string)$arreglo_correos[$i]['PARA']);
+        $tooltip_departa = htmlspecialchars("De: ".$de_limpio."\nPara: ".$para_limpio, ENT_QUOTES, 'UTF-8');
+        $tooltip_departa = str_replace("\n", "&#10;", $tooltip_departa);
         $asunto    = htmlspecialchars((string)$arreglo_correos[$i]['ASUNTO'], ENT_QUOTES, 'UTF-8');
         $asunto_js = htmlspecialchars(addslashes((string)$arreglo_correos[$i]['ASUNTO']), ENT_QUOTES, 'UTF-8');
         $estado    = htmlspecialchars((string)$arreglo_correos[$i]['ESTADO'], ENT_QUOTES, 'UTF-8');
@@ -593,27 +591,22 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         $est_14   = 'background-color:#f2f2f2; font-size:14px;';
         $est_12   = 'background-color:#f2f2f2; font-size:12px;';
         $est_11   = 'background-color:#f2f2f2; font-size:11px;';
-        $est_asun = 'background-color:#f2f2f2; font-size:14px; font-weight:normal; font-style:italic; color:#333;';
+        $est_asun = 'background-color:#f2f2f2; font-size:13px; font-weight:normal; font-style:italic; color:#333;';
         $est_obs  = 'background-color:#f2f2f2; font-size:14px; font-weight:normal; font-style:normal; color:#333;';
 
         $html .= '<tbody id="id_grupo_correo_'.$codigo.'" class="grupo_correo" onclick="devuelve_correo('.$codigo.');">';
         $html .= '<tr>';
-        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$codigo.'</strong></td>';
+        $html .= '<td class="td_centro" style="'.$est_14.'"><i class="icon-mail" title="'.$codigo.'" style="color:#c97b85; font-size:13px;"></i></td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
-        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$cons.'</strong></td>';
+        $html .= '<td colspan="2" style="'.$est_asun.'">'.$asunto.'</td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
-        $html .= '<td class="tooltip_correo" style="'.$est_11.'" data-tooltip="'.$de_full.'">'.$de.'</td>';
-        $html .= '<td class="tooltip_correo" style="'.$est_11.'" data-tooltip="'.$para_full.'">'.$para.'</td>';
-        $html .= '<td class="td_centro" style="'.$est_12.'">'.$estado.'</td>';
+        $html .= '<td class="td_centro" style="background-color:#f2f2f2; font-size:10px;">'.$estado.'</td>';
         $html .= '<td class="td_opc" style="'.$est_14.' text-align:right;">';
         $html .= '<a href="javascript: devuelve_correo('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_correo('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="#" onclick="ver_cuerpo_correo('.$codigo.', \''.$asunto_js.'\'); return false;" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>';
+        $html .= '<a href="javascript:void(0);" class="tooltip_correo" data-tooltip="'.$tooltip_departa.'" onclick="return false;"><i class="icon-user-2" style="color:#155a60;"></i></a>';
         $html .= '</td>';
-        $html .= '</tr>';
-        $html .= '<tr class="fila_asunto">';
-        $html .= '<td colspan="5" style="'.$est_asun.'">'.$asunto.'</td>';
-        $html .= '<td colspan="3" style="'.$est_obs.'">'.$obs.'</td>';
         $html .= '</tr>';
 
         // Filas de adjuntos del correo (si tiene).
@@ -656,12 +649,11 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 $est_adj = 'background-color:rgba(195,195,195,0.4); color:#000; font-size:13px; font-weight:normal;';
 
                 $html .= '<tr class="fila_adjunto">';
-                $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;">'.$adj_codigo.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_cons.'</td>';
-                $html .= '<td colspan="2" style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
-                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tipo.'</td>';
-                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_tamano.'</td>';
+                $html .= '<td style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
+                $html .= '<td colspan="2" class="td_centro" style="'.$est_adj.'">'.$adj_tamano.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">'.$adj_visor.'</td>';
                 $html .= '</tr>';
                 }
@@ -673,4 +665,188 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
     $html .= '</table>';
     $html .= '<div style="text-align:right; font-size:11px; color:#666; padding:5px;">Total: '.$numero_correos.' correos (ultimos 5 dias)</div>';
     return $html;
+    }
+
+
+// ============================================================================
+//  Comparacion de doble extraccion (procesa_factura_test)
+// ============================================================================
+
+function compara_extracciones($json1, $json2)
+    {
+    $discrepancias = array();
+
+    $campos_texto_cabecera = array("FINCA_PROVEEDOR", "RUC_PROVEEDOR", "NUMERO_FACTURA", "FECHA_FACTURACION", "CLIENTE_MARCACION");
+    for($i = 0; $i < count($campos_texto_cabecera); $i++)
+        {
+        $campo = $campos_texto_cabecera[$i];
+        $v1 = isset($json1["CABECERA"][$campo]) ? $json1["CABECERA"][$campo] : null;
+        $v2 = isset($json2["CABECERA"][$campo]) ? $json2["CABECERA"][$campo] : null;
+        if(!compara_texto($v1, $v2))
+            $discrepancias[] = "CABECERA.".$campo.": [".$v1."] vs [".$v2."]";
+        }
+
+    if(!compara_decimal($json1["CABECERA"]["SUBTOTAL"] ?? 0, $json2["CABECERA"]["SUBTOTAL"] ?? 0, 0.01))
+        $discrepancias[] = "CABECERA.SUBTOTAL: [".($json1["CABECERA"]["SUBTOTAL"] ?? "null")."] vs [".($json2["CABECERA"]["SUBTOTAL"] ?? "null")."]";
+    if(!compara_decimal($json1["CABECERA"]["TOTAL"] ?? 0, $json2["CABECERA"]["TOTAL"] ?? 0, 0.01))
+        $discrepancias[] = "CABECERA.TOTAL: [".($json1["CABECERA"]["TOTAL"] ?? "null")."] vs [".($json2["CABECERA"]["TOTAL"] ?? "null")."]";
+    if(!compara_decimal($json1["CABECERA"]["IVA_VALOR"] ?? 0, $json2["CABECERA"]["IVA_VALOR"] ?? 0, 0.01))
+        $discrepancias[] = "CABECERA.IVA_VALOR: [".($json1["CABECERA"]["IVA_VALOR"] ?? "null")."] vs [".($json2["CABECERA"]["IVA_VALOR"] ?? "null")."]";
+
+    $campos_logistica = array("PAIS_DESTINO", "MAWB", "HAWB", "DAE");
+    for($i = 0; $i < count($campos_logistica); $i++)
+        {
+        $campo = $campos_logistica[$i];
+        $v1 = isset($json1["LOGISTICA"][$campo]) ? $json1["LOGISTICA"][$campo] : null;
+        $v2 = isset($json2["LOGISTICA"][$campo]) ? $json2["LOGISTICA"][$campo] : null;
+        if(!compara_texto($v1, $v2))
+            $discrepancias[] = "LOGISTICA.".$campo.": [".$v1."] vs [".$v2."]";
+        }
+
+    if(!compara_decimal($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? 0, $json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? 0, 0.001))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_CAJAS_EQUIVALENTES: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? "null")."]";
+    if(($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? 0) != ($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? 0))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_RAMOS: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? "null")."]";
+    if(($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? 0) != ($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? 0))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_TALLOS: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? "null")."]";
+
+    $cajas1 = isset($json1["CAJAS"]) ? $json1["CAJAS"] : array();
+    $cajas2 = isset($json2["CAJAS"]) ? $json2["CAJAS"] : array();
+    if(count($cajas1) != count($cajas2))
+        {
+        $discrepancias[] = "CAJAS.cantidad: [".count($cajas1)."] vs [".count($cajas2)."]";
+        return $discrepancias;
+        }
+
+    $lineas1 = aplana_lineas($cajas1);
+    $lineas2 = aplana_lineas($cajas2);
+
+    if(count($lineas1) != count($lineas2))
+        {
+        $discrepancias[] = "DETALLE.cantidad_lineas: [".count($lineas1)."] vs [".count($lineas2)."]";
+        return $discrepancias;
+        }
+
+    for($i = 0; $i < count($lineas1); $i++)
+        {
+        $l1 = $lineas1[$i];
+        $l2 = $lineas2[$i];
+        if(!compara_texto($l1["VARIEDAD_NORM"], $l2["VARIEDAD_NORM"]))
+            $discrepancias[] = "LINEA[".$i."].VARIEDAD: [".$l1["VARIEDAD"]."] vs [".$l2["VARIEDAD"]."]";
+        if(!compara_texto($l1["PRODUCTO"] ?? null, $l2["PRODUCTO"] ?? null))
+            $discrepancias[] = "LINEA[".$i."].PRODUCTO: [".($l1["PRODUCTO"] ?? "null")."] vs [".($l2["PRODUCTO"] ?? "null")."]";
+        if(($l1["LARGO"] ?? null) != ($l2["LARGO"] ?? null))
+            $discrepancias[] = "LINEA[".$i."].LARGO: [".($l1["LARGO"] ?? "null")."] vs [".($l2["LARGO"] ?? "null")."]";
+        if(!compara_texto($l1["GRADO"] ?? null, $l2["GRADO"] ?? null))
+            $discrepancias[] = "LINEA[".$i."].GRADO: [".($l1["GRADO"] ?? "null")."] vs [".($l2["GRADO"] ?? "null")."]";
+        if(($l1["TALLOS_POR_RAMO"] ?? 0) != ($l2["TALLOS_POR_RAMO"] ?? 0))
+            $discrepancias[] = "LINEA[".$i."].TALLOS_POR_RAMO: [".($l1["TALLOS_POR_RAMO"] ?? "null")."] vs [".($l2["TALLOS_POR_RAMO"] ?? "null")."]";
+        if(($l1["RAMOS"] ?? 0) != ($l2["RAMOS"] ?? 0))
+            $discrepancias[] = "LINEA[".$i."].RAMOS: [".($l1["RAMOS"] ?? "null")."] vs [".($l2["RAMOS"] ?? "null")."]";
+        if(($l1["TALLOS_TOTAL"] ?? 0) != ($l2["TALLOS_TOTAL"] ?? 0))
+            $discrepancias[] = "LINEA[".$i."].TALLOS_TOTAL: [".($l1["TALLOS_TOTAL"] ?? "null")."] vs [".($l2["TALLOS_TOTAL"] ?? "null")."]";
+        if(!compara_decimal($l1["PRECIO_UNITARIO"] ?? 0, $l2["PRECIO_UNITARIO"] ?? 0, 0.0001))
+            $discrepancias[] = "LINEA[".$i."].PRECIO_UNITARIO: [".($l1["PRECIO_UNITARIO"] ?? "null")."] vs [".($l2["PRECIO_UNITARIO"] ?? "null")."]";
+        if(!compara_decimal($l1["PRECIO_TOTAL"] ?? 0, $l2["PRECIO_TOTAL"] ?? 0, 0.01))
+            $discrepancias[] = "LINEA[".$i."].PRECIO_TOTAL: [".($l1["PRECIO_TOTAL"] ?? "null")."] vs [".($l2["PRECIO_TOTAL"] ?? "null")."]";
+        }
+
+    return $discrepancias;
+    }
+
+
+function compara_texto($v1, $v2)
+    {
+    if($v1 === null && $v2 === null)
+        return true;
+    if($v1 === null || $v2 === null)
+        return false;
+    return strtoupper(trim((string)$v1)) === strtoupper(trim((string)$v2));
+    }
+
+
+function compara_decimal($v1, $v2, $tolerancia)
+    {
+    $n1 = is_numeric($v1) ? (float)$v1 : 0;
+    $n2 = is_numeric($v2) ? (float)$v2 : 0;
+    return abs($n1 - $n2) <= $tolerancia;
+    }
+
+
+function normaliza_variedad($texto)
+    {
+    $t = strtoupper(trim((string)$texto));
+    $t = str_replace("X-PRESSION", "XPRESSION", $t);
+    $t = str_replace("O HARA", "OHARA", $t);
+    $t = preg_replace("/\\s+/", " ", $t);
+    return $t;
+    }
+
+
+function aplana_lineas($cajas)
+    {
+    $lineas = array();
+    for($i = 0; $i < count($cajas); $i++)
+        {
+        $contenido = isset($cajas[$i]["CONTENIDO"]) ? $cajas[$i]["CONTENIDO"] : array();
+        for($j = 0; $j < count($contenido); $j++)
+            {
+            $l = $contenido[$j];
+            $l["VARIEDAD_NORM"] = normaliza_variedad($l["VARIEDAD"] ?? "");
+            $lineas[] = $l;
+            }
+        }
+
+    usort($lineas, function($a, $b)
+        {
+        $cmp = strcmp($a["VARIEDAD_NORM"], $b["VARIEDAD_NORM"]);
+        if($cmp != 0)
+            return $cmp;
+        $cmp = (($a["LARGO"] ?? 0) - ($b["LARGO"] ?? 0));
+        if($cmp != 0)
+            return $cmp;
+        return (float)($a["PRECIO_UNITARIO"] ?? 0) <=> (float)($b["PRECIO_UNITARIO"] ?? 0);
+        });
+
+    return $lineas;
+    }
+
+
+function normaliza_decimales(&$dato, $decimales = 4)
+    {
+    if(is_array($dato))
+        {
+        foreach($dato as $k => $v)
+            {
+            normaliza_decimales($dato[$k], $decimales);
+            }
+        }
+    elseif(is_float($dato))
+        {
+        $dato = round($dato, $decimales);
+        }
+    }
+
+
+function limpia_json_decimales(&$dato)
+    {
+    $campos_decimales = array(
+        "PRECIO_UNITARIO", "PRECIO_TOTAL", "SUBTOTAL", "IVA_VALOR",
+        "DESCUENTO", "TOTAL", "CARGO_FLETE", "CARGO_CAJAS", "CARGO_OTROS",
+        "TOTAL_CAJAS_EQUIVALENTES", "PESO_BRUTO_KG", "PESO_NETO_KG"
+        );
+    if(is_array($dato))
+        {
+        foreach($dato as $clave => $valor)
+            {
+            if(in_array($clave, $campos_decimales, true) && is_numeric($valor))
+                {
+                $dato[$clave] = round((float)$valor, 4);
+                }
+            elseif(is_array($valor))
+                {
+                limpia_json_decimales($dato[$clave]);
+                }
+            }  
+        } 
     }
