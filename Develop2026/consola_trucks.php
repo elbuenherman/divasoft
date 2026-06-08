@@ -1,53 +1,24 @@
 <?php
-include("variables_globales.php"); 
+include("variables_globales.php");
 include("funciones.php");
-include("valida_sesion.php"); 
-// CHEQUEO PERMISOS
-$permiso[] = NULL; 
+include("valida_sesion.php");
+// CHEQUEO PERMISOS 
+$permiso[] = NULL;
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
-
-// Conectar a la BD para cargar los listados de cliente y truck inline en los Select2.
-$link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
-mysqli_query($link, "SET CHARACTER SET utf8");
-
-$sql_clientes = "SELECT CODIGO, NOMBRECLIENTE FROM cliente WHERE ESTADO >= 0 ORDER BY NOMBRECLIENTE";
-$resultado_clientes = mysqli_query($link, $sql_clientes);
-$numero_clientes    = $resultado_clientes ? mysqli_num_rows($resultado_clientes) : 0;
-$arreglo_clientes   = array();
-for($i=0; $i<$numero_clientes; $i++)
-    {
-    $fila = mysqli_fetch_array($resultado_clientes);
-    $arreglo_clientes[$i]['CODIGO']        = $fila['CODIGO'];
-    $arreglo_clientes[$i]['NOMBRECLIENTE'] = $fila['NOMBRECLIENTE'];
-    }
-
-$sql_trucks = "SELECT CODIGO, NOMBRETRUCK FROM truck WHERE ESTADO >= 0 ORDER BY NOMBRETRUCK";
-$resultado_trucks = mysqli_query($link, $sql_trucks);
-$numero_trucks    = $resultado_trucks ? mysqli_num_rows($resultado_trucks) : 0;
-$arreglo_trucks   = array();
-for($i=0; $i<$numero_trucks; $i++)
-    {
-    $fila = mysqli_fetch_array($resultado_trucks);
-    $arreglo_trucks[$i]['CODIGO']      = $fila['CODIGO'];
-    $arreglo_trucks[$i]['NOMBRETRUCK'] = $fila['NOMBRETRUCK'];
-    }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0">
-<title><?php echo $titulo_hoja;?> - Marcaciones</title>
+<title><?php echo $titulo_hoja;?> - Trucks</title>
 <?php include("css_v4.php"); ?>
 <script language="javascript" src="controles_especiales.js"></script>
 <script type="text/javascript" src="js/jquery.mask.min.js"></script>
-<!-- Select2 -->
-<link href="css/select2.min.css" rel="stylesheet" />
-<script src="js/select2.min.js"></script>
 <style>
 body.metro {
     background-color: #edededff !important;
@@ -71,21 +42,21 @@ textarea, input[type="text"] {
 .myTitleClass .ui-dialog-titlebar { background: #88010e; color: #FFFFFF; }
 .ui-button.cancelButton { background: #88010e; color: #FFFFFF; }
 
-/* ===== Grid de marcaciones ===== */
-.grid_marcaciones {
+/* ===== Grid de trucks ===== */
+.grid_trucks {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     table-layout: fixed;
     }
-.grid_marcaciones thead {
+.grid_trucks thead {
     background-color: rgb(154, 22, 22);
     color: white;
     position: sticky;
     top: 0;
     z-index: 5;
     }
-.grid_marcaciones thead th {
+.grid_trucks thead th {
     font-size: 11px;
     padding: 8px 5px;
     text-align: center;
@@ -97,7 +68,7 @@ textarea, input[type="text"] {
     text-overflow: ellipsis;
     white-space: nowrap;
     }
-.grid_marcaciones tbody td {
+.grid_trucks tbody td {
     font-size: 11px;
     padding: 5px 5px;
     border: none !important;
@@ -107,33 +78,33 @@ textarea, input[type="text"] {
     text-overflow: ellipsis;
     white-space: nowrap;
     }
-.grid_marcaciones tbody .grupo_marcacion:nth-child(even) td {
+.grid_trucks tbody .grupo_truck:nth-child(even) td {
     background-color: #f9f9f9;
     }
-.grid_marcaciones tbody .td_centro {
+.grid_trucks tbody .td_centro {
     text-align: center;
     }
-.grid_marcaciones tbody .td_opc {
+.grid_trucks tbody .td_opc {
     text-align: center;
     white-space: nowrap;
     }
-.grid_marcaciones tbody .td_opc a {
+.grid_trucks tbody .td_opc a {
     margin: 0 3px;
     text-decoration: none;
     font-size: 14px;
     }
-.grid_marcaciones tbody .grupo_marcacion {
+.grid_trucks tbody .grupo_truck {
     cursor: pointer;
     transition: background-color 0.15s ease;
     }
-.grid_marcaciones tbody .grupo_marcacion:hover td {
+.grid_trucks tbody .grupo_truck:hover td {
     background-color: rgba(255, 240, 240, 0.95) !important;
     }
-.grid_marcaciones tbody .grupo_marcacion_seleccionado td {
+.grid_trucks tbody .grupo_truck_seleccionado td {
     background-color: #ffe8e8 !important;
     color: #88010e !important;
     }
-.grid_marcaciones tbody .grupo_marcacion_seleccionado td:first-child {
+.grid_trucks tbody .grupo_truck_seleccionado td:first-child {
     box-shadow: inset 4px 0 0 #88010e !important;
     }
 
@@ -166,31 +137,10 @@ textarea, input[type="text"] {
 .fg-brown { color: #8a5048; }
 .fg-darkRed { color: #88010e; }
 .fg-teal { color: #155a60; }
-
-/* ===== Select2 ===== */
-.select2-selection__rendered {
-    font-size: 13px !important;
-    line-height: 30px !important;
-    }
-.select2-container .select2-selection--single {
-    height: 32px !important;
-    border: 1px solid #c0c0c0 !important;
-    border-radius: 2px !important;
-    }
-.select2-container--default .select2-selection--single .select2-selection__arrow {
-    height: 30px !important;
-    }
-.select2-results__option {
-    font-size: 13px;
-    padding: 5px 12px !important;
-    }
-.select2-container--open .select2-selection--single {
-    border-color: #88010e !important;
-    }
 </style>
 <script language="javascript">
 var global_codigo_seleccionado = 0;
-var global_ordenamiento = "NOMBREMARCACION";
+var global_ordenamiento = "NOMBRETRUCK";
 var global_direccion = "ASC";
 var global_codigo_usuario = <?php echo (int)$_SESSION['s_codigo']; ?>;
 
@@ -205,7 +155,7 @@ function messageBox(texto)
 function filtrar_listado_local()
     {
     var texto = $("#id_busqueda_listado").val().toUpperCase();
-    $("#id_listado_marcaciones table tbody .grupo_marcacion").each(function()
+    $("#id_listado_trucks table tbody .grupo_truck").each(function()
         {
         var fila = $(this).text().toUpperCase();
         if(fila.indexOf(texto) > -1)
@@ -215,21 +165,21 @@ function filtrar_listado_local()
         });
     }
 
-// ===== Marca visualmente la marcacion seleccionada =====
-function marca_marcacion_seleccionada()
+// ===== Marca visualmente el truck seleccionado =====
+function marca_truck_seleccionado()
     {
-    $("#id_listado_marcaciones .grupo_marcacion").removeClass("grupo_marcacion_seleccionado");
+    $("#id_listado_trucks .grupo_truck").removeClass("grupo_truck_seleccionado");
     if(global_codigo_seleccionado > 0)
-        $("#id_grupo_marcacion_"+global_codigo_seleccionado).addClass("grupo_marcacion_seleccionado");
+        $("#id_grupo_truck_"+global_codigo_seleccionado).addClass("grupo_truck_seleccionado");
     }
 
-// ===== Trae la marcacion y llena el formulario =====
-function devuelve_marcacion(codigo)
+// ===== Trae el truck y llena el formulario =====
+function devuelve_truck(codigo)
     {
     global_codigo_seleccionado = codigo;
-    marca_marcacion_seleccionada();
+    marca_truck_seleccionado();
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=devuelve_marcacion_dsft&parametro1=" + codigo;
+    var url = "funciones_ajax.php?funcion=devuelve_truck_dsft&parametro1=" + codigo;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -240,12 +190,10 @@ function devuelve_marcacion(codigo)
             messageBox(datos.ERROR);
             return;
             }
-        $("#id_codigo_marcacion").val(datos.CODIGO || "");
-        $("#id_nombre_marcacion").val(datos.NOMBREMARCACION || "");
-        var cliente_val = (datos.CODIGOCLIENTE && parseInt(datos.CODIGOCLIENTE) > 0) ? datos.CODIGOCLIENTE.toString() : "0";
-        $("#id_codigocliente").val(cliente_val).trigger('change');
-        var truck_val = (datos.CODIGOTRUCK && parseInt(datos.CODIGOTRUCK) > 0) ? datos.CODIGOTRUCK.toString() : "0";
-        $("#id_codigotruck").val(truck_val).trigger('change');
+        $("#id_codigo_truck").val(datos.CODIGO || "");
+        $("#id_nombre_truck").val(datos.NOMBRETRUCK || "");
+        $("#id_correo_truck").val(datos.CORREOTRUCK || "");
+        $("#id_telefono").val(datos.TELEFONO || "");
         $("#id_observaciones").val(datos.OBSERVACIONES || "");
         if(parseInt(datos.ESTADO) == 0)
             {
@@ -257,15 +205,15 @@ function devuelve_marcacion(codigo)
             $("#id_estado_activo").prop('checked', true);
             $("#id_estado_inactivo").prop('checked', false);
             }
-        $("#id_nombre_marcacion").focus();
+        $("#id_nombre_truck").focus();
         });
     }
 
 // ===== Trazabilidad =====
-function muestra_trazabilidad_marcacion(codigo)
+function muestra_trazabilidad_truck(codigo)
     {
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=trazabilidad_marcacion_dsft&parametro1=" + codigo;
+    var url = "funciones_ajax.php?funcion=trazabilidad_truck_dsft&parametro1=" + codigo;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -275,13 +223,13 @@ function muestra_trazabilidad_marcacion(codigo)
     }
 
 // ===== Eliminacion logica (ESTADO = -1) =====
-function elimina_marcacion_dsft(codigo)
+function elimina_truck_dsft(codigo)
     {
-    var r = confirm("Esta seguro de eliminar esta marcacion?");
+    var r = confirm("Esta seguro de eliminar este truck?");
     if(r == true)
         {
         $("#id_espera").show();
-        var url = "funciones_ajax.php?funcion=elimina_marcacion_dsft&parametro1=" + codigo + "&parametro2=" + global_codigo_usuario;
+        var url = "funciones_ajax.php?funcion=elimina_truck_dsft&parametro1=" + codigo + "&parametro2=" + global_codigo_usuario;
         var obj_ajax = $.get(url, function(data, status){;});
         obj_ajax.success(function(data, status)
             {
@@ -301,20 +249,16 @@ function elimina_marcacion_dsft(codigo)
     }
 
 // ===== Validacion de formulario =====
-// MARCACION y CLIENTE son obligatorios. Valida en ese orden, retorna el primer
-// error encontrado.
+// NOMBRE es obligatorio.
 function valida_formulario()
     {
-    if($("#id_nombre_marcacion").val().trim() == "")
-        return "Por favor ingrese la MARCACION";
-    var cliente_sel = parseInt($("#id_codigocliente").val());
-    if(isNaN(cliente_sel) || cliente_sel <= 0)
-        return "Por favor seleccione el CLIENTE";
+    if($("#id_nombre_truck").val().trim() == "")
+        return "Por favor ingrese el NOMBRE del truck";
     return "OK";
     }
 
 // ===== Grabar (INSERT si codigo == 0, UPDATE si > 0) =====
-function grabar_marcacion()
+function grabar_truck()
     {
     var mensaje = valida_formulario();
     if(mensaje != "OK")
@@ -326,11 +270,11 @@ function grabar_marcacion()
     if(estado_val == null || estado_val == "")
         estado_val = "1";
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=graba_marcacion_dsft"
+    var url = "funciones_ajax.php?funcion=graba_truck_dsft"
         + "&parametro1=" + global_codigo_seleccionado
-        + "&parametro2=" + encodeURIComponent($("#id_nombre_marcacion").val())
-        + "&parametro3=" + $("#id_codigocliente").val()
-        + "&parametro4=" + $("#id_codigotruck").val()
+        + "&parametro2=" + encodeURIComponent($("#id_nombre_truck").val())
+        + "&parametro3=" + encodeURIComponent($("#id_correo_truck").val())
+        + "&parametro4=" + encodeURIComponent($("#id_telefono").val())
         + "&parametro5=" + encodeURIComponent($("#id_observaciones").val())
         + "&parametro6=" + estado_val
         + "&parametro7=" + global_codigo_usuario;
@@ -340,7 +284,7 @@ function grabar_marcacion()
         $("#id_espera").hide();
         if(data.substring(0, 2) == "OK")
             {
-            messageBox("Marcacion grabada correctamente");
+            messageBox("Truck grabado correctamente");
             boton_nuevo();
             actualiza_listado();
             }
@@ -373,12 +317,12 @@ function ordenar_por(campo)
 function actualiza_listado()
     {
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=lista_marcaciones_dsft&parametro1=" + global_ordenamiento + "&parametro2=" + global_direccion;
+    var url = "funciones_ajax.php?funcion=lista_trucks_dsft&parametro1=" + global_ordenamiento + "&parametro2=" + global_direccion;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
         $("#id_espera").hide();
-        $("#id_listado_marcaciones").html(data);
+        $("#id_listado_trucks").html(data);
         });
     }
 
@@ -386,15 +330,15 @@ function actualiza_listado()
 function boton_nuevo()
     {
     global_codigo_seleccionado = 0;
-    $("#id_codigo_marcacion").val("");
-    $("#id_nombre_marcacion").val("");
-    $("#id_codigocliente").val("0").trigger('change');
-    $("#id_codigotruck").val("0").trigger('change');
+    $("#id_codigo_truck").val("");
+    $("#id_nombre_truck").val("");
+    $("#id_correo_truck").val("");
+    $("#id_telefono").val("");
     $("#id_observaciones").val("");
     $("#id_estado_activo").prop('checked', true);
     $("#id_estado_inactivo").prop('checked', false);
-    $("#id_listado_marcaciones .grupo_marcacion").removeClass("grupo_marcacion_seleccionado");
-    $("#id_nombre_marcacion").focus();
+    $("#id_listado_trucks .grupo_truck").removeClass("grupo_truck_seleccionado");
+    $("#id_nombre_truck").focus();
     }
 
 $(document).ready(function()
@@ -409,30 +353,8 @@ $(document).ready(function()
         dialogClass: 'myTitleClass'
         });
 
-    // Select2 en el select de cliente (con buscador)
-    $('#id_codigocliente').select2(
-        {
-        width: '100%',
-        minimumResultsForSearch: 3,
-        placeholder: "-- SELECCIONE --"
-        });
-
-    // Select2 en el select de truck (con buscador, opcional)
-    $('#id_codigotruck').select2(
-        {
-        width: '100%',
-        minimumResultsForSearch: 3,
-        placeholder: "-- SELECCIONE --"
-        });
-
     boton_nuevo();
     actualiza_listado();
-
-    // Si la URL trae ?codigo=N, cargar esa marcacion automaticamente.
-    // Usado por consola_clientes_dsft.php para abrir una marcacion en pestana nueva.
-    var codigo_url = new URLSearchParams(window.location.search).get("codigo");
-    if(codigo_url && parseInt(codigo_url) > 0)
-        devuelve_marcacion(parseInt(codigo_url));
     });
 </script>
 </head>
@@ -442,10 +364,10 @@ $(document).ready(function()
     <!-- LAYOUT PRINCIPAL: listado a la izquierda + formulario a la derecha -->
     <div style="display: flex; flex-direction: row; align-items: flex-start; margin-top:10px; margin-left:0; gap: 8px;">
 
-        <!-- ===== COLUMNA IZQUIERDA: LISTADO DE MARCACIONES ===== -->
+        <!-- ===== COLUMNA IZQUIERDA: LISTADO DE TRUCKS ===== -->
         <div id="id_panel_listado" class="aida" style="width: 760px; height: 850px; overflow: hidden; display: flex; flex-direction: column;">
             <div class="ribbed-crimson" style="height: 2px;"></div>
-            <span><center><strong><i class="icon-tag fg-darkRed"></i> LISTADO DE MARCACIONES</strong></center></span>
+            <span><center><strong><i class="icon-truck fg-darkRed"></i> LISTADO DE TRUCKS</strong></center></span>
 
             <!-- Buscador -->
             <div style="padding: 5px 8px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9; overflow: hidden;">
@@ -459,15 +381,15 @@ $(document).ready(function()
             </div>
 
             <!-- Listado -->
-            <div id="id_listado_marcaciones" style="flex: 1; overflow-y: auto; padding: 0;">
+            <div id="id_listado_trucks" style="flex: 1; overflow-y: auto; padding: 0;">
                 <!-- Se llena via AJAX -->
             </div>
         </div>
 
         <!-- ===== COLUMNA DERECHA: FORMULARIO ===== -->
-        <div id="id_formulario_marcacion" class="aida" style="width: 440px; height: auto;">
+        <div id="id_formulario_truck" class="aida" style="width: 440px; height: auto;">
             <div class="ribbed-crimson" style="height: 2px;"></div>
-            <span><center><strong><i class="icon-tag fg-darkRed"></i> DATOS DE LA MARCACION</strong></center></span>
+            <span><center><strong><i class="icon-truck fg-darkRed"></i> DATOS DEL TRUCK</strong></center></span>
 
             <div style="padding: 12px;">
                 <table style="width: 100%; font-size: 13px;">
@@ -479,44 +401,28 @@ $(document).ready(function()
                     <tr>
                         <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CODIGO:</td>
                         <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_codigo_marcacion" class="input_readonly" readonly />
+                            <input type="text" id="id_codigo_truck" class="input_readonly" readonly />
                         </td>
                     </tr>
-                    <!-- MARCACION -->
+                    <!-- NOMBRE -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">MARCACION:</td>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">NOMBRE:</td>
                         <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_nombre_marcacion" class="input_pequeno" maxlength="255" />
+                            <input type="text" id="id_nombre_truck" class="input_pequeno" maxlength="255" />
                         </td>
                     </tr>
-                    <!-- CLIENTE -->
+                    <!-- CORREO -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CLIENTE:</td>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CORREO:</td>
                         <td style="padding-bottom: 8px;">
-                            <select id="id_codigocliente" style="width: 100%;">
-                                <option value="0">-- SELECCIONE --</option>
-                                <?php
-                                for($i=0; $i<$numero_clientes; $i++)
-                                    {
-                                    echo '<option value="'.(int)$arreglo_clientes[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_clientes[$i]['NOMBRECLIENTE'], ENT_QUOTES, 'UTF-8').'</option>';
-                                    }
-                                ?>
-                            </select>
+                            <input type="text" id="id_correo_truck" class="input_pequeno" maxlength="255" style="text-transform: none;" />
                         </td>
                     </tr>
-                    <!-- TRUCK -->
+                    <!-- TELEFONO -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">TRUCK:</td>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">TELEFONO:</td>
                         <td style="padding-bottom: 8px;">
-                            <select id="id_codigotruck" style="width: 100%;">
-                                <option value="0">-- SELECCIONE --</option>
-                                <?php
-                                for($i=0; $i<$numero_trucks; $i++)
-                                    {
-                                    echo '<option value="'.(int)$arreglo_trucks[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_trucks[$i]['NOMBRETRUCK'], ENT_QUOTES, 'UTF-8').'</option>';
-                                    }
-                                ?>
-                            </select>
+                            <input type="text" id="id_telefono" class="input_pequeno" maxlength="128" style="text-transform: none;" />
                         </td>
                     </tr>
                     <!-- OBSERVACIONES -->
@@ -543,7 +449,7 @@ $(document).ready(function()
 
                 <!-- Botones GRABAR / NUEVO -->
                 <div style="text-align: right; margin-top: 10px;">
-                    <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="grabar_marcacion();">GRABAR</button>
+                    <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="grabar_truck();">GRABAR</button>
                     <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="boton_nuevo();" style="margin-left: 5px;">NUEVO</button>
                 </div>
             </div>

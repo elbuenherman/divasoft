@@ -2,8 +2,8 @@
 include("variables_globales.php");
 include("funciones.php");
 include("valida_sesion.php");
-// CHEQUEO PERMISOS   
-$permiso[] = NULL;
+// CHEQUEO PERMISOS     
+$permiso[] = NULL; 
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
@@ -238,7 +238,7 @@ textarea, input[type="text"] {
     border-color: #88010e !important;
     color: #fff !important;
     } 
-.ui-tooltip { 
+.ui-tooltip {  
     background: #fff;
     color: #333;
     border: 1px solid #88010e;
@@ -261,6 +261,7 @@ div[id^="ui-tooltip"] {
 var global_codigo_correo_seleccionado = 0;
 var global_ordenamiento = "FECHAHORA";
 var global_direccion = "DESC";
+var global_intervalo_progreso = null;
 
 function messageBox(texto)
     {
@@ -356,12 +357,55 @@ function extraer_correos()
     var fecha_desde = fechas[0];
     var fecha_hasta = fechas[1];
     $("#id_espera").show();
+
+    // Mostrar progreso e iniciar polling al endpoint progreso_extraccion.
+    $("#id_progreso_extraccion").show().html("Iniciando extraccion...");
+    if(global_intervalo_progreso != null)
+        clearInterval(global_intervalo_progreso);
+    global_intervalo_progreso = setInterval(function()
+        {
+        $.get("funciones_ajax.php?funcion=progreso_extraccion", function(data)
+            {
+            try
+                {
+                var p = JSON.parse(data);
+                if(p.estado == "en_curso")
+                    {
+                    var html = "Procesando dia: " + (p.dia_actual || "...") + "<br>";
+                    html += "Correos: " + p.procesados + " procesados<br>";
+                    html += "Guardados: " + p.guardados + " | Saltados: " + p.saltados;
+                    if(p.total_dias)
+                        html += "<br>(Total dias: " + p.total_dias + ")";
+                    $("#id_progreso_extraccion").html(html);
+                    }
+                }
+            catch(e) {}
+            });
+        }, 2000);
+
     var url = "funciones_ajax.php?funcion=extraer_correos_facturas&parametro1="+fecha_desde+"&parametro2="+fecha_hasta;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
+        clearInterval(global_intervalo_progreso);
+        global_intervalo_progreso = null;
+        $("#id_progreso_extraccion").hide();
         $("#id_espera").hide();
         messageBox(data);
+        actualiza_listado();
+        });
+    obj_ajax.fail(function(jqXHR, textStatus, errorThrown)
+        {
+        clearInterval(global_intervalo_progreso);
+        global_intervalo_progreso = null;
+        $("#id_progreso_extraccion").hide();
+        $("#id_espera").hide();
+        var msg = "Error en la extraccion:\n";
+        msg += "Estado: " + textStatus + "\n";
+        msg += "HTTP: " + jqXHR.status + "\n";
+        if(errorThrown)
+            msg += "Detalle: " + errorThrown;
+        messageBox(msg);
         });
     }
 
@@ -383,16 +427,42 @@ function ordenar_por(campo)
     actualiza_listado();
     }
 
-// ===== Actualizar listado: trae los correos reales (ultimos 5 dias) por AJAX =====
+// ===== Actualizar listado: trae los correos reales por AJAX, con filtro por rango si esta seteado =====
 function actualiza_listado()
     {
     $("#id_espera").show();
-    var url = "funciones_ajax.php?funcion=lista_correos_facturas&parametro1="+global_ordenamiento+"&parametro2="+global_direccion;
+    var fecha_desde = "";
+    var fecha_hasta = "";
+    var rango = $("#id_rango_filtro").val();
+    if(rango)
+        {
+        var fechas = rango.match(/\d{4}-\d{2}-\d{2}/g);
+        if(fechas && fechas.length >= 2)
+            {
+            fecha_desde = fechas[0];
+            fecha_hasta = fechas[1];
+            }
+        }
+    var url = "funciones_ajax.php?funcion=lista_correos_facturas"
+        +"&parametro1="+global_ordenamiento
+        +"&parametro2="+global_direccion
+        +"&parametro3="+fecha_desde
+        +"&parametro4="+fecha_hasta;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
         $("#id_espera").hide();
         $("#id_listado_correos").html(data);
+        });
+    obj_ajax.fail(function(jqXHR, textStatus, errorThrown)
+        {
+        $("#id_espera").hide();
+        var msg = "Error al actualizar listado:\n";
+        msg += "Estado: " + textStatus + "\n";
+        msg += "HTTP: " + jqXHR.status + "\n";
+        if(errorThrown)
+            msg += "Detalle: " + errorThrown;
+        messageBox(msg);
         });
     }
 
@@ -476,7 +546,21 @@ $(document).ready(function()
         {
         mode: "range",
         dateFormat: "Y-m-d",
-        locale: "es"
+        locale: "es",
+        onChange: function(selectedDates, dateStr, instance)
+            {
+            if(selectedDates.length == 2)
+                {
+                actualiza_listado();
+                }
+            },
+        onClose: function(selectedDates, dateStr, instance)
+            {
+            if(selectedDates.length == 0)
+                {
+                actualiza_listado();
+                }
+            }
         });
 
     // Rango de fechas ABAJO (extraccion desde Gmail) - Flatpickr en modo range
@@ -677,7 +761,8 @@ $(document).ready(function()
     <div id="id_dialog_cuerpo" title=""></div>
     <div id="id_dialog_pdf" title=""></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
+    <div id="id_progreso_extraccion" style="position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.95); padding:20px 30px; border-radius:8px; border:2px solid #88010e; font-size:14px; font-weight:bold; color:#88010e; display:none; text-align:center; min-width:280px;"></div>
 
-</body> 
+</body>
 </html> 
  

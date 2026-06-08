@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-
+     
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -292,14 +292,61 @@ if($funcion == 'elimina_suscripcion')
     echo elimina_suscripcion($parametro1);
 if($funcion == 'inserta_suscripcion')
     echo inserta_suscripcion($parametro1,$parametro2,$parametro3,$parametro4,$parametro5,$parametro6);
-if($funcion == 'check_email')
+if($funcion == 'check_email') 
     echo check_email($parametro1,$parametro2);
 
-//// 
+////  
 if($funcion == 'extraer_correos_facturas')
-    echo extraer_correos_facturas($parametro1,$parametro2); 
+    echo extraer_correos_facturas($parametro1,$parametro2);
+if($funcion == 'progreso_extraccion')
+    {
+    $ruta_progreso_extr = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_progreso_extraccion.json";
+    if(file_exists($ruta_progreso_extr))
+        echo file_get_contents($ruta_progreso_extr);
+    else
+        echo '{"estado":"inactivo"}';
+    }
 if($funcion == 'lista_correos_facturas')
-    echo lista_correos_facturas($parametro1, $parametro2);
+    echo lista_correos_facturas($parametro1, $parametro2, $parametro3, $parametro4);
+
+// CLIENTES (consola nueva _dsft - independiente del legacy)
+if($funcion == 'lista_clientes_dsft')
+    echo lista_clientes_dsft($parametro1, $parametro2);
+if($funcion == 'devuelve_cliente_dsft')
+    echo devuelve_cliente_dsft($parametro1);
+if($funcion == 'graba_cliente_dsft')
+    echo graba_cliente_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10, $parametro11, $parametro12);
+if($funcion == 'elimina_cliente_dsft')
+    echo elimina_cliente_dsft($parametro1, $parametro2);
+if($funcion == 'trazabilidad_cliente_dsft')
+    echo trazabilidad_cliente_dsft($parametro1);
+
+// TRUCKS (consola nueva _dsft)
+if($funcion == 'lista_trucks_dsft')
+    echo lista_trucks_dsft($parametro1, $parametro2);
+if($funcion == 'devuelve_truck_dsft')
+    echo devuelve_truck_dsft($parametro1);
+if($funcion == 'graba_truck_dsft')
+    echo graba_truck_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
+if($funcion == 'elimina_truck_dsft')
+    echo elimina_truck_dsft($parametro1, $parametro2);
+if($funcion == 'trazabilidad_truck_dsft')
+    echo trazabilidad_truck_dsft($parametro1);
+
+// MARCACIONES (consola nueva _dsft)
+if($funcion == 'lista_marcaciones_dsft')
+    echo lista_marcaciones_dsft($parametro1, $parametro2);
+if($funcion == 'devuelve_marcacion_dsft')
+    echo devuelve_marcacion_dsft($parametro1);
+if($funcion == 'graba_marcacion_dsft')
+    echo graba_marcacion_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
+if($funcion == 'elimina_marcacion_dsft')
+    echo elimina_marcacion_dsft($parametro1, $parametro2);
+if($funcion == 'trazabilidad_marcacion_dsft')
+    echo trazabilidad_marcacion_dsft($parametro1);
+// Tablita read-only en consola_clientes_dsft.php
+if($funcion == 'lista_marcaciones_por_cliente_dsft')
+    echo lista_marcaciones_por_cliente_dsft($parametro1);
 
 
 mysqli_close($link);

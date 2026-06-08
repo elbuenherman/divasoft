@@ -65,14 +65,16 @@ consulta_permisos($_SESSION['s_codigo'],$permiso);
                         </li>
                         <li>
                             <a class="dropdown-toggle"  href="#">Consolas</a>
-                            <ul class="dropdown-menu dark" data-role="dropdown">
+                            <ul class="dropdown-menu dark" data-role="dropdown"> 
                             	<li>
                                     <a href="#" class="dropdown-toggle">Clientes</a>
                                     <ul class="dropdown-menu dark" data-role="dropdown">
-                                        <li <?php echo $permiso[14];?>><a href="consola_clientes.php">Clientes</a></li>
+                                        <!-- <li <?php echo $permiso[14];?>><a href="consola_clientes.php">Clientes</a></li> -->
+                                        <li <?php echo $permiso[35];?>><a href="consola_clientes_dsft.php">Clientes</a></li>
                                         <li <?php echo $permiso[30];?>><a href="consola_marcaciones.php">Marcaciones</a></li>
+                                        <li <?php echo $permiso[30];?>><a href="consola_trucks.php">Trucks</a></li>
                                         <li <?php echo $permiso[8];?>><a href="consola_paises.php">Países</a></li>
-                                        <li <?php echo $permiso[9];?>><a href="consola_ciudad.php">Ciudades</a></li>
+                                        <!-- <li <?php echo $permiso[9];?>><a href="consola_ciudad.php">Ciudades</a></li> -->
                                     </ul>
                                 </li>
                             	<li>

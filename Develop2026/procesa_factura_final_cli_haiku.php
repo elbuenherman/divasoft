@@ -1,5 +1,5 @@
 <?php
-
+ 
 // ============================================================================
 //  procesa_factura_final_cli_haiku.php
 //  Variante CLI usando Claude Haiku 4.5 como formateador del fallback OCR
@@ -62,6 +62,27 @@ function log_dual($texto)
     echo $texto;
     if($fh_log)
         fwrite($fh_log, $texto);
+    }
+
+
+// ----------------------------------------------------------------------------
+// Helpers para armar INSERTs con SQL inline (estilo del resto del proyecto).
+// sql_string: NULL si vacio/null, sino 'valor escapado'.
+// sql_numero: NULL si vacio/null, sino numero (forzado con 0 +).
+// ----------------------------------------------------------------------------
+function sql_string($valor)
+    {
+    global $link;
+    if($valor === null || $valor === "")
+        return "NULL";
+    return "'".mysqli_real_escape_string($link, (string)$valor)."'";
+    }
+
+function sql_numero($valor)
+    {
+    if($valor === null || $valor === "")
+        return "NULL";
+    return (string)(0 + $valor);
     }
 
 // ----------------------------------------------------------------------------
@@ -442,7 +463,7 @@ ALERTAS típicas a emitir:
    (revisar)"
 - "Grid posicional: ambigüedad en alineación, REVISAR"
 PROMPT;
-
+ 
 // ----------------------------------------------------------------------------
 // Llama a Haiku con PDF directo (un solo bloque document + bloque text con
 // cache_control + prefill assistant "{").
@@ -1239,6 +1260,49 @@ log_dual($total_lineas." lineas en ".$total_cajas." cajas\n");
 log_dual("Suma PRECIO_TOTAL lineas: $".number_format($suma_total_lineas, 2)."\n");
 
 // ----------------------------------------------------------------------------
+// INSERT EN factura_finca
+// ----------------------------------------------------------------------------
+$modelo_haiku_doble  = "claude-haiku-4-5-20251001";
+$se_disparo_fallback = ($resultado_fallback !== null);
+$hubo_discrepancia   = (isset($resultado_haiku["estado"]) && (int)$resultado_haiku["estado"] == 4);
+$estado_factura      = ($se_disparo_fallback || $hubo_discrepancia) ? 4 : 3;
+
+if($se_disparo_fallback)
+    {
+    $modelo_segundo          = $modelo_formateador;
+    $respuesta_cruda_segunda = isset($resultado_fallback["respuesta_haiku"]) ? $resultado_fallback["respuesta_haiku"] : null;
+    $tokens_in_2_db          = isset($resultado_fallback["tokens_haiku"]["input"])  ? (int)$resultado_fallback["tokens_haiku"]["input"]  : 0;
+    $tokens_out_2_db         = isset($resultado_fallback["tokens_haiku"]["output"]) ? (int)$resultado_fallback["tokens_haiku"]["output"] : 0;
+    }
+else if(!$resultado_haiku["omitida_segunda_llamada"])
+    {
+    $modelo_segundo          = $modelo_haiku_doble;
+    $respuesta_cruda_segunda = isset($resultado_haiku["respuesta2_cruda"]) ? $resultado_haiku["respuesta2_cruda"] : null;
+    $tokens_in_2_db          = $in2;
+    $tokens_out_2_db         = $ou2;
+    }
+else
+    {
+    $modelo_segundo          = null;
+    $respuesta_cruda_segunda = null;
+    $tokens_in_2_db          = 0;
+    $tokens_out_2_db         = 0;
+    }
+
+$codigo_factura = inserta_factura_finca(
+    $codigo,
+    $json_definitivo,
+    $modelo_haiku_doble, $resultado_haiku["respuesta1_cruda"], $in1, $ou1, $cr1,
+    $modelo_segundo, $respuesta_cruda_segunda, $tokens_in_2_db, $tokens_out_2_db,
+    $estado_factura
+    );
+if($codigo_factura > 0)
+    {
+    $lineas_det = inserta_detalle_factura_finca($codigo_factura, $json_definitivo);
+    log_dual("INSERT en detalle_factura_finca: ".$lineas_det." lineas\n");
+    }
+
+// ----------------------------------------------------------------------------
 // FIN
 // ----------------------------------------------------------------------------
 log_dual("\n=== FIN ===\n");
@@ -1251,3 +1315,161 @@ if($comando_borrar !== "")
 log_dual("\nArchivos crudos en /tmp/: final_".$codigo."_".$fecha_corrida."_*\n");
 
 if($fh_log) fclose($fh_log);
+
+
+// ============================================================================
+//  inserta_factura_finca - INSERT en factura_finca con los datos del JSON
+//  definitivo + crudos + metadata de las llamadas Haiku doble / formateador.
+//  Las columnas no listadas reciben NULL via el default de MySQL.
+//  Retorna mysqli_insert_id($link) si OK, 0 si falla.
+// ============================================================================
+function inserta_factura_finca(
+    $codigo_adjunto,
+    $arreglo_definitivo,
+    $modelo_1, $respuesta_cruda_1, $tokens_in_1, $tokens_out_1, $tokens_cache_read,
+    $modelo_2, $respuesta_cruda_2, $tokens_in_2, $tokens_out_2,
+    $estado
+    )
+    {
+    global $link;
+
+    $cabecera        = isset($arreglo_definitivo["CABECERA"])        ? $arreglo_definitivo["CABECERA"]        : array();
+    $logistica       = isset($arreglo_definitivo["LOGISTICA"])       ? $arreglo_definitivo["LOGISTICA"]       : array();
+    $resumen_empaque = isset($arreglo_definitivo["RESUMEN_EMPAQUE"]) ? $arreglo_definitivo["RESUMEN_EMPAQUE"] : array();
+    $alertas_arr     = isset($arreglo_definitivo["ALERTAS"])         ? $arreglo_definitivo["ALERTAS"]         : array();
+    $metadatos       = isset($arreglo_definitivo["METADATOS"])       ? $arreglo_definitivo["METADATOS"]       : array();
+
+    $alertas_json = json_encode($alertas_arr, JSON_UNESCAPED_UNICODE);
+
+    $sql = "INSERT INTO factura_finca (
+        CODIGO, ESTADO, CODIGOADJUNTO, FINCA, RUCFINCA, NUMEROFACTURA,
+        FECHAFACTURACION, CLIENTEMARCACION, MONEDA, SUBTOTAL, DESCUENTO,
+        IVAPORCENTAJE, IVAVALOR, CARGOFLETE, CARGOCAJAS, CARGOOTROS, TOTAL,
+        PAISDESTINO, GUIA, GUIAHIJA, DAE, AEROLINEA, NOMBREAGENCIA,
+        FULLBOX, HALFBOX, QUARTERBOX, OCTAVEBOX, TOTALCAJASEQUIVALENTES,
+        TOTALRAMOS, TOTALTALLOS, PESOBRUTOKG, PESONETOKG,
+        ALERTAS, MODELOCLAUDE, MODELOCLAUDE2,
+        RESPUESTACLAUDE, RESPUESTACLAUDE2,
+        TOKENS_INPUT_1, TOKENS_OUTPUT_1, TOKENS_CACHE_READ,
+        TOKENS_INPUT_2, TOKENS_OUTPUT_2,
+        CODIGOUSUARIOREGISTRA, FECHAPROCESADA, FECHAREGISTRO
+    ) VALUES (
+        0,
+        ".sql_numero($estado).",
+        ".sql_numero($codigo_adjunto).",
+        ".sql_string(isset($cabecera["FINCA_PROVEEDOR"])     ? $cabecera["FINCA_PROVEEDOR"]     : null).",
+        ".sql_string(isset($cabecera["RUC_PROVEEDOR"])       ? $cabecera["RUC_PROVEEDOR"]       : null).",
+        ".sql_string(isset($cabecera["NUMERO_FACTURA"])      ? $cabecera["NUMERO_FACTURA"]      : null).",
+        ".sql_string(isset($cabecera["FECHA_FACTURACION"])   ? $cabecera["FECHA_FACTURACION"]   : null).",
+        ".sql_string(isset($cabecera["CLIENTE_MARCACION"])   ? $cabecera["CLIENTE_MARCACION"]   : null).",
+        'USD',
+        ".sql_numero(isset($cabecera["SUBTOTAL"])            ? $cabecera["SUBTOTAL"]            : null).",
+        ".sql_numero(isset($cabecera["DESCUENTO"])           ? $cabecera["DESCUENTO"]           : null).",
+        ".sql_numero(isset($cabecera["IVA_PORCENTAJE"])      ? $cabecera["IVA_PORCENTAJE"]      : null).",
+        ".sql_numero(isset($cabecera["IVA_VALOR"])           ? $cabecera["IVA_VALOR"]           : null).",
+        ".sql_numero(isset($cabecera["CARGO_FLETE"])         ? $cabecera["CARGO_FLETE"]         : null).",
+        ".sql_numero(isset($cabecera["CARGO_CAJAS"])         ? $cabecera["CARGO_CAJAS"]         : null).",
+        ".sql_numero(isset($cabecera["CARGO_OTROS"])         ? $cabecera["CARGO_OTROS"]         : null).",
+        ".sql_numero(isset($cabecera["TOTAL"])               ? $cabecera["TOTAL"]               : null).",
+        ".sql_string(isset($logistica["PAIS_DESTINO"])       ? $logistica["PAIS_DESTINO"]       : null).",
+        ".sql_string(isset($logistica["MAWB"])               ? $logistica["MAWB"]               : null).",
+        ".sql_string(isset($logistica["HAWB"])               ? $logistica["HAWB"]               : null).",
+        ".sql_string(isset($logistica["DAE"])                ? $logistica["DAE"]                : null).",
+        ".sql_string(isset($logistica["AEROLINEA"])          ? $logistica["AEROLINEA"]          : null).",
+        ".sql_string(isset($logistica["FORWARDER"])          ? $logistica["FORWARDER"]          : null).",
+        ".sql_numero(isset($resumen_empaque["FULL_BOX"])                 ? $resumen_empaque["FULL_BOX"]                 : null).",
+        ".sql_numero(isset($resumen_empaque["HALF_BOX"])                 ? $resumen_empaque["HALF_BOX"]                 : null).",
+        ".sql_numero(isset($resumen_empaque["QUARTER_BOX"])              ? $resumen_empaque["QUARTER_BOX"]              : null).",
+        ".sql_numero(isset($resumen_empaque["OCTAVE_BOX"])               ? $resumen_empaque["OCTAVE_BOX"]               : null).",
+        ".sql_numero(isset($resumen_empaque["TOTAL_CAJAS_EQUIVALENTES"]) ? $resumen_empaque["TOTAL_CAJAS_EQUIVALENTES"] : null).",
+        ".sql_numero(isset($resumen_empaque["TOTAL_RAMOS"])              ? $resumen_empaque["TOTAL_RAMOS"]              : null).",
+        ".sql_numero(isset($resumen_empaque["TOTAL_TALLOS"])             ? $resumen_empaque["TOTAL_TALLOS"]             : null).",
+        ".sql_numero(isset($resumen_empaque["PESO_BRUTO_KG"])            ? $resumen_empaque["PESO_BRUTO_KG"]            : null).",
+        ".sql_numero(isset($resumen_empaque["PESO_NETO_KG"])             ? $resumen_empaque["PESO_NETO_KG"]             : null).",
+        ".sql_string($alertas_json).",
+        ".sql_string($modelo_1).",
+        ".sql_string($modelo_2).",
+        ".sql_string($respuesta_cruda_1).",
+        ".sql_string($respuesta_cruda_2).",
+        ".sql_numero($tokens_in_1).",
+        ".sql_numero($tokens_out_1).",
+        ".sql_numero($tokens_cache_read).",
+        ".sql_numero($tokens_in_2).",
+        ".sql_numero($tokens_out_2).",
+        0,
+        ".sql_string(isset($metadatos["FECHA_PROCESAMIENTO"]) ? $metadatos["FECHA_PROCESAMIENTO"] : null).",
+        NOW()
+    )";
+
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        {
+        log_dual("ERROR INSERT factura_finca: ".mysqli_error($link)."\n");
+        return 0;
+        }
+    $codigo_nuevo = mysqli_insert_id($link);
+    log_dual("INSERT en factura_finca: CODIGO=".$codigo_nuevo.", ESTADO=".$estado."\n");
+    return $codigo_nuevo;
+    }
+
+
+// ============================================================================
+//  inserta_detalle_factura_finca - INSERT por cada linea de CAJAS[i].CONTENIDO[j].
+//  Retorna el numero de lineas insertadas correctamente.
+// ============================================================================
+function inserta_detalle_factura_finca($codigo_factura, $arreglo_definitivo)
+    {
+    global $link;
+
+    $cajas = isset($arreglo_definitivo["CAJAS"]) ? $arreglo_definitivo["CAJAS"] : array();
+    $total_cajas = count($cajas);
+    $indice_linea = 0;
+    $lineas_ok    = 0;
+
+    for($i=0; $i<$total_cajas; $i++)
+        {
+        $numero_caja = isset($cajas[$i]["NUMERO_CAJA"]) ? $cajas[$i]["NUMERO_CAJA"] : null;
+        $tipo_caja   = isset($cajas[$i]["TIPO_CAJA"])   ? $cajas[$i]["TIPO_CAJA"]   : null;
+        $contenido   = isset($cajas[$i]["CONTENIDO"])   ? $cajas[$i]["CONTENIDO"]   : array();
+        $total_lin   = count($contenido);
+
+        for($j=0; $j<$total_lin; $j++)
+            {
+            $indice_linea++;
+            $L = $contenido[$j];
+
+            $sql = "INSERT INTO detalle_factura_finca (
+                CODIGO, ESTADO, CODIGOFACTURAFINCA, NUMEROCAJA, TIPOCAJA, INDICELINEA,
+                PRODUCTO, VARIEDAD, LARGO, GRADO,
+                TALLOSPORRAMO, RAMOS, TALLOSTOTAL,
+                PRECIOUNITARIO, PRECIOTOTAL, ALERTA,
+                CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+            ) VALUES (
+                0, 1,
+                ".sql_numero($codigo_factura).",
+                ".sql_numero($numero_caja).",
+                ".sql_string($tipo_caja).",
+                ".sql_numero($indice_linea).",
+                ".sql_string(isset($L["PRODUCTO"])         ? $L["PRODUCTO"]         : null).",
+                ".sql_string(isset($L["VARIEDAD"])         ? $L["VARIEDAD"]         : null).",
+                ".sql_numero(isset($L["LARGO"])            ? $L["LARGO"]            : null).",
+                ".sql_string(isset($L["GRADO"])            ? $L["GRADO"]            : null).",
+                ".sql_numero(isset($L["TALLOS_POR_RAMO"])  ? $L["TALLOS_POR_RAMO"]  : null).",
+                ".sql_numero(isset($L["RAMOS"])            ? $L["RAMOS"]            : null).",
+                ".sql_numero(isset($L["TALLOS_TOTAL"])     ? $L["TALLOS_TOTAL"]     : null).",
+                ".sql_numero(isset($L["PRECIO_UNITARIO"])  ? $L["PRECIO_UNITARIO"]  : null).",
+                ".sql_numero(isset($L["PRECIO_TOTAL"])     ? $L["PRECIO_TOTAL"]     : null).",
+                ".sql_string(isset($L["ALERTA"])           ? $L["ALERTA"]           : null).",
+                0, NOW()
+            )";
+
+            $r = mysqli_query($link, $sql);
+            if($r)
+                $lineas_ok++;
+            else
+                log_dual("ERROR INSERT detalle linea ".$indice_linea.": ".mysqli_error($link)."\n");
+            }
+        }
+
+    return $lineas_ok;
+    }

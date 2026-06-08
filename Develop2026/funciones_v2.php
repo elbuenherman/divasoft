@@ -1,11 +1,11 @@
 <?php
-
+      
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-  
-
+       
+   
 // Normaliza texto: minusculas y sin tildes/dieresis/enie.
 function normalizar_texto_correo($texto)
     {
@@ -18,25 +18,72 @@ function normalizar_texto_correo($texto)
     }
 
 
-// Retorna true si el texto contiene una palabra prohibida o la combinacion estado+cuenta.
+// Retorna true si el dominio del remitente esta en la lista de bloqueados.
+// Esta verificacion gana sobre todo lo demas y se ejecuta antes de cualquier
+// otra regla. Tres patrones soportados:
+//   - direccion exacta:  compras2@divaflor.com  (solo esa direccion)
+//   - dominio completo:  @ifc.net.co            (cualquier address @ifc.net.co)
+//   - dominio completo:  @saftec.com.ec, @directcargo.ec
+// Comparacion case-insensitive (strtolower previo + patrones en minusculas).
+function remitente_dominio_bloqueado($de)
+    {
+    if($de == "")
+        return false;
+    $de_lower = strtolower((string)$de);
+
+    $patrones = array(
+        1 => 'compras2@divaflor.com',
+        2 => '@ifc.net.co',
+        3 => '@saftec.com.ec',
+        4 => '@directcargo.ec'
+        );
+    $total = count($patrones);
+    for($i=1; $i<=$total; $i++)
+        {
+        if(strpos($de_lower, $patrones[$i]) !== false)
+            return true;
+        }
+    return false;
+    }
+
+
+// Retorna la palabra/frase prohibida encontrada en el texto, o cadena vacia
+// si no hay match. Las prohibidas GANAN sobre las gatillo.
+// Pre-normalizacion: '_' se reemplaza por espacio, asi "EST_CUENTA" matchea
+// la frase "est cuenta". Luego se aplica normalizar_texto_correo (lowercase
+// + sin tildes/enie).
 function texto_es_prohibido_correo($texto)
     {
+    $texto = str_replace('_', ' ', (string)$texto);
     $norm = normalizar_texto_correo($texto);
     if($norm == "")
-        return false;
+        return "";
 
-    $palabras_sueltas = array(1 => 'credito', 'disponible', 'disponibilidad', 'availability', 'statement');
+    // 1) Palabras sueltas.
+    $palabras_sueltas = array(1 => 'credito', 'credit', 'disponible', 'disponibilidad', 'availability',
+        'statement', 'balance', 'corte', 'reporte', 'promotion', 'promocion', 'oferta', 'offer');
     $total_sueltas = count($palabras_sueltas);
     for($i=1; $i<=$total_sueltas; $i++)
         {
         if(strpos($norm, $palabras_sueltas[$i]) !== false)
-            return true;
+            return $palabras_sueltas[$i];
         }
 
-    if(strpos($norm, 'estado') !== false && strpos($norm, 'cuenta') !== false)
-        return true;
+    // 2) Frases (substring).
+    $frases = array(1 => 'est cuenta', 'est cta', 'nota de credito', 'credit note',
+        'pending invoices', 'facturas pendientes');
+    $total_frases = count($frases);
+    for($i=1; $i<=$total_frases; $i++)
+        {
+        if(strpos($norm, $frases[$i]) !== false)
+            return $frases[$i];
+        }
 
-    return false;
+    // 3) Combinacion: ambas palabras presentes (no necesariamente juntas).
+    if(strpos($norm, 'estado') !== false && strpos($norm, 'cuenta') !== false)
+        return "estado+cuenta";
+
+    return "";
     }
 
 
@@ -142,7 +189,9 @@ function recolecta_parts_adjuntos_correo($payload, &$acumulado)
 // Descarga y guarda en archivo_correo los adjuntos PDF/XLSX/XLS de un mensaje.
 // Idempotente: salta los que ya existan (mismo IDCORREO + NOMBREARCHIVO).
 // Retorna el numero de adjuntos guardados.
-function guarda_adjuntos_correo($service, $id_mensaje, $payload)
+// Si $fh_log no es null, escribe en el log el nombre y tamano de cada
+// adjunto que efectivamente se descarga.
+function guarda_adjuntos_correo($service, $id_mensaje, $payload, $fh_log = null)
     {
     global $link;
 
@@ -201,6 +250,9 @@ function guarda_adjuntos_correo($service, $id_mensaje, $payload)
         mysqli_stmt_execute($stmt);
         mysqli_stmt_close($stmt);
 
+        if($fh_log !== null)
+            fwrite($fh_log, date("H:i:s")."   Adjunto: ".$filename." (".$tamano." bytes)\n");
+
         $guardados++;
         }
     return $guardados;
@@ -208,9 +260,13 @@ function guarda_adjuntos_correo($service, $id_mensaje, $payload)
 
 
 // Procesa un mensaje: aplica filtros, verifica duplicado por IDCORREO e inserta.
-// Retorna 'descartado' (no paso filtros), 'saltado' (ya existia) o 'guardado'.
-// $payload_out devuelve el payload del mensaje (para guardar adjuntos sin re-descargar).
-function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
+// Retorna un veredicto descriptivo: 'guardado', 'saltado:duplicado', o
+// 'descartado:<motivo>[:detalle]'.
+// $payload_out devuelve el payload del mensaje (para guardar adjuntos sin
+// re-descargar). $de_out / $asunto_out devuelven los headers ya extraidos
+// del payload, para que el caller los loggee sin tener que volver a
+// llamar a la API de Gmail.
+function procesa_mensaje_factura($service, $msg, $tz, &$payload_out, &$de_out, &$asunto_out)
     {
     global $link;
 
@@ -236,11 +292,16 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
         else if($nombre == 'message-id') $messageid = $h->getValue();
         }
 
-    // 1) Remitente compras2@divaflor.com -> descartar.
-    if(stripos($de, 'compras2@divaflor.com') !== false)
-        return 'descartado';
+    // Devolver De y Asunto al caller para que pueda loggear (sin nueva llamada API).
+    $de_out     = $de;
+    $asunto_out = $asunto;
 
-    // 2) Adjuntos PDF/XLSX/XLS y cuerpos.
+    // 1) Dominio bloqueado -> descartar absoluto (gana sobre todo).
+    if(remitente_dominio_bloqueado($de))
+        return 'descartado:dominio_bloqueado';
+
+    // 2) Recolectar adjuntos PDF/XLSX/XLS y cuerpos (cuerpos se usan solo
+    //    para guardar en BD, ya NO para filtrar).
     $adjuntos = array();
     if($payload)
         {
@@ -257,23 +318,24 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
     $cuerpo_html        = extraer_cuerpo_mime_correo($payload, 'text/html');
     $nombres_adj_concat = implode(' ', $adjuntos);
 
-    // 3) Override factura/invoice (asunto, cuerpo o adjuntos) - prioridad sobre prohibidas.
-    $es_factura = (
-        texto_es_factura_correo($asunto) ||
-        texto_es_factura_correo($cuerpo_texto . ' ' . $cuerpo_html) ||
-        texto_es_factura_correo($nombres_adj_concat)
-        );
+    // 3) Sin adjuntos PDF/XLSX/XLS validos -> descartar.
+    if(empty($adjuntos))
+        return 'descartado:sin_adjuntos';
 
-    // 4) Filtros normales (solo si NO es factura).
-    if(!$es_factura)
-        {
-        if(empty($adjuntos))
-            return 'descartado';
-        if(texto_es_prohibido_correo($asunto))
-            return 'descartado';
-        if(texto_es_prohibido_correo($nombres_adj_concat))
-            return 'descartado';
-        }
+    // 4) Prohibida en ASUNTO -> descartar (gana sobre factura).
+    $palabra_prohibida = texto_es_prohibido_correo($asunto);
+    if($palabra_prohibida != "")
+        return 'descartado:prohibida_asunto:'.$palabra_prohibida;
+
+    // 5) Prohibida en NOMBRES DE ADJUNTOS -> descartar (gana sobre factura).
+    $palabra_prohibida = texto_es_prohibido_correo($nombres_adj_concat);
+    if($palabra_prohibida != "")
+        return 'descartado:prohibida_adjunto:'.$palabra_prohibida;
+
+    // 6/7) El correo paso los filtros: tiene adjuntos validos y ninguna
+    //      prohibida. Sea factura explicita (gatillo en asunto/adjunto) o
+    //      no, se guarda. Las gatillo ya no influyen en la decision
+    //      porque el descarte por prohibida ocurrio antes.
 
     // Verificar duplicado por IDCORREO.
     $idcorreo     = $msg->getId();
@@ -281,7 +343,7 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
     $sql_existe   = "SELECT CODIGO FROM correo_facturas_fincas WHERE IDCORREO = '".$idcorreo_sql."'";
     $resultado_existe = mysqli_query($link, $sql_existe);
     if($resultado_existe && mysqli_num_rows($resultado_existe) > 0)
-        return 'saltado';
+        return 'saltado:duplicado';
 
     // FECHAHORA: header Date -> Y-m-d H:i:s (America/Guayaquil).
     $fechahora = date('Y-m-d H:i:s');
@@ -321,69 +383,133 @@ function procesa_mensaje_factura($service, $msg, $tz, &$payload_out)
     }
 
 
+// Helper para escribir el archivo de progreso (consumido por el endpoint
+// 'progreso_extraccion' que el frontend polea cada 2 segundos).
+function _escribir_progreso_extraccion($ruta, $estado, $procesados, $guardados, $saltados, $dia_actual, $total_dias, $extra = array())
+    {
+    $data = array(
+        "estado"     => $estado,
+        "procesados" => $procesados,
+        "guardados"  => $guardados,
+        "saltados"   => $saltados,
+        "dia_actual" => $dia_actual,
+        "total_dias" => $total_dias
+        );
+    if(!empty($extra))
+        $data = array_merge($data, $extra);
+    file_put_contents($ruta, json_encode($data));
+    }
+
+
 // Extrae correos de facturas desde Gmail en un rango (Y-m-d), recorriendo dia por dia,
 // y los guarda en correo_facturas_fincas sin reprocesar los ya existentes.
 function extraer_correos_facturas($fecha_desde, $fecha_hasta)
     {
     global $link;
-    $tiempo_inicio = microtime(true);
+    $tiempo_inicio = microtime(true); 
+
+    // Ruta fija conocida por el frontend (polling) y por este script.
+    $ruta_progreso    = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_progreso_extraccion.json";
+    $procesados_total = 0;
+    $total_guardados  = 0;
+    $total_saltados   = 0;
+    $numero_dias      = 0;
+
+    // Estado inicial. total_dias todavia 0 (se actualizara apenas se calcule).
+    _escribir_progreso_extraccion($ruta_progreso, "en_curso", 0, 0, 0, "", 0);
 
     if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_desde) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_hasta))
+        {
+        _escribir_progreso_extraccion($ruta_progreso, "error", 0, 0, 0, "", 0, array("mensaje" => "Rango de fechas invalido"));
         return "Por favor seleccione un rango de fechas valido";
+        }
 
     require_once __DIR__ . '/vendor/autoload.php';
 
     $ruta_client_secret = '/home/u154-6g3keph3vtcn/credenciales_correos/client_secret.json';
     $ruta_token         = '/home/u154-6g3keph3vtcn/credenciales_correos/token.json';
 
-    try 
+    // Log de la extraccion (un archivo nuevo por corrida).
+    $ruta_log = "/tmp/extraccion_correos_".date("Ymd_His").".log";
+    $fh_log   = fopen($ruta_log, "w");
+
+    if($fh_log)
+        fwrite($fh_log, date("H:i:s")." - Extraccion iniciada. Rango: ".$fecha_desde." a ".$fecha_hasta."\n");
+
+    try
         {
         $client = new Google\Client();
         $client->setAuthConfig($ruta_client_secret);
         $client->addScope(Google\Service\Gmail::GMAIL_READONLY);
         $client->setAccessType('offline');
- 
+
         if(!file_exists($ruta_token))
-            return "ERROR: No existe token.json. Autorice primero con oauth_callback.php";
+            {
+            if($fh_log) fwrite($fh_log, date("H:i:s")." - ERROR API: No existe token.json\n");
+            if($fh_log) fclose($fh_log);
+            _escribir_progreso_extraccion($ruta_progreso, "error", 0, 0, 0, "", 0, array("mensaje" => "No existe token.json"));
+            return "ERROR: No existe token.json. Autorice primero con oauth_callback.php. Log: ".$ruta_log;
+            }
         $token = json_decode(file_get_contents($ruta_token), true);
         $client->setAccessToken($token);
- 
+
         if($client->isAccessTokenExpired())
             {
             $refresh_token = $client->getRefreshToken();
             if(empty($refresh_token))
-                return "ERROR: Token expirado y sin refresh token. Re-autorice con oauth_callback.php";
+                {
+                if($fh_log) fwrite($fh_log, date("H:i:s")." - ERROR API: Token expirado sin refresh token\n");
+                if($fh_log) fclose($fh_log);
+                _escribir_progreso_extraccion($ruta_progreso, "error", 0, 0, 0, "", 0, array("mensaje" => "Token expirado sin refresh token"));
+                return "ERROR: Token expirado y sin refresh token. Re-autorice con oauth_callback.php. Log: ".$ruta_log;
+                }
             $nuevo_token = $client->fetchAccessTokenWithRefreshToken($refresh_token);
             if(isset($nuevo_token['error']))
-                return "ERROR: No se pudo refrescar el token: " . $nuevo_token['error'];
+                {
+                if($fh_log) fwrite($fh_log, date("H:i:s")." - ERROR API: No se pudo refrescar el token: ".$nuevo_token['error']."\n");
+                if($fh_log) fclose($fh_log);
+                _escribir_progreso_extraccion($ruta_progreso, "error", 0, 0, 0, "", 0, array("mensaje" => "No se pudo refrescar el token: ".$nuevo_token['error']));
+                return "ERROR: No se pudo refrescar el token: ".$nuevo_token['error'].". Log: ".$ruta_log;
+                }
             if(!isset($nuevo_token['refresh_token']) && !empty($refresh_token))
                 $nuevo_token['refresh_token'] = $refresh_token;
             file_put_contents($ruta_token, json_encode($nuevo_token));
+            if($fh_log) fwrite($fh_log, date("H:i:s")." - Token refrescado y persistido\n");
             }
 
         $service = new Google\Service\Gmail($client);
         $tz = new DateTimeZone('America/Guayaquil');
 
-        $total_guardados = 0;
-        $total_saltados  = 0;
-        $total_adjuntos  = 0;
+        // total_guardados, total_saltados y numero_dias ya inicializados a 0
+        // al inicio de la funcion (para que esten disponibles en el catch).
+        $total_adjuntos = 0;
 
         // Recorrer el rango dia por dia.
         $primer_dia  = new DateTime($fecha_desde . ' 00:00:00', $tz);
         $ultimo_dia  = new DateTime($fecha_hasta . ' 00:00:00', $tz);
         $numero_dias = (int)$primer_dia->diff($ultimo_dia)->days + 1;
 
+        // Re-escribir progreso ahora que conocemos total_dias.
+        _escribir_progreso_extraccion($ruta_progreso, "en_curso", 0, 0, 0, "", $numero_dias);
+
         $dia = clone $primer_dia;
         for($d=1; $d<=$numero_dias; $d++)
             {
+            $fecha_dia_str = $dia->format('Y-m-d');
+            if($fh_log) fwrite($fh_log, date("H:i:s")." - Procesando dia: ".$fecha_dia_str."\n");
+
+            $guardados_dia  = 0;
+            $procesados_dia = 0;
+
             // Rango del dia: 00:00:00 a 23:59:59 -> timestamps.
-            $inicio_dia = new DateTime($dia->format('Y-m-d') . ' 00:00:00', $tz);
-            $fin_dia    = new DateTime($dia->format('Y-m-d') . ' 23:59:59', $tz);
+            $inicio_dia = new DateTime($fecha_dia_str . ' 00:00:00', $tz);
+            $fin_dia    = new DateTime($fecha_dia_str . ' 23:59:59', $tz);
             $ts_inicio  = $inicio_dia->getTimestamp();
             $ts_fin     = $fin_dia->getTimestamp();
 
-            // Mismo query que prueba_listado.php.
-            $query = 'in:anywhere -from:compras2@divaflor.com has:attachment after:' . $ts_inicio . ' before:' . $ts_fin;
+            // Excluir dominios bloqueados ya desde el query Gmail (defensa en
+            // capas: PHP tambien los chequea con remitente_dominio_bloqueado).
+            $query = 'in:anywhere -from:*@ifc.net.co -from:*@saftec.com.ec -from:*@directcargo.ec -from:compras2@divaflor.com has:attachment after:' . $ts_inicio . ' before:' . $ts_fin;
 
             // Paginacion dentro del dia (red de seguridad si hay > 100).
             $page_token = "";
@@ -401,15 +527,42 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
                     $numero_mensajes = count($mensajes);
                     for($i=1; $i<=$numero_mensajes; $i++)
                         {
+                        $msg_actual   = $mensajes[$i-1];
+                        $idcorreo_log = $msg_actual->getId();
+                        $procesados_dia++;
+
+                        // Una sola llamada a la API (format:full) dentro de
+                        // procesa_mensaje_factura. De y Asunto vienen de ahi
+                        // por referencia, listos para loggear despues del veredicto.
                         $payload_msg = null;
-                        $estado_msg = procesa_mensaje_factura($service, $mensajes[$i-1], $tz, $payload_msg);
+                        $de_msg      = "";
+                        $asunto_msg  = "";
+                        $estado_msg  = procesa_mensaje_factura($service, $msg_actual, $tz, $payload_msg, $de_msg, $asunto_msg);
+
+                        if($fh_log)
+                            fwrite($fh_log, date("H:i:s")." - Correo ID=".$idcorreo_log.", De=".$de_msg.", Asunto=".$asunto_msg."\n");
+
                         if($estado_msg == 'guardado')
                             {
                             $total_guardados++;
-                            $total_adjuntos += guarda_adjuntos_correo($service, $mensajes[$i-1]->getId(), $payload_msg);
+                            $guardados_dia++;
+                            $adj_n = guarda_adjuntos_correo($service, $idcorreo_log, $payload_msg, $fh_log);
+                            $total_adjuntos += $adj_n;
+                            if($fh_log) fwrite($fh_log, date("H:i:s")." -> guardado (adjuntos: ".$adj_n.")\n");
                             }
-                        else if($estado_msg == 'saltado')
+                        else if(strpos($estado_msg, 'saltado') === 0)
+                            {
                             $total_saltados++;
+                            if($fh_log) fwrite($fh_log, date("H:i:s")." -> ".$estado_msg."\n");
+                            }
+                        else  // descartado:...
+                            {
+                            if($fh_log) fwrite($fh_log, date("H:i:s")." -> ".$estado_msg."\n");
+                            }
+
+                        // Actualizar el archivo de progreso despues de cada correo.
+                        $procesados_total++;
+                        _escribir_progreso_extraccion($ruta_progreso, "en_curso", $procesados_total, $total_guardados, $total_saltados, $fecha_dia_str, $numero_dias);
                         }
                     }
 
@@ -418,16 +571,36 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
                     break;
                 }
 
+            if($fh_log) fwrite($fh_log, date("H:i:s")." - Dia ".$fecha_dia_str." completado. Correos: ".$procesados_dia.", Guardados: ".$guardados_dia."\n");
+
             $dia->modify('+1 day');
             }
 
         $tiempo_total = round(microtime(true) - $tiempo_inicio, 2);
         $total_procesados = $total_guardados + $total_saltados;
-        return "Se procesaron ".$total_procesados." correos, se guardaron ".$total_guardados." nuevos, se saltaron ".$total_saltados." ya existentes. Adjuntos guardados: ".$total_adjuntos.". Tiempo: ".$tiempo_total." segundos";
-        } 
+
+        if($fh_log)
+            {
+            fwrite($fh_log, date("H:i:s")." - Extraccion finalizada. Total procesados: ".$total_procesados.", guardados: ".$total_guardados.", saltados: ".$total_saltados.", adjuntos: ".$total_adjuntos.". Tiempo: ".$tiempo_total."s\n");
+            fwrite($fh_log, date("H:i:s")." - Log guardado en: ".$ruta_log."\n");
+            fclose($fh_log);
+            }
+
+        // Estado final OK. El frontend detecta esto y detiene el polling.
+        _escribir_progreso_extraccion($ruta_progreso, "finalizado", $total_procesados, $total_guardados, $total_saltados, "", $numero_dias);
+
+        return "Se procesaron ".$total_procesados." correos, se guardaron ".$total_guardados." nuevos, se saltaron ".$total_saltados." ya existentes. Adjuntos guardados: ".$total_adjuntos.". Tiempo: ".$tiempo_total." segundos. Log: ".$ruta_log;
+        }
     catch(Throwable $e)
         {
-        return "ERROR: " . $e->getMessage();
+        if($fh_log)
+            {
+            fwrite($fh_log, date("H:i:s")." - ERROR API: ".$e->getMessage()."\n");
+            fclose($fh_log);
+            }
+        // Estado error. El frontend detecta esto y detiene el polling.
+        _escribir_progreso_extraccion($ruta_progreso, "error", $procesados_total, $total_guardados, $total_saltados, "", $numero_dias, array("mensaje" => $e->getMessage()));
+        return "ERROR: ".$e->getMessage().". Log: ".$ruta_log;
         }
     }
 
@@ -466,7 +639,7 @@ function indicador_orden($campo, $orden_valido, $direccion_valida)
 
 // Lista los correos de correo_facturas_fincas de los ultimos 5 dias (HTML de la tabla).
 // Debajo de cada correo agrega una fila por cada adjunto guardado en archivo_correo.
-function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "DESC")
+function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
     {
     global $link;
 
@@ -484,6 +657,21 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         }
     $direccion_valida = ($direccion_orden == "ASC") ? "ASC" : "DESC";
 
+    // Filtro por rango de fechas: si vienen ambas, usar ese rango.
+    // Si no, mantener el comportamiento por defecto (ultimos 5 dias).
+    $valida_desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_desde);
+    $valida_hasta = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_hasta);
+    if($valida_desde && $valida_hasta)
+        {
+        $fecha_desde = mysqli_real_escape_string($link, $fecha_desde);
+        $fecha_hasta = mysqli_real_escape_string($link, $fecha_hasta);
+        $where_fechas = "FECHAHORA >= '".$fecha_desde." 00:00:00' AND FECHAHORA <= '".$fecha_hasta." 23:59:59'";
+        }
+    else
+        {
+        $where_fechas = "FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)";
+        }
+
     $sql = "SELECT
         CODIGO AS CODIGO,
         CODIGOFINCA AS CODIGOFINCA,
@@ -496,7 +684,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         ESTADO AS ESTADO,
         OBSERVACIONES AS OBSERVACIONES
         FROM correo_facturas_fincas
-        WHERE FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)
+        WHERE ".$where_fechas."
         ORDER BY ".$orden_valido." ".$direccion_valida;
     $resultado = mysqli_query($link, $sql);
     $numero_correos = mysqli_num_rows($resultado);
@@ -847,6 +1035,807 @@ function limpia_json_decimales(&$dato)
                 {
                 limpia_json_decimales($dato[$clave]);
                 }
-            }  
-        } 
+            }
+        }
+    }
+
+
+// ============================================================================
+// CLIENTES - consola nueva (_dsft). Independiente del legacy en funciones.php.
+// ============================================================================
+
+// Helper interno para indicador de ordenamiento (triangulo ASC/DESC).
+function _ind_orden_cliente($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+// Lista el grid de clientes (HTML completo: thead + tbody + total).
+function lista_clientes_dsft($campo_orden = "NOMBRECLIENTE", $direccion_orden = "ASC")
+    {
+    global $link;
+
+    // Validar campo y direccion contra lista blanca.
+    // NOMBREPAIS se ordena por el alias del LEFT JOIN con pais.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"NOMBRECLIENTE", 3=>"CORREOFACTURAS", 4=>"TELEFONO", 5=>"NOMBREPAIS", 6=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "NOMBRECLIENTE";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "DESC") ? "DESC" : "ASC";
+
+    $sql = "SELECT cliente.CODIGO         AS CODIGO,
+        cliente.NOMBRECLIENTE  AS NOMBRECLIENTE,
+        cliente.NOMBRECORTO    AS NOMBRECORTO,
+        cliente.CORREOFACTURAS AS CORREOFACTURAS,
+        cliente.TELEFONO       AS TELEFONO,
+        cliente.CIUDAD         AS CIUDAD,
+        pais.nombre_pais       AS NOMBREPAIS,
+        cliente.ESTADO         AS ESTADO
+        FROM cliente
+        LEFT JOIN pais ON cliente.CODIGOPAIS = pais.codigo_pais
+        WHERE cliente.ESTADO >= 0
+        ORDER BY ".$orden_valido." ".$direccion_valida;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="padding: 10px; color: #88010e;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+    $numero = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=0; $i<$numero; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']         = $fila['CODIGO'];
+        $arreglo[$i]['NOMBRECLIENTE']  = $fila['NOMBRECLIENTE'];
+        $arreglo[$i]['NOMBRECORTO']    = $fila['NOMBRECORTO'];
+        $arreglo[$i]['CORREOFACTURAS'] = $fila['CORREOFACTURAS'];
+        $arreglo[$i]['TELEFONO']       = $fila['TELEFONO'];
+        $arreglo[$i]['CIUDAD']         = $fila['CIUDAD'];
+        $arreglo[$i]['NOMBREPAIS']     = $fila['NOMBREPAIS'];
+        $arreglo[$i]['ESTADO']         = $fila['ESTADO'];
+        }
+
+    // Indicadores de ordenamiento por columna.
+    $ind_codigo   = _ind_orden_cliente("CODIGO",         $orden_valido, $direccion_valida);
+    $ind_nombre   = _ind_orden_cliente("NOMBRECLIENTE",  $orden_valido, $direccion_valida);
+    $ind_correo   = _ind_orden_cliente("CORREOFACTURAS", $orden_valido, $direccion_valida);
+    $ind_telefono = _ind_orden_cliente("TELEFONO",       $orden_valido, $direccion_valida);
+    $ind_pais     = _ind_orden_cliente("NOMBREPAIS",     $orden_valido, $direccion_valida);
+    $ind_estado   = _ind_orden_cliente("ESTADO",         $orden_valido, $direccion_valida);
+
+    $html  = '<table class="grid_clientes">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
+    $html .= '<th style="width: 30%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">NOMBRE'.$ind_nombre.'</th>';
+    $html .= '<th style="width: 20%; cursor: pointer;" onclick="ordenar_por(\'CORREOFACTURAS\')">MAIL FACT'.$ind_correo.'</th>';
+    $html .= '<th style="width: 13%; cursor: pointer;" onclick="ordenar_por(\'TELEFONO\')">TELEFONO'.$ind_telefono.'</th>';
+    $html .= '<th style="width: 12%; cursor: pointer;" onclick="ordenar_por(\'NOMBREPAIS\')">PAIS'.$ind_pais.'</th>';
+    $html .= '<th style="width: 7%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 13%;">OPC</th>';
+    $html .= '</tr></thead>';
+    $html .= '<tbody>';
+
+    for($i=0; $i<$numero; $i++)
+        {
+        $codigo   = (int)$arreglo[$i]['CODIGO'];
+        $nombre   = htmlspecialchars((string)$arreglo[$i]['NOMBRECLIENTE'], ENT_QUOTES, 'UTF-8');
+        $correo   = htmlspecialchars((string)$arreglo[$i]['CORREOFACTURAS'], ENT_QUOTES, 'UTF-8');
+        $telefono = htmlspecialchars((string)$arreglo[$i]['TELEFONO'], ENT_QUOTES, 'UTF-8');
+        $pais     = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREPAIS']) ? $arreglo[$i]['NOMBREPAIS'] : ''), ENT_QUOTES, 'UTF-8');
+        $estado_n = (int)$arreglo[$i]['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_cliente" id="id_grupo_cliente_'.$codigo.'">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td title="'.$nombre.'" onclick="devuelve_cliente('.$codigo.');"><strong>'.$nombre.'</strong></td>';
+        $html .= '<td title="'.$correo.'" onclick="devuelve_cliente('.$codigo.');">'.$correo.'</td>';
+        $html .= '<td onclick="devuelve_cliente('.$codigo.');">'.$telefono.'</td>';
+        $html .= '<td onclick="devuelve_cliente('.$codigo.');">'.$pais.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: muestra_trazabilidad_cliente('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
+        $html .= '<a href="javascript: devuelve_cliente('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: elimina_cliente_dsft('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</tbody></table>';
+    $html .= '<div style="text-align: right; font-size: 11px; color: #666; padding: 5px;">Total: '.$numero.' registros</div>';
+    return $html;
+    }
+
+// Devuelve un cliente como JSON para llenar el formulario.
+function devuelve_cliente_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return json_encode(array("ERROR" => "Codigo invalido"));
+
+    $sql = "SELECT CODIGO, NOMBRECLIENTE, NOMBRECORTO, CORREOFACTURAS, CORREOESTADOSCUENTA,
+        TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES, ESTADO
+        FROM cliente
+        WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return json_encode(array("ERROR" => "Cliente no encontrado"));
+
+    $fila = mysqli_fetch_array($resultado);
+    $respuesta = array();
+    $respuesta['CODIGO']              = $fila['CODIGO'];
+    $respuesta['NOMBRECLIENTE']       = $fila['NOMBRECLIENTE'];
+    $respuesta['NOMBRECORTO']         = $fila['NOMBRECORTO'];
+    $respuesta['CORREOFACTURAS']      = $fila['CORREOFACTURAS'];
+    $respuesta['CORREOESTADOSCUENTA'] = $fila['CORREOESTADOSCUENTA'];
+    $respuesta['TELEFONO']            = $fila['TELEFONO'];
+    $respuesta['DIRECCION']           = $fila['DIRECCION'];
+    $respuesta['CIUDAD']              = $fila['CIUDAD'];
+    $respuesta['CODIGOPAIS']          = $fila['CODIGOPAIS'];
+    $respuesta['OBSERVACIONES']       = $fila['OBSERVACIONES'];
+    $respuesta['ESTADO']              = $fila['ESTADO'];
+
+    return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+    }
+
+// INSERT si $codigo == 0, UPDATE si > 0. Eliminacion logica via ESTADO = -1.
+function graba_cliente_dsft($codigo, $nombrecliente, $nombrecorto, $correofacturas, $correoestadoscuenta, $telefono, $direccion, $ciudad, $observaciones, $estado, $codigo_usuario, $codigopais)
+    {
+    global $link;
+
+    // Validacion identica al cliente JS.
+    $nombrecliente = strtoupper(trim((string)$nombrecliente));
+    if($nombrecliente == "")
+        return "Por favor ingrese el NOMBRE del cliente";
+
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    $estado         = (int)$estado;
+    $codigopais     = (int)$codigopais;
+    $valor_codigopais = ($codigopais == 0) ? "NULL" : $codigopais;
+
+    // Escape de strings (sobrescribir misma variable).
+    $nombrecliente       = mysqli_real_escape_string($link, $nombrecliente);
+    $nombrecorto         = mysqli_real_escape_string($link, strtoupper(trim((string)$nombrecorto)));
+    $correofacturas      = mysqli_real_escape_string($link, trim((string)$correofacturas));
+    $correoestadoscuenta = mysqli_real_escape_string($link, trim((string)$correoestadoscuenta));
+    $telefono            = mysqli_real_escape_string($link, trim((string)$telefono));
+    $direccion           = mysqli_real_escape_string($link, strtoupper(trim((string)$direccion)));
+    $ciudad              = mysqli_real_escape_string($link, strtoupper(trim((string)$ciudad)));
+    $observaciones       = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+
+    if($codigo == 0)
+        {
+        $sql = "INSERT INTO cliente (
+            CODIGO, NOMBRECLIENTE, NOMBRECORTO, CORREOFACTURAS, CORREOESTADOSCUENTA,
+            TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES,
+            ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            0, '".$nombrecliente."', '".$nombrecorto."', '".$correofacturas."', '".$correoestadoscuenta."',
+            '".$telefono."', '".$direccion."', '".$ciudad."', ".$valor_codigopais.", '".$observaciones."',
+            ".$estado.", ".$codigo_usuario.", NOW()
+        )";
+        }
+    else
+        {
+        $sql = "UPDATE cliente SET
+            NOMBRECLIENTE       = '".$nombrecliente."',
+            NOMBRECORTO         = '".$nombrecorto."',
+            CORREOFACTURAS      = '".$correofacturas."',
+            CORREOESTADOSCUENTA = '".$correoestadoscuenta."',
+            TELEFONO            = '".$telefono."',
+            DIRECCION           = '".$direccion."',
+            CIUDAD              = '".$ciudad."',
+            CODIGOPAIS          = ".$valor_codigopais.",
+            OBSERVACIONES       = '".$observaciones."',
+            ESTADO              = ".$estado.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION   = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Eliminacion logica: ESTADO = -1. NO hace DELETE fisico.
+function elimina_cliente_dsft($codigo, $codigo_usuario)
+    {
+    global $link;
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE cliente SET
+        ESTADO              = -1,
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION   = NOW()
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Devuelve HTML formateado con la trazabilidad (quien registro/modifico, cuando).
+function trazabilidad_cliente_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "SELECT CODIGO, NOMBRECLIENTE,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO,
+        CODIGOUSUARIOMODIFICA, FECHAMODIFICACION
+        FROM cliente WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return "Cliente no encontrado";
+
+    $fila = mysqli_fetch_array($resultado);
+
+    $usuario_reg = (isset($fila['CODIGOUSUARIOREGISTRA']) && $fila['CODIGOUSUARIOREGISTRA'] !== null) ? $fila['CODIGOUSUARIOREGISTRA'] : "N/A";
+    $fecha_reg   = (isset($fila['FECHAREGISTRO'])         && $fila['FECHAREGISTRO']         !== null) ? $fila['FECHAREGISTRO']         : "N/A";
+    $usuario_mod = (isset($fila['CODIGOUSUARIOMODIFICA']) && $fila['CODIGOUSUARIOMODIFICA'] !== null) ? $fila['CODIGOUSUARIOMODIFICA'] : "N/A";
+    $fecha_mod   = (isset($fila['FECHAMODIFICACION'])     && $fila['FECHAMODIFICACION']     !== null) ? $fila['FECHAMODIFICACION']     : "N/A";
+
+    $html  = '<div style="font-size: 12px; line-height: 1.7;">';
+    $html .= '<b>Cliente:</b> ('.$fila['CODIGO'].') '.htmlspecialchars((string)$fila['NOMBRECLIENTE'], ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Registrado por usuario:</b> '.htmlspecialchars((string)$usuario_reg, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha registro:</b> '.htmlspecialchars((string)$fecha_reg, ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Ultima modificacion por usuario:</b> '.htmlspecialchars((string)$usuario_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha modificacion:</b> '.htmlspecialchars((string)$fecha_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '</div>';
+    return $html;
+    }
+
+
+// ============================================================================
+// TRUCKS - consola nueva (_dsft).
+// ============================================================================
+
+// Helper interno para indicador de ordenamiento (triangulo ASC/DESC).
+function _ind_orden_truck($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+// Lista el grid de trucks (HTML completo: thead + tbody + total).
+function lista_trucks_dsft($campo_orden = "NOMBRETRUCK", $direccion_orden = "ASC")
+    {
+    global $link;
+
+    // Validar campo y direccion contra lista blanca.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"NOMBRETRUCK", 3=>"CORREOTRUCK", 4=>"TELEFONO", 5=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "NOMBRETRUCK";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "DESC") ? "DESC" : "ASC";
+
+    $sql = "SELECT CODIGO, NOMBRETRUCK, CORREOTRUCK, TELEFONO, ESTADO
+        FROM truck
+        WHERE ESTADO >= 0
+        ORDER BY ".$orden_valido." ".$direccion_valida;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="padding: 10px; color: #88010e;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+    $numero = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=0; $i<$numero; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']      = $fila['CODIGO'];
+        $arreglo[$i]['NOMBRETRUCK'] = $fila['NOMBRETRUCK'];
+        $arreglo[$i]['CORREOTRUCK'] = $fila['CORREOTRUCK'];
+        $arreglo[$i]['TELEFONO']    = $fila['TELEFONO'];
+        $arreglo[$i]['ESTADO']      = $fila['ESTADO'];
+        }
+
+    // Indicadores de ordenamiento por columna.
+    $ind_codigo   = _ind_orden_truck("CODIGO",      $orden_valido, $direccion_valida);
+    $ind_nombre   = _ind_orden_truck("NOMBRETRUCK", $orden_valido, $direccion_valida);
+    $ind_correo   = _ind_orden_truck("CORREOTRUCK", $orden_valido, $direccion_valida);
+    $ind_telefono = _ind_orden_truck("TELEFONO",    $orden_valido, $direccion_valida);
+    $ind_estado   = _ind_orden_truck("ESTADO",      $orden_valido, $direccion_valida);
+
+    $html  = '<table class="grid_trucks">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 6%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
+    $html .= '<th style="width: 30%; cursor: pointer;" onclick="ordenar_por(\'NOMBRETRUCK\')">NOMBRE'.$ind_nombre.'</th>';
+    $html .= '<th style="width: 25%; cursor: pointer;" onclick="ordenar_por(\'CORREOTRUCK\')">CORREO'.$ind_correo.'</th>';
+    $html .= '<th style="width: 15%; cursor: pointer;" onclick="ordenar_por(\'TELEFONO\')">TELEFONO'.$ind_telefono.'</th>';
+    $html .= '<th style="width: 8%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 16%;">OPC</th>';
+    $html .= '</tr></thead>';
+    $html .= '<tbody>';
+
+    for($i=0; $i<$numero; $i++)
+        {
+        $codigo   = (int)$arreglo[$i]['CODIGO'];
+        $nombre   = htmlspecialchars((string)$arreglo[$i]['NOMBRETRUCK'], ENT_QUOTES, 'UTF-8');
+        $correo   = htmlspecialchars((string)$arreglo[$i]['CORREOTRUCK'], ENT_QUOTES, 'UTF-8');
+        $telefono = htmlspecialchars((string)$arreglo[$i]['TELEFONO'], ENT_QUOTES, 'UTF-8');
+        $estado_n = (int)$arreglo[$i]['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_truck" id="id_grupo_truck_'.$codigo.'">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td title="'.$nombre.'" onclick="devuelve_truck('.$codigo.');"><strong>'.$nombre.'</strong></td>';
+        $html .= '<td title="'.$correo.'" onclick="devuelve_truck('.$codigo.');">'.$correo.'</td>';
+        $html .= '<td onclick="devuelve_truck('.$codigo.');">'.$telefono.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: muestra_trazabilidad_truck('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
+        $html .= '<a href="javascript: devuelve_truck('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: elimina_truck_dsft('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</tbody></table>';
+    $html .= '<div style="text-align: right; font-size: 11px; color: #666; padding: 5px;">Total: '.$numero.' registros</div>';
+    return $html;
+    }
+
+// Devuelve un truck como JSON para llenar el formulario.
+function devuelve_truck_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return json_encode(array("ERROR" => "Codigo invalido"));
+
+    $sql = "SELECT CODIGO, NOMBRETRUCK, CORREOTRUCK, TELEFONO, OBSERVACIONES, ESTADO
+        FROM truck
+        WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return json_encode(array("ERROR" => "Truck no encontrado"));
+
+    $fila = mysqli_fetch_array($resultado);
+    $respuesta = array();
+    $respuesta['CODIGO']        = $fila['CODIGO'];
+    $respuesta['NOMBRETRUCK']   = $fila['NOMBRETRUCK'];
+    $respuesta['CORREOTRUCK']   = $fila['CORREOTRUCK'];
+    $respuesta['TELEFONO']      = $fila['TELEFONO'];
+    $respuesta['OBSERVACIONES'] = $fila['OBSERVACIONES'];
+    $respuesta['ESTADO']        = $fila['ESTADO'];
+
+    return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+    }
+
+// INSERT si $codigo == 0, UPDATE si > 0.
+function graba_truck_dsft($codigo, $nombretruck, $correotruck, $telefono, $observaciones, $estado, $codigo_usuario)
+    {
+    global $link;
+
+    // Validacion identica al cliente JS.
+    $nombretruck = strtoupper(trim((string)$nombretruck));
+    if($nombretruck == "")
+        return "Por favor ingrese el NOMBRE del truck";
+
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    $estado         = (int)$estado;
+
+    // Escape de strings (sobrescribir misma variable).
+    $nombretruck   = mysqli_real_escape_string($link, $nombretruck);
+    $correotruck   = mysqli_real_escape_string($link, trim((string)$correotruck));
+    $telefono      = mysqli_real_escape_string($link, trim((string)$telefono));
+    $observaciones = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+
+    if($codigo == 0)
+        {
+        $sql = "INSERT INTO truck (
+            CODIGO, NOMBRETRUCK, CORREOTRUCK, TELEFONO, OBSERVACIONES,
+            ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            0, '".$nombretruck."', '".$correotruck."', '".$telefono."', '".$observaciones."',
+            ".$estado.", ".$codigo_usuario.", NOW()
+        )";
+        }
+    else
+        {
+        $sql = "UPDATE truck SET
+            NOMBRETRUCK         = '".$nombretruck."',
+            CORREOTRUCK         = '".$correotruck."',
+            TELEFONO            = '".$telefono."',
+            OBSERVACIONES       = '".$observaciones."',
+            ESTADO              = ".$estado.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION   = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Eliminacion logica: ESTADO = -1. NO hace DELETE fisico.
+function elimina_truck_dsft($codigo, $codigo_usuario)
+    {
+    global $link;
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE truck SET
+        ESTADO              = -1,
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION   = NOW()
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Devuelve HTML formateado con la trazabilidad (quien registro/modifico, cuando).
+function trazabilidad_truck_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "SELECT CODIGO, NOMBRETRUCK,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO,
+        CODIGOUSUARIOMODIFICA, FECHAMODIFICACION
+        FROM truck WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return "Truck no encontrado";
+
+    $fila = mysqli_fetch_array($resultado);
+
+    $usuario_reg = (isset($fila['CODIGOUSUARIOREGISTRA']) && $fila['CODIGOUSUARIOREGISTRA'] !== null) ? $fila['CODIGOUSUARIOREGISTRA'] : "N/A";
+    $fecha_reg   = (isset($fila['FECHAREGISTRO'])         && $fila['FECHAREGISTRO']         !== null) ? $fila['FECHAREGISTRO']         : "N/A";
+    $usuario_mod = (isset($fila['CODIGOUSUARIOMODIFICA']) && $fila['CODIGOUSUARIOMODIFICA'] !== null) ? $fila['CODIGOUSUARIOMODIFICA'] : "N/A";
+    $fecha_mod   = (isset($fila['FECHAMODIFICACION'])     && $fila['FECHAMODIFICACION']     !== null) ? $fila['FECHAMODIFICACION']     : "N/A";
+
+    $html  = '<div style="font-size: 12px; line-height: 1.7;">';
+    $html .= '<b>Truck:</b> ('.$fila['CODIGO'].') '.htmlspecialchars((string)$fila['NOMBRETRUCK'], ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Registrado por usuario:</b> '.htmlspecialchars((string)$usuario_reg, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha registro:</b> '.htmlspecialchars((string)$fecha_reg, ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Ultima modificacion por usuario:</b> '.htmlspecialchars((string)$usuario_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha modificacion:</b> '.htmlspecialchars((string)$fecha_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '</div>';
+    return $html;
+    }
+
+
+// ============================================================================
+// MARCACIONES - consola nueva (_dsft). LEFT JOIN a cliente y truck.
+// ============================================================================
+
+// Helper interno para indicador de ordenamiento (triangulo ASC/DESC).
+function _ind_orden_marcacion($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+// Lista el grid de marcaciones (HTML completo: thead + tbody + total).
+function lista_marcaciones_dsft($campo_orden = "NOMBREMARCACION", $direccion_orden = "ASC")
+    {
+    global $link;
+
+    // Validar campo y direccion contra lista blanca.
+    // NOMBRECLIENTE y NOMBRETRUCK se ordenan por los alias del LEFT JOIN.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"NOMBREMARCACION", 3=>"NOMBRECLIENTE", 4=>"NOMBRETRUCK", 5=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "NOMBREMARCACION";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "DESC") ? "DESC" : "ASC";
+
+    // Mapear el alias logico a la columna real en el ORDER BY.
+    $map_orden = array(
+        "CODIGO"          => "m.CODIGO",
+        "NOMBREMARCACION" => "m.NOMBREMARCACION",
+        "NOMBRECLIENTE"   => "c.NOMBRECLIENTE",
+        "NOMBRETRUCK"     => "t.NOMBRETRUCK",
+        "ESTADO"          => "m.ESTADO",
+        );
+    $columna_order_by = $map_orden[$orden_valido];
+
+    $sql = "SELECT m.CODIGO          AS CODIGO,
+        m.NOMBREMARCACION AS NOMBREMARCACION,
+        m.CODIGOCLIENTE   AS CODIGOCLIENTE,
+        m.CODIGOTRUCK     AS CODIGOTRUCK,
+        m.ESTADO          AS ESTADO,
+        c.NOMBRECLIENTE   AS NOMBRECLIENTE,
+        t.NOMBRETRUCK     AS NOMBRETRUCK
+        FROM marcacion m
+        LEFT JOIN cliente c ON m.CODIGOCLIENTE = c.CODIGO
+        LEFT JOIN truck   t ON m.CODIGOTRUCK   = t.CODIGO
+        WHERE m.ESTADO >= 0
+        ORDER BY ".$columna_order_by." ".$direccion_valida;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="padding: 10px; color: #88010e;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+    $numero = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=0; $i<$numero; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']          = $fila['CODIGO'];
+        $arreglo[$i]['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
+        $arreglo[$i]['NOMBRECLIENTE']   = $fila['NOMBRECLIENTE'];
+        $arreglo[$i]['NOMBRETRUCK']     = $fila['NOMBRETRUCK'];
+        $arreglo[$i]['ESTADO']          = $fila['ESTADO'];
+        }
+
+    // Indicadores de ordenamiento por columna.
+    $ind_codigo     = _ind_orden_marcacion("CODIGO",          $orden_valido, $direccion_valida);
+    $ind_marcacion  = _ind_orden_marcacion("NOMBREMARCACION", $orden_valido, $direccion_valida);
+    $ind_cliente    = _ind_orden_marcacion("NOMBRECLIENTE",   $orden_valido, $direccion_valida);
+    $ind_truck      = _ind_orden_marcacion("NOMBRETRUCK",     $orden_valido, $direccion_valida);
+    $ind_estado     = _ind_orden_marcacion("ESTADO",          $orden_valido, $direccion_valida);
+
+    $html  = '<table class="grid_marcaciones">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
+    $html .= '<th style="width: 25%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCACION'.$ind_marcacion.'</th>';
+    $html .= '<th style="width: 25%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">CLIENTE'.$ind_cliente.'</th>';
+    $html .= '<th style="width: 20%; cursor: pointer;" onclick="ordenar_por(\'NOMBRETRUCK\')">TRUCK'.$ind_truck.'</th>';
+    $html .= '<th style="width: 8%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 17%;">OPC</th>';
+    $html .= '</tr></thead>';
+    $html .= '<tbody>';
+
+    for($i=0; $i<$numero; $i++)
+        {
+        $codigo    = (int)$arreglo[$i]['CODIGO'];
+        $marcacion = htmlspecialchars((string)$arreglo[$i]['NOMBREMARCACION'], ENT_QUOTES, 'UTF-8');
+        $cliente   = htmlspecialchars((string)(isset($arreglo[$i]['NOMBRECLIENTE']) ? $arreglo[$i]['NOMBRECLIENTE'] : ''), ENT_QUOTES, 'UTF-8');
+        $truck     = htmlspecialchars((string)(isset($arreglo[$i]['NOMBRETRUCK'])   ? $arreglo[$i]['NOMBRETRUCK']   : ''), ENT_QUOTES, 'UTF-8');
+        $estado_n  = (int)$arreglo[$i]['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_marcacion" id="id_grupo_marcacion_'.$codigo.'">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td title="'.$marcacion.'" onclick="devuelve_marcacion('.$codigo.');"><strong>'.$marcacion.'</strong></td>';
+        $html .= '<td title="'.$cliente.'" onclick="devuelve_marcacion('.$codigo.');">'.$cliente.'</td>';
+        $html .= '<td title="'.$truck.'" onclick="devuelve_marcacion('.$codigo.');">'.$truck.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: muestra_trazabilidad_marcacion('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
+        $html .= '<a href="javascript: devuelve_marcacion('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: elimina_marcacion_dsft('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</tbody></table>';
+    $html .= '<div style="text-align: right; font-size: 11px; color: #666; padding: 5px;">Total: '.$numero.' registros</div>';
+    return $html;
+    }
+
+// Devuelve una marcacion como JSON para llenar el formulario.
+function devuelve_marcacion_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return json_encode(array("ERROR" => "Codigo invalido"));
+
+    $sql = "SELECT CODIGO, NOMBREMARCACION, CODIGOCLIENTE, CODIGOTRUCK, OBSERVACIONES, ESTADO
+        FROM marcacion
+        WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return json_encode(array("ERROR" => "Marcacion no encontrada"));
+
+    $fila = mysqli_fetch_array($resultado);
+    $respuesta = array();
+    $respuesta['CODIGO']          = $fila['CODIGO'];
+    $respuesta['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
+    $respuesta['CODIGOCLIENTE']   = $fila['CODIGOCLIENTE'];
+    $respuesta['CODIGOTRUCK']     = $fila['CODIGOTRUCK'];
+    $respuesta['OBSERVACIONES']   = $fila['OBSERVACIONES'];
+    $respuesta['ESTADO']          = $fila['ESTADO'];
+
+    return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+    }
+
+// INSERT si $codigo == 0, UPDATE si > 0. CODIGOTRUCK: 0 se guarda como NULL.
+function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigotruck, $observaciones, $estado, $codigo_usuario)
+    {
+    global $link;
+
+    // Validacion identica al cliente JS.
+    $nombremarcacion = strtoupper(trim((string)$nombremarcacion));
+    if($nombremarcacion == "")
+        return "Por favor ingrese la MARCACION";
+
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    $estado         = (int)$estado;
+    $codigocliente  = (int)$codigocliente;
+    $codigotruck    = (int)$codigotruck;
+
+    if($codigocliente <= 0)
+        return "Por favor seleccione el CLIENTE";
+
+    $valor_codigotruck = ($codigotruck == 0) ? "NULL" : $codigotruck;
+
+    // Escape de strings (sobrescribir misma variable).
+    $nombremarcacion = mysqli_real_escape_string($link, $nombremarcacion);
+    $observaciones   = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+
+    if($codigo == 0)
+        {
+        $sql = "INSERT INTO marcacion (
+            CODIGO, NOMBREMARCACION, CODIGOCLIENTE, CODIGOTRUCK, OBSERVACIONES,
+            ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            0, '".$nombremarcacion."', ".$codigocliente.", ".$valor_codigotruck.", '".$observaciones."',
+            ".$estado.", ".$codigo_usuario.", NOW()
+        )";
+        }
+    else
+        {
+        $sql = "UPDATE marcacion SET
+            NOMBREMARCACION       = '".$nombremarcacion."',
+            CODIGOCLIENTE         = ".$codigocliente.",
+            CODIGOTRUCK           = ".$valor_codigotruck.",
+            OBSERVACIONES         = '".$observaciones."',
+            ESTADO                = ".$estado.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Eliminacion logica: ESTADO = -1. NO hace DELETE fisico.
+function elimina_marcacion_dsft($codigo, $codigo_usuario)
+    {
+    global $link;
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE marcacion SET
+        ESTADO                = -1,
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Devuelve HTML formateado con la trazabilidad (quien registro/modifico, cuando).
+function trazabilidad_marcacion_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "SELECT CODIGO, NOMBREMARCACION,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO,
+        CODIGOUSUARIOMODIFICA, FECHAMODIFICACION
+        FROM marcacion WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return "Marcacion no encontrada";
+
+    $fila = mysqli_fetch_array($resultado);
+
+    $usuario_reg = (isset($fila['CODIGOUSUARIOREGISTRA']) && $fila['CODIGOUSUARIOREGISTRA'] !== null) ? $fila['CODIGOUSUARIOREGISTRA'] : "N/A";
+    $fecha_reg   = (isset($fila['FECHAREGISTRO'])         && $fila['FECHAREGISTRO']         !== null) ? $fila['FECHAREGISTRO']         : "N/A";
+    $usuario_mod = (isset($fila['CODIGOUSUARIOMODIFICA']) && $fila['CODIGOUSUARIOMODIFICA'] !== null) ? $fila['CODIGOUSUARIOMODIFICA'] : "N/A";
+    $fecha_mod   = (isset($fila['FECHAMODIFICACION'])     && $fila['FECHAMODIFICACION']     !== null) ? $fila['FECHAMODIFICACION']     : "N/A";
+
+    $html  = '<div style="font-size: 12px; line-height: 1.7;">';
+    $html .= '<b>Marcacion:</b> ('.$fila['CODIGO'].') '.htmlspecialchars((string)$fila['NOMBREMARCACION'], ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Registrado por usuario:</b> '.htmlspecialchars((string)$usuario_reg, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha registro:</b> '.htmlspecialchars((string)$fecha_reg, ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Ultima modificacion por usuario:</b> '.htmlspecialchars((string)$usuario_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha modificacion:</b> '.htmlspecialchars((string)$fecha_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '</div>';
+    return $html;
+    }
+
+// Tabla read-only de marcaciones de un cliente, usada en consola_clientes_dsft.php.
+// Retorna solo las filas <tr>...</tr> (sin thead ni tbody wrapper).
+// Si no hay marcaciones, retorna una sola fila con colspan informativa.
+function lista_marcaciones_por_cliente_dsft($codigo_cliente)
+    {
+    global $link;
+    $codigo_cliente = (int)$codigo_cliente;
+    if($codigo_cliente <= 0)
+        return '<tr><td colspan="4" class="td_vacio">Codigo de cliente invalido</td></tr>';
+
+    $sql = "SELECT m.CODIGO          AS CODIGO,
+        m.NOMBREMARCACION AS NOMBREMARCACION,
+        m.CODIGOTRUCK     AS CODIGOTRUCK,
+        m.ESTADO          AS ESTADO,
+        t.NOMBRETRUCK     AS NOMBRETRUCK
+        FROM marcacion m
+        LEFT JOIN truck t ON m.CODIGOTRUCK = t.CODIGO
+        WHERE m.CODIGOCLIENTE = ".$codigo_cliente."
+          AND m.ESTADO >= 0
+        ORDER BY m.NOMBREMARCACION ASC";
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<tr><td colspan="4" class="td_vacio">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</td></tr>';
+    $numero = mysqli_num_rows($resultado);
+
+    if($numero == 0)
+        return '<tr><td colspan="4" class="td_vacio">Sin marcaciones asignadas</td></tr>';
+
+    $html = "";
+    for($i=0; $i<$numero; $i++)
+        {
+        $fila      = mysqli_fetch_array($resultado);
+        $codigo    = (int)$fila['CODIGO'];
+        $marcacion = htmlspecialchars((string)$fila['NOMBREMARCACION'], ENT_QUOTES, 'UTF-8');
+        $truck     = htmlspecialchars((string)(isset($fila['NOMBRETRUCK']) ? $fila['NOMBRETRUCK'] : ''), ENT_QUOTES, 'UTF-8');
+        $estado_n  = (int)$fila['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_marc_link" onclick="window.open(\'consola_marcaciones.php?codigo='.$codigo.'\', \'_blank\');">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td title="'.$marcacion.'">'.$marcacion.'</td>';
+        $html .= '<td title="'.$truck.'">'.$truck.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '</tr>';
+        }
+
+    return $html;
     }
