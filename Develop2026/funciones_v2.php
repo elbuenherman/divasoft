@@ -1,12 +1,12 @@
 <?php
-      
+        
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-       
-   
-// Normaliza texto: minusculas y sin tildes/dieresis/enie.
+           
+     
+// Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
     $texto = mb_strtolower((string)$texto, 'UTF-8');
@@ -605,6 +605,47 @@ function extraer_correos_facturas($fecha_desde, $fecha_hasta)
     }
 
  
+// ============================================================================
+// Procesar factura desde la web (invoca procesa_factura_final_cli_haiku.php
+// por CLI con exec). Llamado desde el icono "Procesar factura con IA" en el
+// grid de correos. Retorna texto plano con el resultado para el messageBox.
+// ============================================================================
+function procesar_factura_web($codigo_adjunto)
+    {
+    global $link;
+    $codigo_adjunto = (int)$codigo_adjunto;
+    if($codigo_adjunto <= 0)
+        return "Error: codigo de adjunto invalido";
+
+    // Verificar que el adjunto existe.
+    $sql_check = "SELECT CODIGO, NOMBREARCHIVO FROM archivo_correo WHERE CODIGO = ".$codigo_adjunto;
+    $res_check = mysqli_query($link, $sql_check);
+    if(!$res_check || mysqli_num_rows($res_check) == 0)
+        return "Error: adjunto no encontrado (codigo ".$codigo_adjunto.")";
+    $fila = mysqli_fetch_assoc($res_check);
+
+    // Rutas fijas conocidas.
+    $ruta_script   = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/procesa_factura_final_cli_haiku.php";
+    $ruta_progreso = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_progreso_factura.json";
+    $ruta_output   = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_factura_output_".$codigo_adjunto.".txt";
+
+    // Escribir progreso inicial (consumido por el endpoint progreso_factura).
+    file_put_contents($ruta_progreso, json_encode(array(
+        "estado"  => "en_curso",
+        "mensaje" => "Iniciando procesamiento de ".$fila["NOMBREARCHIVO"]."..."
+        )));
+
+    // Lanzar el script CLI en SEGUNDO PLANO (no bloqueante).
+    // El endpoint progreso_factura detecta el final leyendo $ruta_output (busca
+    // "=== FIN ===" o "Fatal error"). El script CLI tambien escribe su propio
+    // log detallado en /tmp/final_log_*.txt para diagnostico.
+    $comando = "nohup php ".$ruta_script." ".$codigo_adjunto." > ".$ruta_output." 2>&1 &";
+    exec($comando);
+
+    return "Procesamiento iniciado para ".$fila["NOMBREARCHIVO"].". El proceso corre en segundo plano.";
+    }
+
+
 // Extrae solo el/los email(s) de un campo De/Para (quita nombres, comillas y < >).
 function limpia_email($texto)
     {
@@ -642,6 +683,29 @@ function indicador_orden($campo, $orden_valido, $direccion_valida)
 function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
     {
     global $link;
+
+    // Set de adjuntos que ya fueron procesados (un solo query, no uno por adjunto).
+    // Clave = CODIGOADJUNTO, valor = array con datos de factura_finca para mostrar
+    // en el grid (CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA).
+    $adjuntos_procesados = array();
+    $sql_procesados = "SELECT CODIGOADJUNTO, CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA
+        FROM factura_finca WHERE CODIGOADJUNTO IS NOT NULL";
+    $res_procesados = mysqli_query($link, $sql_procesados);
+    if($res_procesados)
+        {
+        $numero_procesados = mysqli_num_rows($res_procesados);
+        for($p=1; $p<=$numero_procesados; $p++)
+            {
+            $fila_p = mysqli_fetch_assoc($res_procesados);
+            $adjuntos_procesados[(int)$fila_p["CODIGOADJUNTO"]] = array(
+                "CODIGO"           => (int)$fila_p["CODIGO"],
+                "FINCA"            => $fila_p["FINCA"],
+                "CLIENTEMARCACION" => $fila_p["CLIENTEMARCACION"],
+                "NUMEROFACTURA"    => $fila_p["NUMEROFACTURA"],
+                "GUIA"             => $fila_p["GUIA"]
+                );
+            }
+        }
 
     // Validar campo y direccion de ordenamiento.
     $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"ASUNTO", 5=>"FECHAHORA", 6=>"DE", 7=>"PARA", 8=>"ESTADO");
@@ -746,9 +810,9 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
     $html .= '<th style="width: 6%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 18%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">FINCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 10%;">CONS</th>';
-    $html .= '<th style="width: 34%; cursor:pointer;" onclick="ordenar_por(\'ASUNTO\')">ASUNTO'.indicador_orden("ASUNTO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 18%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 15%;">FINCA</th>';
+    $html .= '<th style="width: 29%; cursor:pointer;" onclick="ordenar_por(\'ASUNTO\')">ASUNTO'.indicador_orden("ASUNTO", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 108px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 30px; font-size:10px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">E'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 95px; text-align:center;">OPC</th>';
@@ -811,38 +875,79 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 $adj_cons   = ($adj['CODIGOCONSOLIDADO'] === null || $adj['CODIGOCONSOLIDADO'] === '') ? '&mdash;' : htmlspecialchars($adj['CODIGOCONSOLIDADO'], ENT_QUOTES, 'UTF-8');
                 $adj_nombre = htmlspecialchars((string)$adj['NOMBREARCHIVO'], ENT_QUOTES, 'UTF-8');
                 $adj_nombre_js = htmlspecialchars(addslashes((string)$adj['NOMBREARCHIVO']), ENT_QUOTES, 'UTF-8');
-                $adj_mime   = (string)$adj['MIMETYPE'];
+                $adj_mime   = (string)$adj['MIMETYPE']; 
                 $adj_ext    = strtolower(pathinfo((string)$adj['NOMBREARCHIVO'], PATHINFO_EXTENSION));
 
                 if(stripos($adj_mime, 'pdf') !== false || $adj_ext == 'pdf')
                     {
                     $adj_tipo  = 'PDF';
-                    $adj_visor = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="Ver adjunto"><i class="icon-file-pdf" style="color:#88010e; background:#fff;"></i></a>';
+                    $adj_visor_titulo_base = 'Ver adjunto';
+                    $adj_visor_template = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="VISOR_TITLE"><i class="icon-file-pdf" style="color:#88010e; background:#fff;"></i></a>';
                     $adj_nombre_link = '<a href="#" onclick="ver_adjunto_pdf('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 else if(stripos($adj_mime, 'spreadsheet') !== false || $adj_ext == 'xlsx' || $adj_ext == 'xls')
                     {
                     $adj_tipo  = 'EXCEL';
-                    $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Descargar adjunto"><i class="icon-file-excel" style="color:#006400; background:#fff;"></i></a>';
+                    $adj_visor_titulo_base = 'Descargar adjunto';
+                    $adj_visor_template = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="VISOR_TITLE"><i class="icon-file-excel" style="color:#006400; background:#fff;"></i></a>';
                     $adj_nombre_link = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 else
                     {
                     $adj_tipo  = strtoupper($adj_ext);
-                    $adj_visor = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="Ver adjunto"><i class="icon-file" style="color:#666; background:#fff;"></i></a>';
+                    $adj_visor_titulo_base = 'Ver adjunto';
+                    $adj_visor_template = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="VISOR_TITLE"><i class="icon-file" style="color:#666; background:#fff;"></i></a>';
                     $adj_nombre_link = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
                     }
                 $adj_tamano = number_format(((float)$adj['TAMANOBYTES']) / 1024, 1) . ' KB';
 
                 $est_adj = 'background-color:rgba(195,195,195,0.4); color:#000; font-size:13px; font-weight:normal;';
 
+                // Determinar las celdas de FINCA/CONS/TAMANO segun si esta procesado.
+                // Cuando ya esta procesado, mostrar datos de factura_finca; sino,
+                // mostrar guiones y tamano normales.
+                $proc = isset($adjuntos_procesados[(int)$adj_codigo]) ? $adjuntos_procesados[(int)$adj_codigo] : null;
+
+                $celda_finca = $adj_finca;   // por defecto: "—" o codigo_finca de archivo_correo
+                $celda_cons  = $adj_cons;    // por defecto: "—" o codigo_consolidado de archivo_correo
+                $celda_tam   = $adj_tamano;  // por defecto: "38.8 KB"
+                $visor_title = $adj_visor_titulo_base;
+
+                if($proc !== null)
+                    {
+                    // Procesado: 2da celda = CLIENTEMARCACION, 3ra = FINCA, tam = GUIA.
+                    $cm   = isset($proc["CLIENTEMARCACION"]) ? trim((string)$proc["CLIENTEMARCACION"]) : '';
+                    $fn   = isset($proc["FINCA"])            ? trim((string)$proc["FINCA"])            : '';
+                    $guia = isset($proc["GUIA"])             ? trim((string)$proc["GUIA"])             : '';
+                    if($cm   !== '') $celda_finca = htmlspecialchars($cm, ENT_QUOTES, 'UTF-8');
+                    if($fn   !== '') $celda_cons  = htmlspecialchars($fn, ENT_QUOTES, 'UTF-8');
+                    if($guia !== '') $celda_tam   = htmlspecialchars($guia, ENT_QUOTES, 'UTF-8');
+                    // Visor con tamano en el title para no perder el dato del KB.
+                    $visor_title = $adj_visor_titulo_base.' ('.$adj_tamano.')';
+                    }
+                $adj_visor = str_replace('VISOR_TITLE', $visor_title, $adj_visor_template);
+
                 $html .= '<tr class="fila_adjunto">';
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
-                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_finca.'</td>';
-                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$adj_cons.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_finca.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_cons.'</td>';
                 $html .= '<td style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
-                $html .= '<td colspan="2" class="td_centro" style="'.$est_adj.'">'.$adj_tamano.'</td>';
-                $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">'.$adj_visor.'</td>';
+                $html .= '<td colspan="2" class="td_centro" style="'.$est_adj.'">'.$celda_tam.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">';
+                if($proc !== null)
+                    {
+                    // Ya procesado: icono target verde pastel, clickeable.
+                    // Abre ver_factura_finca.php con el CODIGO de factura_finca en pestana nueva.
+                    $codigo_ff = (int)$proc["CODIGO"];
+                    $html .= '<a onclick="window.open(\'ver_factura_finca.php?codigo='.$codigo_ff.'\', \'_blank\');" title="Procesada - factura_finca CODIGO: '.$codigo_ff.'" style="cursor:pointer; color:#8fbc8f; margin-right:6px;"><i class="icon-target"></i></a>';
+                    }
+                else
+                    {
+                    // No procesado: icono code rojo crimson con onclick para procesar.
+                    $html .= '<a onclick="procesar_factura('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="Procesar factura con IA" style="cursor:pointer; color:#88010e; margin-right:6px;"><i class="icon-code"></i></a>';
+                    }
+                $html .= $adj_visor;
+                $html .= '</td>';
                 $html .= '</tr>';
                 }
             }

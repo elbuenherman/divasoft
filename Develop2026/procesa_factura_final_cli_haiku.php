@@ -1,5 +1,5 @@
 <?php
- 
+  
 // ============================================================================
 //  procesa_factura_final_cli_haiku.php
 //  Variante CLI usando Claude Haiku 4.5 como formateador del fallback OCR
@@ -63,6 +63,23 @@ function log_dual($texto)
     if($fh_log)
         fwrite($fh_log, $texto);
     }
+
+// Red de seguridad: si el script muere por error no capturado (memoria, timeout,
+// fatal error), garantizar que el log y el stdout terminen con "=== FIN ===" para
+// que el endpoint progreso_factura pueda detectar el fin del proceso.
+register_shutdown_function(function()
+    {
+    global $fh_log;
+    $error = error_get_last();
+    if($error !== null)
+        {
+        $msg = "SHUTDOWN ERROR: ".$error["message"]." en ".$error["file"].":".$error["line"];
+        if($fh_log)
+            fwrite($fh_log, "\n".$msg."\n=== FIN ===\n");
+        else
+            echo "\n".$msg."\n=== FIN ===\n";
+        }
+    });
 
 
 // ----------------------------------------------------------------------------
@@ -445,7 +462,7 @@ Los strings se devuelven tal como aparecen en la factura.
   ],
   "ALERTAS": ["lista de strings con motivos generales de REVISAR"]
 }
-
+ 
 REGLAS DE FORMATO JSON:
 - Devuelve SOLO el JSON, sin texto antes ni después, sin markdown.
 - Números como números, no como strings.
@@ -463,7 +480,7 @@ ALERTAS típicas a emitir:
    (revisar)"
 - "Grid posicional: ambigüedad en alineación, REVISAR"
 PROMPT;
- 
+  
 // ----------------------------------------------------------------------------
 // Llama a Haiku con PDF directo (un solo bloque document + bloque text con
 // cache_control + prefill assistant "{").
@@ -623,14 +640,74 @@ function ejecuta_haiku_doble($pdf_binario, $api_anthropic)
             "tiempo" => $tiempo
             );
 
+    // Solo una de las dos fallo: usar la exitosa como base, estado=4 (REVISAR)
+    // porque no hay verificacion cruzada. El flujo principal sigue normal.
     if(!$r1["ok"] || !$r2["ok"])
+        {
+        if($r1["ok"])
+            {
+            // R2 fallo: usar R1 (reusar parseo previo si esta listo).
+            if($json1_pre !== null && is_array($json1_pre))
+                {
+                $texto_base = $texto1_pre;
+                $json_base  = $json1_pre;
+                }
+            else
+                {
+                $texto_base = "{" . $r1["texto"];
+                $texto_base = extraer_json($texto_base);
+                $json_base  = json_decode($texto_base, true);
+                if(is_array($json_base))
+                    limpia_json_decimales($json_base);
+                }
+            $msg_adv     = "R2 fallo (".$r2["error"]."), usando R1 como base. Estado=REVISAR.";
+            $usage_base  = isset($r1["usage"]) ? $r1["usage"] : array();
+            }
+        else
+            {
+            // R1 fallo: usar R2.
+            $texto_base = "{" . $r2["texto"];
+            $texto_base = extraer_json($texto_base);
+            $json_base  = json_decode($texto_base, true);
+            if(is_array($json_base))
+                limpia_json_decimales($json_base);
+            $msg_adv    = "R1 fallo (".$r1["error"]."), usando R2 como base. Estado=REVISAR.";
+            $usage_base = isset($r2["usage"]) ? $r2["usage"] : array();
+            }
+
+        $in_b = isset($usage_base["input_tokens"])                ? (int)$usage_base["input_tokens"]                : 0;
+        $ou_b = isset($usage_base["output_tokens"])               ? (int)$usage_base["output_tokens"]               : 0;
+        $cc_b = isset($usage_base["cache_creation_input_tokens"]) ? (int)$usage_base["cache_creation_input_tokens"] : 0;
+        $cr_b = isset($usage_base["cache_read_input_tokens"])     ? (int)$usage_base["cache_read_input_tokens"]     : 0;
+        $costo_b = ($in_b / 1000000.0) * 1.00
+                 + ($ou_b / 1000000.0) * 5.00
+                 + ($cr_b / 1000000.0) * 0.10
+                 + ($cc_b / 1000000.0) * 1.25;
+
         return array(
-            "ok"     => false,
-            "error"  => "Una llamada Haiku fallo. R1 ok=".($r1["ok"]?"si":"no")." R2 ok=".($r2["ok"]?"si":"no"),
-            "r1"     => $r1,
-            "r2"     => $r2,
-            "tiempo" => $tiempo
+            "ok"                      => true,
+            "json_1"                  => is_array($json_base) ? $json_base : array(),
+            "json_2"                  => null,
+            "texto_1"                 => $texto_base,
+            "texto_2"                 => null,
+            "estado"                  => 4,
+            "discrepancias"           => array($msg_adv),
+            "tiempo"                  => $tiempo,
+            "tiempo_1"                => $tiempo_1,
+            "tiempo_2"                => $tiempo_2,
+            "tokens_input"            => $in_b,
+            "tokens_output"           => $ou_b,
+            "tokens_cache_read"       => $cr_b,
+            "tokens_cache_creat"      => $cc_b,
+            "costo"                   => $costo_b,
+            "r1_usage"                => isset($r1["usage"]) ? $r1["usage"] : array(),
+            "r2_usage"                => isset($r2["usage"]) ? $r2["usage"] : array(),
+            "respuesta1_cruda"        => isset($r1["respuesta_cruda"]) ? $r1["respuesta_cruda"] : null,
+            "respuesta2_cruda"        => isset($r2["respuesta_cruda"]) ? $r2["respuesta_cruda"] : null,
+            "omitida_segunda_llamada" => false,
+            "advertencia_parcial"     => $msg_adv
             );
+        }
 
     // Reusar json1 parseado arriba si ya esta listo; sino re-parsear.
     if($json1_pre !== null && is_array($json1_pre))
@@ -898,6 +975,7 @@ if(mysqli_stmt_num_rows($stmt) == 0)
     {
     mysqli_stmt_close($stmt);
     log_dual("ERROR: adjunto codigo ".$codigo." no encontrado\n");
+    log_dual("\n=== FIN ===\n");
     if($fh_log) fclose($fh_log);
     echo "\nLog guardado en: ".$archivo_log."\n";
     exit(1);
@@ -912,6 +990,7 @@ $es_pdf   = (stripos((string)$mimetype, 'pdf') !== false || $ext_arch == 'pdf');
 if(!$es_pdf)
     {
     log_dual("ERROR: el adjunto no es PDF (mime=".$mimetype.", ext=".$ext_arch.")\n");
+    log_dual("\n=== FIN ===\n");
     if($fh_log) fclose($fh_log);
     echo "\nLog guardado en: ".$archivo_log."\n";
     exit(1);
@@ -923,6 +1002,12 @@ log_dual("--- ADJUNTO ---\n");
 log_dual("Nombre:  ".$nombrearchivo."\n");
 log_dual("Mime:    ".$mimetype."\n");
 log_dual("Tamano:  ".number_format($tamano_pdf)." bytes (".number_format($tamano_pdf / 1024, 1)." KB)\n\n");
+
+// Cerrar la conexion MySQL antes de las llamadas API (60-90 segundos sin tocar
+// la BD = wait_timeout/interactive_timeout del servidor MySQL, conexion "gone away").
+// Las funciones de INSERT abriran una conexion nueva cuando la necesiten.
+mysqli_close($link);
+log_dual("Conexion MySQL cerrada (inicio llamadas API).\n");
 
 // ----------------------------------------------------------------------------
 // EJECUTAR HAIKU DOBLE
@@ -938,17 +1023,23 @@ if(isset($resultado_haiku["respuesta1_cruda"]) && $resultado_haiku["respuesta1_c
 if(isset($resultado_haiku["respuesta2_cruda"]) && $resultado_haiku["respuesta2_cruda"] !== null)
     file_put_contents("/tmp/final_".$codigo."_".$fecha_corrida."_haiku2.json", $resultado_haiku["respuesta2_cruda"]);
 
+// Solo abortar si AMBAS llamadas Haiku fallaron. Si solo una fallo, ejecuta_haiku_doble
+// ya devolvio ok=true usando la exitosa como base (con estado=4 REVISAR).
 if(!$resultado_haiku["ok"])
     {
-    log_dual("\nERROR Haiku doble: ".(string)$resultado_haiku["error"]."\n");
+    log_dual("\nERROR FATAL: ambas llamadas Haiku fallaron. ".(string)$resultado_haiku["error"]."\n");
     if(isset($resultado_haiku["r1"]["respuesta_cruda"]) && $resultado_haiku["r1"]["respuesta_cruda"] != "")
         log_dual("Respuesta cruda llamada 1 (primeros 2000 chars):\n".substr((string)$resultado_haiku["r1"]["respuesta_cruda"], 0, 2000)."\n");
     if(isset($resultado_haiku["r2"]["respuesta_cruda"]) && $resultado_haiku["r2"]["respuesta_cruda"] != "")
         log_dual("Respuesta cruda llamada 2 (primeros 2000 chars):\n".substr((string)$resultado_haiku["r2"]["respuesta_cruda"], 0, 2000)."\n");
+    log_dual("\n=== FIN ===\n");
     if($fh_log) fclose($fh_log);
     echo "\nLog guardado en: ".$archivo_log."\n";
     exit(1);
     }
+// Si hubo advertencia parcial (una llamada fallo), loggearlo.
+if(isset($resultado_haiku["advertencia_parcial"]))
+    log_dual("\nADVERTENCIA: ".(string)$resultado_haiku["advertencia_parcial"]."\n");
 
 // Detalle por llamada (parsear respuestas para stop_reason).
 $r1_data = ($resultado_haiku["respuesta1_cruda"] !== null) ? json_decode((string)$resultado_haiku["respuesta1_cruda"], true) : null;
@@ -1332,6 +1423,10 @@ function inserta_factura_finca(
     )
     {
     global $link;
+    // Reabrir conexion MySQL (cerrada al inicio antes de las llamadas API).
+    include("variables_globales.php");
+    $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
+    mysqli_query($link, "SET CHARACTER SET utf8");
 
     $cabecera        = isset($arreglo_definitivo["CABECERA"])        ? $arreglo_definitivo["CABECERA"]        : array();
     $logistica       = isset($arreglo_definitivo["LOGISTICA"])       ? $arreglo_definitivo["LOGISTICA"]       : array();
@@ -1420,6 +1515,15 @@ function inserta_factura_finca(
 function inserta_detalle_factura_finca($codigo_factura, $arreglo_definitivo)
     {
     global $link;
+    // Reabrir conexion MySQL si esta cerrada (puede llegar aqui despues de
+    // inserta_factura_finca, en cuyo caso ya esta abierta; o despues de un
+    // largo proceso si la usaron sola).
+    if(!$link || !@mysqli_ping($link))
+        {
+        include("variables_globales.php");
+        $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
+        mysqli_query($link, "SET CHARACTER SET utf8");
+        }
 
     $cajas = isset($arreglo_definitivo["CAJAS"]) ? $arreglo_definitivo["CAJAS"] : array();
     $total_cajas = count($cajas);

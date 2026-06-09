@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-     
+      
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -295,7 +295,7 @@ if($funcion == 'inserta_suscripcion')
 if($funcion == 'check_email') 
     echo check_email($parametro1,$parametro2);
 
-////  
+////   
 if($funcion == 'extraer_correos_facturas')
     echo extraer_correos_facturas($parametro1,$parametro2);
 if($funcion == 'progreso_extraccion')
@@ -305,6 +305,59 @@ if($funcion == 'progreso_extraccion')
         echo file_get_contents($ruta_progreso_extr);
     else
         echo '{"estado":"inactivo"}';
+    }
+if($funcion == 'procesar_factura_web')
+    echo procesar_factura_web($parametro1);
+if($funcion == 'progreso_factura')
+    {
+    $ruta_progreso_fac = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_progreso_factura.json";
+    $codigo_adj_fac    = isset($parametro1) ? (int)$parametro1 : 0;
+    $ruta_output_fac   = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_factura_output_".$codigo_adj_fac.".txt";
+
+    // Si el archivo de output existe, el proceso CLI ya emitio algo. Buscar
+    // marca de fin "=== FIN ===" o "Fatal error" para detectar si termino.
+    if($codigo_adj_fac > 0 && file_exists($ruta_output_fac))
+        {
+        $contenido_out = file_get_contents($ruta_output_fac);
+        if(strpos($contenido_out, "=== FIN ===") !== false)
+            {
+            // Buscar el CODIGO de factura_finca en el output.
+            $codigo_ff_fac = 0;
+            if(preg_match('/INSERT en factura_finca: CODIGO=(\d+)/', $contenido_out, $m_fac))
+                $codigo_ff_fac = (int)$m_fac[1];
+            echo json_encode(array(
+                "estado"         => "finalizado",
+                "mensaje"        => "Procesamiento completado",
+                "codigo_factura" => $codigo_ff_fac
+                ));
+            // Limpiar archivo temporal para que la proxima corrida arranque limpia.
+            unlink($ruta_output_fac);
+            }
+        else if(strpos($contenido_out, "Fatal error") !== false)
+            {
+            echo json_encode(array(
+                "estado"  => "error",
+                "mensaje" => "Error fatal en el procesamiento"
+                ));
+            unlink($ruta_output_fac);
+            }
+        else
+            {
+            // Proceso aun corriendo: devolver progreso normal.
+            if(file_exists($ruta_progreso_fac))
+                echo file_get_contents($ruta_progreso_fac);
+            else
+                echo '{"estado":"inactivo"}';
+            }
+        }
+    else
+        {
+        // No hay archivo de output todavia (proceso recien lanzado o nunca).
+        if(file_exists($ruta_progreso_fac))
+            echo file_get_contents($ruta_progreso_fac);
+        else
+            echo '{"estado":"inactivo"}';
+        }
     }
 if($funcion == 'lista_correos_facturas')
     echo lista_correos_facturas($parametro1, $parametro2, $parametro3, $parametro4);

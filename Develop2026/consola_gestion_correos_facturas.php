@@ -2,8 +2,8 @@
 include("variables_globales.php");
 include("funciones.php");
 include("valida_sesion.php");
-// CHEQUEO PERMISOS     
-$permiso[] = NULL; 
+// CHEQUEO PERMISOS      
+$permiso[] = NULL;      
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
@@ -271,10 +271,10 @@ function messageBox(texto)
     }
 
 // ===== Filtro local por texto (maqueta: recorre los grupos de correo del grid) =====
-function filtrar_listado_local()
+function filtrar_listado_local() 
     {
     var texto = $("#id_busqueda_listado").val().toUpperCase();
-    $("#id_listado_correos table tbody .grupo_correo").each(function()
+    $("#id_listado_correos .grupo_correo").each(function()
         {
         var fila = $(this).text().toUpperCase();
         if(fila.indexOf(texto) > -1)
@@ -409,6 +409,126 @@ function extraer_correos()
         });
     }
 
+// ===== Procesar una factura adjunta con IA (Claude/GLM via CLI) =====
+function procesar_factura(codigo_adjunto, nombre_archivo)
+    {
+    $("#id_dialog_confirma_factura").html(
+        "<p>Procesar factura con IA:</p>" +
+        "<p><strong>" + nombre_archivo + "</strong></p>" +
+        "<p>Codigo adjunto: " + codigo_adjunto + "</p>"
+        );
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 420,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Procesar",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    ejecutar_procesamiento_factura(codigo_adjunto, nombre_archivo);
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    }
+                }
+            ]
+        });
+    }
+
+// ===== Ejecuta el procesamiento de la factura via AJAX + polling de progreso =====
+function ejecutar_procesamiento_factura(codigo_adjunto, nombre_archivo)
+    {
+    var hora_inicio_proc = new Date();
+    var hora_inicio_str = hora_inicio_proc.getHours().toString().padStart(2,'0') + ":"
+                        + hora_inicio_proc.getMinutes().toString().padStart(2,'0') + ":"
+                        + hora_inicio_proc.getSeconds().toString().padStart(2,'0');
+    $("#id_progreso_extraccion").show().html(
+        "Iniciando procesamiento de " + nombre_archivo + "...<br>"
+        + "<span style='font-size:12px; color:#555;'>Inicio: " + hora_inicio_str + "</span>"
+        );
+    $("#id_espera").show();
+
+    // Polling: el script CLI corre en background. El endpoint progreso_factura
+    // detecta cuando termina leyendo tmp_factura_output_<codigo>.txt.
+    if(global_intervalo_progreso != null)
+        clearInterval(global_intervalo_progreso);
+    global_intervalo_progreso = setInterval(function()
+        {
+        $.get("funciones_ajax.php?funcion=progreso_factura&parametro1=" + codigo_adjunto, function(data)
+            {
+            try
+                {
+                var p = JSON.parse(data);
+                if(p.estado == "en_curso")
+                    {
+                    var ahora2 = new Date();
+                    var hora2 = ahora2.getHours().toString().padStart(2,'0') + ":"
+                              + ahora2.getMinutes().toString().padStart(2,'0') + ":"
+                              + ahora2.getSeconds().toString().padStart(2,'0');
+                    var segs = Math.round((ahora2 - hora_inicio_proc) / 1000);
+                    $("#id_progreso_extraccion").html(
+                        (p.mensaje || "Procesando...") + "<br>"
+                        + "<span style='font-size:12px; color:#555;'>Inicio: "
+                        + hora_inicio_str + " | Transcurrido: " + segs
+                        + "s | Actualizado: " + hora2 + "</span>"
+                        );
+                    }
+                else if(p.estado == "finalizado")
+                    {
+                    clearInterval(global_intervalo_progreso);
+                    global_intervalo_progreso = null;
+                    $("#id_progreso_extraccion").hide();
+                    $("#id_espera").hide();
+                    var msg = p.mensaje || "Procesamiento completado";
+                    if(p.codigo_factura > 0)
+                        msg += '<br><a href="ver_factura_finca.php?codigo='
+                             + p.codigo_factura
+                             + '" target="_blank" style="color:#88010e; font-weight:bold;">Ver factura procesada</a>';
+                    messageBox(msg);
+                    actualiza_listado();
+                    }
+                else if(p.estado == "error")
+                    {
+                    clearInterval(global_intervalo_progreso);
+                    global_intervalo_progreso = null;
+                    $("#id_progreso_extraccion").hide();
+                    $("#id_espera").hide();
+                    messageBox("Error: " + (p.mensaje || "Error desconocido"));
+                    actualiza_listado();
+                    }
+                }
+            catch(e) {}
+            });
+        }, 2000);
+
+    // El AJAX solo dispara el proceso en background y retorna casi instantaneo.
+    // El resultado real lo detecta el polling cuando aparece "=== FIN ===".
+    var url = "funciones_ajax.php?funcion=procesar_factura_web&parametro1=" + codigo_adjunto;
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        // El proceso ya esta corriendo en background. No hacer nada aqui;
+        // el polling se encarga de detectar el fin y mostrar el resultado.
+        });
+    obj_ajax.fail(function(jqXHR, textStatus, errorThrown)
+        {
+        clearInterval(global_intervalo_progreso);
+        global_intervalo_progreso = null;
+        $("#id_progreso_extraccion").hide();
+        $("#id_espera").hide();
+        messageBox("Error al iniciar el proceso:\nEstado: " + textStatus + "\nHTTP: " + jqXHR.status);
+        });
+    }
+
 // ===== Ordenar el listado por una columna (alterna ASC/DESC) =====
 function ordenar_por(campo)
     {
@@ -428,7 +548,7 @@ function ordenar_por(campo)
     }
 
 // ===== Actualizar listado: trae los correos reales por AJAX, con filtro por rango si esta seteado =====
-function actualiza_listado()
+function actualiza_listado(callback_post)
     {
     $("#id_espera").show();
     var fecha_desde = "";
@@ -453,6 +573,12 @@ function actualiza_listado()
         {
         $("#id_espera").hide();
         $("#id_listado_correos").html(data);
+        // Reaplicar el filtro de texto si el usuario tenia algo escrito,
+        // asi un actualiza_listado() disparado tras procesar/extraer no
+        // tira el estado del buscador.
+        filtrar_listado_local();
+        if(typeof callback_post === "function")
+            callback_post();
         });
     obj_ajax.fail(function(jqXHR, textStatus, errorThrown)
         {
@@ -760,6 +886,7 @@ $(document).ready(function()
     <div id="dialog" title="Alerta"></div>
     <div id="id_dialog_cuerpo" title=""></div>
     <div id="id_dialog_pdf" title=""></div>
+    <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
     <div id="id_progreso_extraccion" style="position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.95); padding:20px 30px; border-radius:8px; border:2px solid #88010e; font-size:14px; font-weight:bold; color:#88010e; display:none; text-align:center; min-width:280px;"></div>
 
