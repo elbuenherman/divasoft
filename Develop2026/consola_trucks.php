@@ -1,9 +1,10 @@
 <?php
 include("variables_globales.php");
 include("funciones.php");
-include("valida_sesion.php");
-// CHEQUEO PERMISOS 
-$permiso[] = NULL;
+include("valida_sesion.php");  
+  
+// CHEQUEO PERMISOS.
+$permiso[] = NULL; 
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
@@ -323,6 +324,8 @@ function actualiza_listado()
         {
         $("#id_espera").hide();
         $("#id_listado_trucks").html(data);
+        // Reaplicar el filtro de texto si el usuario tenia algo escrito.
+        filtrar_listado_local();
         });
     }
 

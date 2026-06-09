@@ -1,11 +1,11 @@
 <?php
-        
+         
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-             
-      
+                
+        
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -1977,7 +1977,8 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         }
 
     // Validar campo y direccion contra lista blanca.
-    $campos_permitidos = array(1=>"CODIGO", 2=>"FECHAVUELO", 3=>"GUIA", 4=>"NOMBREMARCACION", 5=>"NOMBRECLIENTE", 6=>"NOMBREAGENCIA", 7=>"ESTADO");
+    // AGENCIA ya no es columna del grid; queda fuera de la lista de orden permitido.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"FECHAVUELO", 3=>"GUIA", 4=>"NOMBREMARCACION", 5=>"NOMBRECLIENTE", 6=>"ESTADO");
     $total_campos = count($campos_permitidos);
     $orden_valido = "FECHAVUELO";
     for($c=1; $c<=$total_campos; $c++)
@@ -1997,14 +1998,17 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         "GUIA"            => "c.GUIA",
         "NOMBREMARCACION" => "m.NOMBREMARCACION",
         "NOMBRECLIENTE"   => "cl.NOMBRECLIENTE",
-        "NOMBREAGENCIA"   => "p.nombre_proveedor",
         "ESTADO"          => "c.ESTADO"
         );
     $columna_order_by = $map_orden[$orden_valido];
 
+    // Se elimino el LEFT JOIN con proveedor (ya no se muestra NOMBREAGENCIA en el grid).
     $sql = "SELECT c.CODIGO          AS CODIGO,
         c.FECHAVUELO       AS FECHAVUELO,
-        c.GUIA             AS GUIA,
+        (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
+            FROM guiaconsolidado gc
+            INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+            WHERE gc.CODIGOCONSOLIDADO = c.CODIGO) AS GUIAS_CONCAT,
         c.CODIGOMARCACION  AS CODIGOMARCACION,
         c.CODIGOCLIENTE    AS CODIGOCLIENTE,
         c.CODIGOTRUCK      AS CODIGOTRUCK,
@@ -2013,12 +2017,10 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         c.DESTINO          AS DESTINO,
         c.ESTADO           AS ESTADO,
         m.NOMBREMARCACION  AS NOMBREMARCACION,
-        cl.NOMBRECLIENTE   AS NOMBRECLIENTE,
-        p.nombre_proveedor AS NOMBREAGENCIA
+        cl.NOMBRECLIENTE   AS NOMBRECLIENTE
         FROM consolidado c
         LEFT JOIN marcacion m  ON c.CODIGOMARCACION = m.CODIGO
         LEFT JOIN cliente   cl ON c.CODIGOCLIENTE   = cl.CODIGO
-        LEFT JOIN proveedor p  ON c.CODIGOAGENCIA   = p.codigo_proveedor
         WHERE c.ESTADO >= 0".$where_fechas."
         ORDER BY ".$columna_order_by." ".$direccion_valida;
     $resultado = mysqli_query($link, $sql);
@@ -2032,10 +2034,9 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $fila = mysqli_fetch_array($resultado);
         $arreglo[$i]['CODIGO']          = $fila['CODIGO'];
         $arreglo[$i]['FECHAVUELO']      = $fila['FECHAVUELO'];
-        $arreglo[$i]['GUIA']            = $fila['GUIA'];
+        $arreglo[$i]['GUIA']            = $fila['GUIAS_CONCAT'];
         $arreglo[$i]['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
         $arreglo[$i]['NOMBRECLIENTE']   = $fila['NOMBRECLIENTE'];
-        $arreglo[$i]['NOMBREAGENCIA']   = $fila['NOMBREAGENCIA'];
         $arreglo[$i]['ESTADO']          = $fila['ESTADO'];
         }
 
@@ -2045,19 +2046,19 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     $ind_guia    = _ind_orden_consolidado("GUIA",            $orden_valido, $direccion_valida);
     $ind_marca   = _ind_orden_consolidado("NOMBREMARCACION", $orden_valido, $direccion_valida);
     $ind_cliente = _ind_orden_consolidado("NOMBRECLIENTE",   $orden_valido, $direccion_valida);
-    $ind_agencia = _ind_orden_consolidado("NOMBREAGENCIA",   $orden_valido, $direccion_valida);
     $ind_estado  = _ind_orden_consolidado("ESTADO",          $orden_valido, $direccion_valida);
 
+    // AGENCIA queda fuera del grid; GUIA es ahora la columna mas ancha (30%)
+    // para que entren 2 guias concatenadas.
     $html  = '<table class="grid_consolidados">';
     $html .= '<thead><tr>';
     $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
     $html .= '<th style="width: 10%; cursor: pointer;" onclick="ordenar_por(\'FECHAVUELO\')">FECHA VUELO'.$ind_fecha.'</th>';
-    $html .= '<th style="width: 13%; cursor: pointer;" onclick="ordenar_por(\'GUIA\')">GUIA'.$ind_guia.'</th>';
-    $html .= '<th style="width: 15%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
+    $html .= '<th style="width: 30%; cursor: pointer;" onclick="ordenar_por(\'GUIA\')">GUIA'.$ind_guia.'</th>';
+    $html .= '<th style="width: 18%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
     $html .= '<th style="width: 17%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">CLIENTE'.$ind_cliente.'</th>';
-    $html .= '<th style="width: 15%; cursor: pointer;" onclick="ordenar_por(\'NOMBREAGENCIA\')">AGENCIA'.$ind_agencia.'</th>';
-    $html .= '<th style="width: 8%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
-    $html .= '<th style="width: 17%;">OPC</th>';
+    $html .= '<th style="width: 7%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 13%;">OPC</th>';
     $html .= '</tr></thead>';
     $html .= '<tbody>';
 
@@ -2068,7 +2069,6 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $guia    = htmlspecialchars((string)(isset($arreglo[$i]['GUIA']) ? $arreglo[$i]['GUIA'] : ''), ENT_QUOTES, 'UTF-8');
         $marca   = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREMARCACION']) ? $arreglo[$i]['NOMBREMARCACION'] : ''), ENT_QUOTES, 'UTF-8');
         $cliente = htmlspecialchars((string)(isset($arreglo[$i]['NOMBRECLIENTE']) ? $arreglo[$i]['NOMBRECLIENTE'] : ''), ENT_QUOTES, 'UTF-8');
-        $agencia = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREAGENCIA']) ? $arreglo[$i]['NOMBREAGENCIA'] : ''), ENT_QUOTES, 'UTF-8');
         $estado_n = (int)$arreglo[$i]['ESTADO'];
         if($estado_n == 1)
             $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
@@ -2081,7 +2081,6 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $html .= '<td title="'.$guia.'" onclick="devuelve_consolidado('.$codigo.');"><strong>'.$guia.'</strong></td>';
         $html .= '<td title="'.$marca.'" onclick="devuelve_consolidado('.$codigo.');">'.$marca.'</td>';
         $html .= '<td title="'.$cliente.'" onclick="devuelve_consolidado('.$codigo.');">'.$cliente.'</td>';
-        $html .= '<td title="'.$agencia.'" onclick="devuelve_consolidado('.$codigo.');">'.$agencia.'</td>';
         $html .= '<td class="td_centro">'.$estado_label.'</td>';
         $html .= '<td class="td_opc">';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
@@ -2128,21 +2127,19 @@ function devuelve_consolidado_dsft($codigo)
     }
 
 // INSERT si $codigo == 0, UPDATE si > 0. Los FK con valor 0 se guardan NULL.
-function graba_consolidado_dsft($codigo, $fechavuelo, $guia, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
+// La GUIA ya NO se escribe en consolidado.GUIA -> se maneja por la tabla
+// guiaconsolidado (uno a muchos). La columna legacy queda en la BD pero
+// no se toca desde esta consola.
+function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
     {
     global $link;
 
     // Validaciones identicas al cliente JS.
     $fechavuelo = trim((string)$fechavuelo);
-    $guia       = strtoupper(trim((string)$guia));
     if($fechavuelo == "")
         return "Por favor ingrese la FECHA DE VUELO";
     if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechavuelo))
         return "FECHA DE VUELO con formato invalido (Y-m-d)";
-    if($guia == "")
-        return "Por favor ingrese la GUIA";
-    if(!preg_match('/^[0-9\-]{1,14}$/', $guia))
-        return "GUIA solo admite numeros y guiones, max 14 caracteres";
 
     $codigo          = (int)$codigo;
     $codigo_usuario  = (int)$codigo_usuario;
@@ -2164,28 +2161,26 @@ function graba_consolidado_dsft($codigo, $fechavuelo, $guia, $codigomarcacion, $
 
     // Escape de strings (sobrescribir misma variable).
     $fechavuelo    = mysqli_real_escape_string($link, $fechavuelo);
-    $guia          = mysqli_real_escape_string($link, $guia);
     $observaciones = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
 
     if($codigo == 0)
         {
-        // DESTINO queda en la BD pero la consola no lo escribe.
+        // GUIA y DESTINO quedan en la BD pero la consola no los escribe.
         $sql = "INSERT INTO consolidado (
-            CODIGO, FECHAVUELO, GUIA, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
+            CODIGO, FECHAVUELO, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
             CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES,
             ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
         ) VALUES (
-            0, '".$fechavuelo."', '".$guia."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
+            0, '".$fechavuelo."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
             ".$valor_codigoagencia.", ".$valor_codigopais.", '".$observaciones."',
             ".$estado.", ".$codigo_usuario.", NOW()
         )";
         }
     else
         {
-        // DESTINO no se toca en el UPDATE.
+        // GUIA y DESTINO no se tocan en el UPDATE.
         $sql = "UPDATE consolidado SET
             FECHAVUELO            = '".$fechavuelo."',
-            GUIA                  = '".$guia."',
             CODIGOMARCACION       = ".$codigomarcacion.",
             CODIGOCLIENTE         = ".$valor_codigocliente.",
             CODIGOTRUCK           = ".$valor_codigotruck.",
@@ -2283,6 +2278,167 @@ function opciones_marcaciones_por_cliente_dsft($codigo_cliente)
         $f     = mysqli_fetch_assoc($res);
         $truck = ($f["CODIGOTRUCK"] !== null) ? (int)$f["CODIGOTRUCK"] : 0;
         $html .= '<option value="'.(int)$f["CODIGO"].'" data-truck="'.$truck.'">'.htmlspecialchars((string)$f["NOMBREMARCACION"], ENT_QUOTES, 'UTF-8').'</option>';
+        }
+    return $html;
+    }
+
+
+// ============================================================================
+// GUIAS DEL CONSOLIDADO (consola_consolidado.php).
+// Tablas:
+//   guia                (CODIGO PK, NUMEROGUIA, ESTADO, FECHAREGISTRO, ...)
+//   guiaconsolidado     (CODIGOGUIA, CODIGOCONSOLIDADO)  -- join NxN
+// ============================================================================
+
+// Asocia una guia a un consolidado. $valor puede ser:
+//   - numerico puro -> es el CODIGO de una guia existente.
+//   - no numerico   -> es un NUMEROGUIA nuevo (el usuario lo escribio).
+// Si es nuevo, inserta en guia y luego usa el CODIGO autogenerado.
+// El INSERT en guiaconsolidado usa IGNORE para evitar duplicar el par.
+function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usuario)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_usuario     = (int)$codigo_usuario;
+    if($codigo_consolidado <= 0)
+        return "Codigo de consolidado invalido";
+
+    $valor = trim((string)$valor);
+    if($valor == "")
+        return "Valor de guia vacio";
+
+    $codigo_guia = 0;
+
+    // Detectar si $valor es codigo numerico (guia existente) o numeroguia nuevo.
+    if(ctype_digit($valor) && (int)$valor > 0)
+        {
+        // Verificar que esa guia existe.
+        $codigo_check = (int)$valor;
+        $sql_check = "SELECT CODIGO FROM guia WHERE CODIGO = ".$codigo_check;
+        $res_check = mysqli_query($link, $sql_check);
+        if($res_check && mysqli_num_rows($res_check) > 0)
+            $codigo_guia = $codigo_check;
+        }
+
+    if($codigo_guia == 0)
+        {
+        // Es un NUMEROGUIA nuevo (o el codigo no existia).
+        $numeroguia = strtoupper($valor);
+        // Validar formato: solo numeros y guiones, max 15 chars.
+        if(!preg_match('/^[0-9\-]{1,15}$/', $numeroguia))
+            return "La guia solo admite numeros y guiones (max 15 caracteres)";
+        $numeroguia_sql = mysqli_real_escape_string($link, $numeroguia);
+
+        // ¿Ya existe el NUMEROGUIA en la tabla guia?
+        $sql_busca = "SELECT CODIGO FROM guia WHERE NUMEROGUIA = '".$numeroguia_sql."' LIMIT 1";
+        $res_busca = mysqli_query($link, $sql_busca);
+        if($res_busca && mysqli_num_rows($res_busca) > 0)
+            {
+            $fila_b = mysqli_fetch_assoc($res_busca);
+            $codigo_guia = (int)$fila_b["CODIGO"];
+            }
+        else
+            {
+            // INSERT nueva guia.
+            $sql_ins = "INSERT INTO guia (CODIGO, NUMEROGUIA, ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO)
+                VALUES (0, '".$numeroguia_sql."', 1, ".$codigo_usuario.", NOW())";
+            $r_ins = mysqli_query($link, $sql_ins);
+            if(!$r_ins)
+                return "Error SQL al crear guia: ".mysqli_error($link);
+            $codigo_guia = (int)mysqli_insert_id($link);
+            }
+        }
+
+    if($codigo_guia <= 0)
+        return "No se pudo determinar el CODIGO de guia";
+
+    // Asociar al consolidado (IGNORE por si ya estaba).
+    $sql_aso = "INSERT IGNORE INTO guiaconsolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
+        VALUES (".$codigo_guia.", ".$codigo_consolidado.")";
+    $r_aso = mysqli_query($link, $sql_aso);
+    if(!$r_aso)
+        return "Error SQL al asociar guia: ".mysqli_error($link);
+
+    return "OK";
+    }
+
+// Desasocia una guia de un consolidado (no toca la tabla guia).
+function quitar_guia_consolidado_dsft($codigo_consolidado, $codigo_guia)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia        = (int)$codigo_guia;
+    if($codigo_consolidado <= 0 || $codigo_guia <= 0)
+        return "Codigos invalidos";
+
+    $sql = "DELETE FROM guiaconsolidado
+        WHERE CODIGOGUIA = ".$codigo_guia."
+          AND CODIGOCONSOLIDADO = ".$codigo_consolidado;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Retorna el HTML de la lista de guias asociadas a un consolidado: badges con
+// el NUMEROGUIA y boton X para quitar.
+function lista_guias_consolidado_dsft($codigo_consolidado)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "";
+
+    $sql = "SELECT g.CODIGO, g.NUMEROGUIA
+        FROM guiaconsolidado gc
+        INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+        WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+        ORDER BY g.NUMEROGUIA";
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="color:#88010e; font-size:11px;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+
+    $numero = mysqli_num_rows($resultado);
+    if($numero == 0)
+        return '<div style="font-size:12px; color:#888; padding:4px 0;">Sin guias asignadas</div>';
+
+    $html = '';
+    for($i=1; $i<=$numero; $i++)
+        {
+        $f         = mysqli_fetch_assoc($resultado);
+        $cg        = (int)$f["CODIGO"];
+        $numguia   = htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8');
+        // Cada badge envuelto en un <div> para que se muestren uno por linea.
+        $html .= '<div style="margin:3px 0;">';
+        $html .= '<span class="badge_guia" style="display:inline-block; background:#f2f2f2; border:1px solid #ccc; border-radius:4px; padding:3px 8px; font-size:13px;">';
+        $html .= $numguia;
+        $html .= '<a onclick="quitar_guia_consolidado('.$cg.');" style="cursor:pointer; color:#88010e; margin-left:4px; font-weight:bold;" title="Quitar guia">&times;</a>';
+        $html .= '</span>';
+        $html .= '</div>';
+        }
+    return $html;
+    }
+
+
+// Retorna las options HTML de guias recientes (ultimos 15 dias) para refrescar
+// el Select2 con tags. La opcion default "-- Buscar o crear guia --" la pone
+// el frontend; aqui solo van las options reales.
+function opciones_guias_recientes_dsft()
+    {
+    global $link;
+    $sql = "SELECT CODIGO, NUMEROGUIA FROM guia
+        WHERE ESTADO >= 0
+          AND FECHAREGISTRO >= DATE_SUB(NOW(), INTERVAL 15 DAY)
+        ORDER BY NUMEROGUIA";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return "";
+    $total = mysqli_num_rows($res);
+    $html  = "";
+    for($i=1; $i<=$total; $i++)
+        {
+        $f = mysqli_fetch_assoc($res);
+        $html .= '<option value="'.(int)$f["CODIGO"].'">'.htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8').'</option>';
         }
     return $html;
     }

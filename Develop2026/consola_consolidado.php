@@ -1,9 +1,9 @@
 <?php
-include("variables_globales.php");
+include("variables_globales.php"); 
 include("funciones.php");
-include("valida_sesion.php"); 
-// CHEQUEO PERMISOS
-$permiso[] = NULL;   
+include("valida_sesion.php");  
+// CHEQUEO PERMISOS  
+$permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
@@ -64,6 +64,22 @@ for($i=0; $i<$numero_agencias; $i++)
     $fila = mysqli_fetch_array($resultado_agencias);
     $arreglo_agencias[$i]['CODIGOAGENCIA'] = $fila['CODIGOAGENCIA'];
     $arreglo_agencias[$i]['NOMBREAGENCIA'] = $fila['NOMBREAGENCIA'];
+    }
+
+// GUIAS recientes (ultimos 15 dias) para el Select2 con tags.
+// Si la usuaria escribe un NUMEROGUIA nuevo, Select2 lo manda como string;
+// el backend crea la guia.
+$sql_guias = "SELECT CODIGO, NUMEROGUIA FROM guia
+    WHERE ESTADO >= 0 AND FECHAREGISTRO >= DATE_SUB(NOW(), INTERVAL 15 DAY)
+    ORDER BY NUMEROGUIA";
+$resultado_guias = mysqli_query($link, $sql_guias);
+$numero_guias    = $resultado_guias ? mysqli_num_rows($resultado_guias) : 0;
+$arreglo_guias   = array();
+for($i=0; $i<$numero_guias; $i++)
+    {
+    $fila = mysqli_fetch_array($resultado_guias);
+    $arreglo_guias[$i]['CODIGO']     = $fila['CODIGO'];
+    $arreglo_guias[$i]['NUMEROGUIA'] = $fila['NUMEROGUIA'];
     }
 ?>
 <!DOCTYPE html>
@@ -317,7 +333,6 @@ function devuelve_consolidado(codigo)
             else
                 flatpickr_fechavuelo.clear();
             }
-        $("#id_guia").val(datos.GUIA || "");
         var pais_val = (datos.CODIGOPAIS && parseInt(datos.CODIGOPAIS) > 0) ? datos.CODIGOPAIS.toString() : "0";
         $("#id_codigopais").val(pais_val).trigger('change');
         var ag_val = (datos.CODIGOAGENCIA && parseInt(datos.CODIGOAGENCIA) > 0) ? datos.CODIGOAGENCIA.toString() : "0";
@@ -357,7 +372,10 @@ function devuelve_consolidado(codigo)
             $("#id_codigotruck").val("0").trigger('change.select2');
             }
 
-        $("#id_guia").focus();
+        // Cargar las guias asociadas a este consolidado.
+        cargar_guias_consolidado(parseInt(datos.CODIGO));
+
+        // No hacer focus al campo de fecha (abre el Flatpickr).
         });
     }
 
@@ -401,17 +419,12 @@ function elimina_consolidado_dsft(codigo)
     }
 
 // ===== Validacion de formulario =====
-// FECHA VUELO, GUIA y MARCACION son obligatorios. Valida en ese orden,
-// retorna el primer error encontrado. GUIA solo admite numeros y guiones (max 14).
+// FECHA VUELO y MARCACION son obligatorios. GUIA ya NO es campo del formulario
+// (se maneja por la seccion GUIAS separada).
 function valida_formulario()
     {
     if($("#id_fechavuelo").val().trim() == "")
         return "Por favor ingrese la FECHA DE VUELO";
-    var guia = $("#id_guia").val().trim();
-    if(guia == "")
-        return "Por favor ingrese la GUIA";
-    if(!/^[0-9\-]{1,14}$/.test(guia))
-        return "GUIA solo admite numeros y guiones (max 14 caracteres)";
     var marc_sel = parseInt($("#id_codigomarcacion").val());
     if(isNaN(marc_sel) || marc_sel <= 0)
         return "Por favor seleccione la MARCACION";
@@ -434,15 +447,14 @@ function grabar_consolidado()
     var url = "funciones_ajax.php?funcion=graba_consolidado_dsft"
         + "&parametro1="  + global_codigo_seleccionado
         + "&parametro2="  + encodeURIComponent($("#id_fechavuelo").val())
-        + "&parametro3="  + encodeURIComponent($("#id_guia").val())
-        + "&parametro4="  + $("#id_codigomarcacion").val()
-        + "&parametro5="  + $("#id_codigocliente").val()
-        + "&parametro6="  + $("#id_codigotruck").val()
-        + "&parametro7="  + $("#id_codigopais").val()
-        + "&parametro8="  + $("#id_codigoagencia").val()
-        + "&parametro9="  + encodeURIComponent($("#id_observaciones").val())
-        + "&parametro10=" + estado_val
-        + "&parametro11=" + global_codigo_usuario;
+        + "&parametro3="  + $("#id_codigomarcacion").val()
+        + "&parametro4="  + $("#id_codigocliente").val()
+        + "&parametro5="  + $("#id_codigotruck").val()
+        + "&parametro6="  + $("#id_codigopais").val()
+        + "&parametro7="  + $("#id_codigoagencia").val()
+        + "&parametro8="  + encodeURIComponent($("#id_observaciones").val())
+        + "&parametro9="  + estado_val
+        + "&parametro10=" + global_codigo_usuario;
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -457,6 +469,116 @@ function grabar_consolidado()
             {
             messageBox("Error al grabar: " + data);
             }
+        });
+    }
+
+// ===== Guias del consolidado (tabla guiaconsolidado, NxN con guia) =====
+// Asocia una guia al consolidado actual. Si la usuaria selecciono una guia
+// existente, el value es el CODIGO numerico. Si tipeo una nueva, Select2
+// (tags:true) la manda como id == el texto -> el backend la crea.
+function agregar_guia_consolidado()
+    {
+    var codigo_consolidado = global_codigo_seleccionado;
+    if(codigo_consolidado <= 0)
+        {
+        messageBox("Primero grabe el consolidado antes de agregar guias.");
+        return;
+        }
+    var select = $("#id_select_guia");
+    var valor  = select.val();
+    // allowClear hace que el valor vacio sea null o "" (no "0").
+    if(!valor || valor == "")
+        {
+        messageBox("Seleccione o escriba una guia.");
+        return;
+        }
+
+    // Si es un tag nuevo (no numerico = no es CODIGO de guia existente),
+    // validar: solo numeros y guiones, max 15 chars.
+    var es_nuevo = isNaN(parseInt(valor));
+    if(es_nuevo)
+        {
+        if(valor.length > 15)
+            {
+            messageBox("La guia no puede tener mas de 15 caracteres.");
+            return;
+            }
+        if(!/^[0-9\-]{1,15}$/.test(valor))
+            {
+            messageBox("La guia solo admite numeros y guiones (max 15 caracteres).");
+            return;
+            }
+        }
+
+    var url = "funciones_ajax.php?funcion=agregar_guia_consolidado_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=" + encodeURIComponent(valor)
+        + "&parametro3=" + global_codigo_usuario;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            cargar_guias_consolidado(codigo_consolidado);
+            // Si era un tag nuevo (valor no numerico), recargar las options del
+            // Select2 para que aparezca en futuras busquedas sin recargar pagina.
+            if(isNaN(parseInt(valor)))
+                {
+                $.get("funciones_ajax.php?funcion=opciones_guias_recientes_dsft", function(data_opts)
+                    {
+                    // allowClear necesita una primera <option value=""></option>.
+                    var default_opt = '<option value=""></option>';
+                    $("#id_select_guia").html(default_opt + data_opts).val("").trigger("change.select2");
+                    });
+                }
+            else
+                {
+                select.val("").trigger("change");
+                }
+            actualiza_listado();
+            }
+        else
+            {
+            messageBox(data);
+            }
+        });
+    }
+
+// Desasocia una guia del consolidado actual (no borra de tabla guia).
+function quitar_guia_consolidado(codigo_guia)
+    {
+    var codigo_consolidado = global_codigo_seleccionado;
+    if(codigo_consolidado <= 0)
+        return;
+    var url = "funciones_ajax.php?funcion=quitar_guia_consolidado_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=" + codigo_guia;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            cargar_guias_consolidado(codigo_consolidado);
+            actualiza_listado();
+            }
+        else
+            {
+            messageBox(data);
+            }
+        });
+    }
+
+// Trae el HTML de los badges con las guias del consolidado y lo pinta.
+function cargar_guias_consolidado(codigo_consolidado)
+    {
+    if(codigo_consolidado <= 0)
+        {
+        $("#id_lista_guias_consolidado").html("");
+        return;
+        }
+    var url = "funciones_ajax.php?funcion=lista_guias_consolidado_dsft"
+        + "&parametro1=" + codigo_consolidado;
+    $.get(url, function(data)
+        {
+        $("#id_lista_guias_consolidado").html(data);
         });
     }
 
@@ -507,6 +629,8 @@ function actualiza_listado()
         {
         $("#id_espera").hide();
         $("#id_listado_consolidados").html(data);
+        // Reaplicar el filtro de texto si el usuario tenia algo escrito.
+        filtrar_listado_local_consolidado();
         });
     }
 
@@ -517,7 +641,6 @@ function boton_nuevo()
     $("#id_codigo_consolidado").val("");
     if(flatpickr_fechavuelo)
         flatpickr_fechavuelo.clear();
-    $("#id_guia").val("");
     // CLIENTE a 0 sin disparar el handler (para no encadenar un AJAX inutil).
     $("#id_codigocliente").val("0").trigger('change.select2');
     // MARCACION vuelve a solo "-- SELECCIONE --" (sin opciones de ningun cliente).
@@ -529,7 +652,10 @@ function boton_nuevo()
     $("#id_estado_activo").prop('checked', true);
     $("#id_estado_inactivo").prop('checked', false);
     $("#id_listado_consolidados .grupo_consolidado").removeClass("grupo_consolidado_seleccionado");
-    $("#id_guia").focus();
+    // Limpiar la seccion GUIAS (allowClear necesita value = "").
+    $("#id_lista_guias_consolidado").html("");
+    $("#id_select_guia").val("").trigger('change.select2');
+    // No hacer focus al campo de fecha (abre el Flatpickr).
     }
 
 $(document).ready(function()
@@ -544,11 +670,13 @@ $(document).ready(function()
         dialogClass: 'myTitleClass'
         });
 
-    // Flatpickr para FECHA VUELO (formulario).
+    // Flatpickr para FECHA VUELO (formulario). clickOpens controla que solo
+    // se abra al clickear el input, no al recibir focus programatico.
     flatpickr_fechavuelo = flatpickr("#id_fechavuelo",
         {
         dateFormat: "Y-m-d",
         locale: "es",
+        clickOpens: true,
         allowInput: false
         });
 
@@ -577,8 +705,50 @@ $(document).ready(function()
     $('#id_codigomarcacion').select2({width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
     $('#id_codigocliente').select2(  {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
     $('#id_codigotruck').select2(    {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
+    // TRUCK es readonly: el valor se hereda de la MARCACION elegida y el
+    // usuario no puede abrir el dropdown. Setear por JS sigue funcionando
+    // ($('#id_codigotruck').val(N).trigger('change.select2')).
+    $('#id_codigotruck').on('select2:opening', function(e)
+        {
+        e.preventDefault();
+        });
     $('#id_codigopais').select2(     {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
     $('#id_codigoagencia').select2(  {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
+    // Select2 de guias con tags:true para permitir crear una guia nueva
+    // escribiendo el NUMEROGUIA en el cuadro de busqueda.
+    // createTag filtra el texto a numeros/guiones y limita a 15 chars antes
+    // de aceptar el tag.
+    $('#id_select_guia').select2(
+        {
+        width: '220px',
+        tags: true,
+        allowClear: true,
+        placeholder: '-- Buscar o crear guia --',
+        minimumResultsForSearch: 1,
+        createTag: function(params)
+            {
+            var term = params.term.replace(/[^0-9\-]/g, '');
+            if(term == '' || term.length > 15)
+                return null;
+            return { id: term, text: term, newTag: true };
+            }
+        });
+
+    // Mascara: en el campo de busqueda del Select2, bloquear caracteres
+    // distintos de numeros y guiones, y limitar a 15 chars.
+    $('#id_select_guia').on('select2:open', function()
+        {
+        var searchField = document.querySelector('.select2-search__field');
+        if(searchField)
+            {
+            searchField.setAttribute('maxlength', '15');
+            searchField.setAttribute('autocomplete', 'off');
+            searchField.addEventListener('input', function()
+                {
+                this.value = this.value.replace(/[^0-9\-]/g, '');
+                });
+            }
+        });
 
     // Cuando cambia CLIENTE: cargar marcaciones de ese cliente via AJAX,
     // limpiar TRUCK. Si cliente == 0, vaciar marcaciones.
@@ -630,11 +800,11 @@ $(document).ready(function()
                 </div>
                 <div style="float: right;">
                     <i class="icon-calendar" style="color:#88010e; vertical-align:middle;" title="Filtrar por rango de fechas"></i>
-                    <input type="text" id="id_rango_filtro_consolidado"
+                    <input type="text" id="id_rango_filtro_consolidado" autocomplete="off"
                         style="width:170px; font-size:13px; display:inline-block; vertical-align:middle; margin-right:10px; padding:5px 6px; border:1px solid #c0c0c0; border-radius:2px; height:30px; box-sizing:border-box;"
                         placeholder="Filtrar por fecha vuelo" readonly>
                     <i class="icon-search" style="color: #88010e; vertical-align: middle;"></i>
-                    <input type="text" id="id_busqueda_consolidado" class="input_pequeno" style="width: 200px; display: inline-block; vertical-align: middle;" placeholder="Buscar..." onkeyup="filtrar_listado_local_consolidado();" />
+                    <input type="text" id="id_busqueda_consolidado" autocomplete="off" class="input_pequeno" style="width: 200px; display: inline-block; vertical-align: middle;" placeholder="Buscar..." onkeyup="filtrar_listado_local_consolidado();" />
                 </div>
             </div>
 
@@ -659,25 +829,17 @@ $(document).ready(function()
                     <tr>
                         <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CODIGO:</td>
                         <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_codigo_consolidado" class="input_readonly" readonly />
+                            <input type="text" id="id_codigo_consolidado" autocomplete="off" class="input_readonly" readonly />
                         </td>
                     </tr>
                     <!-- 2) FECHA VUELO -->
                     <tr>
                         <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">FECHA VUELO:</td>
                         <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_fechavuelo" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
+                            <input type="text" id="id_fechavuelo" autocomplete="off" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
                         </td>
                     </tr>
-                    <!-- 3) GUIA (max 14, solo numeros y guiones) -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">GUIA:</td>
-                        <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_guia" class="input_pequeno" maxlength="14"
-                                oninput="this.value = this.value.replace(/[^0-9\-]/g, '').substring(0, 14);" />
-                        </td>
-                    </tr>
-                    <!-- 4) CLIENTE -->
+                    <!-- 3) CLIENTE (GUIA pasa a ser una seccion separada con tabla guiaconsolidado) -->
                     <tr>
                         <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CLIENTE:</td>
                         <td style="padding-bottom: 8px;">
@@ -753,6 +915,39 @@ $(document).ready(function()
                             <textarea id="id_observaciones" maxlength="500" rows="4"
                                 style="width: 100%; text-transform: uppercase; font-size: 12px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
                         </td>
+                    </tr>
+                    <!-- ===== GUIAS: integrado al formulario como filas de la table ===== -->
+                    <tr>
+                        <td colspan="2"><hr style="border:none; border-top:1px solid #ccc; margin:10px 0;"></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">GUIAS:</td>
+                        <td style="padding-bottom: 8px; white-space: nowrap;">
+                            <select id="id_select_guia" style="width: 220px;">
+                                <option value=""></option>
+                                <?php
+                                for($i=0; $i<$numero_guias; $i++)
+                                    {
+                                    echo '<option value="'.(int)$arreglo_guias[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_guias[$i]['NUMEROGUIA'], ENT_QUOTES, 'UTF-8').'</option>';
+                                    }
+                                ?>
+                            </select>
+                            <a onclick="agregar_guia_consolidado();" title="Agregar guia"
+                                style="cursor:pointer; color:#88010e; margin-left:6px; font-size:16px; vertical-align:middle; display:inline-block;">
+                                <i class="icon-plus"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td style="padding-bottom: 8px;">
+                            <div id="id_lista_guias_consolidado" style="padding: 4px 0;">
+                                <!-- Llenado por cargar_guias_consolidado() cuando se selecciona un consolidado. -->
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><hr style="border:none; border-top:1px solid #ccc; margin:10px 0;"></td>
                     </tr>
                     <!-- ESTADO -->
                     <tr>
