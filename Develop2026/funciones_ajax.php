@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-      
+           
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -397,6 +397,20 @@ if($funcion == 'elimina_marcacion_dsft')
     echo elimina_marcacion_dsft($parametro1, $parametro2);
 if($funcion == 'trazabilidad_marcacion_dsft')
     echo trazabilidad_marcacion_dsft($parametro1);
+
+// CONSOLIDADOS (consola nueva _dsft)
+if($funcion == 'lista_consolidados_dsft')
+    echo lista_consolidados_dsft($parametro1, $parametro2, $parametro3, $parametro4);
+if($funcion == 'devuelve_consolidado_dsft')
+    echo devuelve_consolidado_dsft($parametro1);
+if($funcion == 'graba_consolidado_dsft')
+    echo graba_consolidado_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10, $parametro11);
+if($funcion == 'elimina_consolidado_dsft')
+    echo elimina_consolidado_dsft($parametro1, $parametro2);
+if($funcion == 'trazabilidad_consolidado_dsft')
+    echo trazabilidad_consolidado_dsft($parametro1);
+if($funcion == 'opciones_marcaciones_por_cliente_dsft')
+    echo opciones_marcaciones_por_cliente_dsft($parametro1);
 // Tablita read-only en consola_clientes_dsft.php
 if($funcion == 'lista_marcaciones_por_cliente_dsft')
     echo lista_marcaciones_por_cliente_dsft($parametro1);

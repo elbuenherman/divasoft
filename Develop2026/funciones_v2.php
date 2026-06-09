@@ -4,8 +4,8 @@
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-           
-     
+             
+      
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -1942,5 +1942,347 @@ function lista_marcaciones_por_cliente_dsft($codigo_cliente)
         $html .= '</tr>';
         }
 
+    return $html;
+    }
+
+
+// ============================================================================
+// CONSOLIDADOS - consola nueva (_dsft).
+// LEFT JOIN a marcacion, cliente y proveedor (agencia) para mostrar nombres
+// en el grid sin queries extra por fila.
+// ============================================================================
+
+// Helper interno para indicador de ordenamiento (triangulo ASC/DESC).
+function _ind_orden_consolidado($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+// Lista el grid de consolidados (HTML completo: thead + tbody + total).
+function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
+    {
+    global $link;
+
+    // Filtro por rango de FECHAVUELO si ambas fechas son validas (Y-m-d).
+    $valida_desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_desde);
+    $valida_hasta = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_hasta);
+    $where_fechas = "";
+    if($valida_desde && $valida_hasta)
+        {
+        $fecha_desde = mysqli_real_escape_string($link, $fecha_desde);
+        $fecha_hasta = mysqli_real_escape_string($link, $fecha_hasta);
+        $where_fechas = " AND c.FECHAVUELO >= '".$fecha_desde."' AND c.FECHAVUELO <= '".$fecha_hasta."'";
+        }
+
+    // Validar campo y direccion contra lista blanca.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"FECHAVUELO", 3=>"GUIA", 4=>"NOMBREMARCACION", 5=>"NOMBRECLIENTE", 6=>"NOMBREAGENCIA", 7=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "FECHAVUELO";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "ASC") ? "ASC" : "DESC";
+
+    // Mapear alias logico a la columna real del JOIN para el ORDER BY.
+    $map_orden = array(
+        "CODIGO"          => "c.CODIGO",
+        "FECHAVUELO"      => "c.FECHAVUELO",
+        "GUIA"            => "c.GUIA",
+        "NOMBREMARCACION" => "m.NOMBREMARCACION",
+        "NOMBRECLIENTE"   => "cl.NOMBRECLIENTE",
+        "NOMBREAGENCIA"   => "p.nombre_proveedor",
+        "ESTADO"          => "c.ESTADO"
+        );
+    $columna_order_by = $map_orden[$orden_valido];
+
+    $sql = "SELECT c.CODIGO          AS CODIGO,
+        c.FECHAVUELO       AS FECHAVUELO,
+        c.GUIA             AS GUIA,
+        c.CODIGOMARCACION  AS CODIGOMARCACION,
+        c.CODIGOCLIENTE    AS CODIGOCLIENTE,
+        c.CODIGOTRUCK      AS CODIGOTRUCK,
+        c.CODIGOAGENCIA    AS CODIGOAGENCIA,
+        c.CODIGOPAIS       AS CODIGOPAIS,
+        c.DESTINO          AS DESTINO,
+        c.ESTADO           AS ESTADO,
+        m.NOMBREMARCACION  AS NOMBREMARCACION,
+        cl.NOMBRECLIENTE   AS NOMBRECLIENTE,
+        p.nombre_proveedor AS NOMBREAGENCIA
+        FROM consolidado c
+        LEFT JOIN marcacion m  ON c.CODIGOMARCACION = m.CODIGO
+        LEFT JOIN cliente   cl ON c.CODIGOCLIENTE   = cl.CODIGO
+        LEFT JOIN proveedor p  ON c.CODIGOAGENCIA   = p.codigo_proveedor
+        WHERE c.ESTADO >= 0".$where_fechas."
+        ORDER BY ".$columna_order_by." ".$direccion_valida;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="padding: 10px; color: #88010e;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+    $numero = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=0; $i<$numero; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']          = $fila['CODIGO'];
+        $arreglo[$i]['FECHAVUELO']      = $fila['FECHAVUELO'];
+        $arreglo[$i]['GUIA']            = $fila['GUIA'];
+        $arreglo[$i]['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
+        $arreglo[$i]['NOMBRECLIENTE']   = $fila['NOMBRECLIENTE'];
+        $arreglo[$i]['NOMBREAGENCIA']   = $fila['NOMBREAGENCIA'];
+        $arreglo[$i]['ESTADO']          = $fila['ESTADO'];
+        }
+
+    // Indicadores de ordenamiento por columna.
+    $ind_codigo  = _ind_orden_consolidado("CODIGO",          $orden_valido, $direccion_valida);
+    $ind_fecha   = _ind_orden_consolidado("FECHAVUELO",      $orden_valido, $direccion_valida);
+    $ind_guia    = _ind_orden_consolidado("GUIA",            $orden_valido, $direccion_valida);
+    $ind_marca   = _ind_orden_consolidado("NOMBREMARCACION", $orden_valido, $direccion_valida);
+    $ind_cliente = _ind_orden_consolidado("NOMBRECLIENTE",   $orden_valido, $direccion_valida);
+    $ind_agencia = _ind_orden_consolidado("NOMBREAGENCIA",   $orden_valido, $direccion_valida);
+    $ind_estado  = _ind_orden_consolidado("ESTADO",          $orden_valido, $direccion_valida);
+
+    $html  = '<table class="grid_consolidados">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
+    $html .= '<th style="width: 10%; cursor: pointer;" onclick="ordenar_por(\'FECHAVUELO\')">FECHA VUELO'.$ind_fecha.'</th>';
+    $html .= '<th style="width: 13%; cursor: pointer;" onclick="ordenar_por(\'GUIA\')">GUIA'.$ind_guia.'</th>';
+    $html .= '<th style="width: 15%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
+    $html .= '<th style="width: 17%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">CLIENTE'.$ind_cliente.'</th>';
+    $html .= '<th style="width: 15%; cursor: pointer;" onclick="ordenar_por(\'NOMBREAGENCIA\')">AGENCIA'.$ind_agencia.'</th>';
+    $html .= '<th style="width: 8%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 17%;">OPC</th>';
+    $html .= '</tr></thead>';
+    $html .= '<tbody>';
+
+    for($i=0; $i<$numero; $i++)
+        {
+        $codigo  = (int)$arreglo[$i]['CODIGO'];
+        $fecha   = htmlspecialchars((string)(isset($arreglo[$i]['FECHAVUELO']) ? $arreglo[$i]['FECHAVUELO'] : ''), ENT_QUOTES, 'UTF-8');
+        $guia    = htmlspecialchars((string)(isset($arreglo[$i]['GUIA']) ? $arreglo[$i]['GUIA'] : ''), ENT_QUOTES, 'UTF-8');
+        $marca   = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREMARCACION']) ? $arreglo[$i]['NOMBREMARCACION'] : ''), ENT_QUOTES, 'UTF-8');
+        $cliente = htmlspecialchars((string)(isset($arreglo[$i]['NOMBRECLIENTE']) ? $arreglo[$i]['NOMBRECLIENTE'] : ''), ENT_QUOTES, 'UTF-8');
+        $agencia = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREAGENCIA']) ? $arreglo[$i]['NOMBREAGENCIA'] : ''), ENT_QUOTES, 'UTF-8');
+        $estado_n = (int)$arreglo[$i]['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_consolidado" id="id_grupo_consolidado_'.$codigo.'">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td class="td_centro" onclick="devuelve_consolidado('.$codigo.');">'.$fecha.'</td>';
+        $html .= '<td title="'.$guia.'" onclick="devuelve_consolidado('.$codigo.');"><strong>'.$guia.'</strong></td>';
+        $html .= '<td title="'.$marca.'" onclick="devuelve_consolidado('.$codigo.');">'.$marca.'</td>';
+        $html .= '<td title="'.$cliente.'" onclick="devuelve_consolidado('.$codigo.');">'.$cliente.'</td>';
+        $html .= '<td title="'.$agencia.'" onclick="devuelve_consolidado('.$codigo.');">'.$agencia.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
+        $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: elimina_consolidado_dsft('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</tbody></table>';
+    $html .= '<div style="text-align: right; font-size: 11px; color: #666; padding: 5px;">Total: '.$numero.' registros</div>';
+    return $html;
+    }
+
+// Devuelve un consolidado como JSON para llenar el formulario.
+function devuelve_consolidado_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return json_encode(array("ERROR" => "Codigo invalido"));
+
+    $sql = "SELECT CODIGO, FECHAVUELO, GUIA, CODIGOMARCACION, CODIGOCLIENTE,
+        CODIGOTRUCK, CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES, ESTADO
+        FROM consolidado WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return json_encode(array("ERROR" => "Consolidado no encontrado"));
+
+    $fila = mysqli_fetch_array($resultado);
+    $respuesta = array();
+    $respuesta['CODIGO']          = $fila['CODIGO'];
+    $respuesta['FECHAVUELO']      = $fila['FECHAVUELO'];
+    $respuesta['GUIA']            = $fila['GUIA'];
+    $respuesta['CODIGOMARCACION'] = $fila['CODIGOMARCACION'];
+    $respuesta['CODIGOCLIENTE']   = $fila['CODIGOCLIENTE'];
+    $respuesta['CODIGOTRUCK']     = $fila['CODIGOTRUCK'];
+    $respuesta['CODIGOAGENCIA']   = $fila['CODIGOAGENCIA'];
+    $respuesta['CODIGOPAIS']      = $fila['CODIGOPAIS'];
+    $respuesta['OBSERVACIONES']   = $fila['OBSERVACIONES'];
+    $respuesta['ESTADO']          = $fila['ESTADO'];
+
+    return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+    }
+
+// INSERT si $codigo == 0, UPDATE si > 0. Los FK con valor 0 se guardan NULL.
+function graba_consolidado_dsft($codigo, $fechavuelo, $guia, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
+    {
+    global $link;
+
+    // Validaciones identicas al cliente JS.
+    $fechavuelo = trim((string)$fechavuelo);
+    $guia       = strtoupper(trim((string)$guia));
+    if($fechavuelo == "")
+        return "Por favor ingrese la FECHA DE VUELO";
+    if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechavuelo))
+        return "FECHA DE VUELO con formato invalido (Y-m-d)";
+    if($guia == "")
+        return "Por favor ingrese la GUIA";
+    if(!preg_match('/^[0-9\-]{1,14}$/', $guia))
+        return "GUIA solo admite numeros y guiones, max 14 caracteres";
+
+    $codigo          = (int)$codigo;
+    $codigo_usuario  = (int)$codigo_usuario;
+    $estado          = (int)$estado;
+    $codigomarcacion = (int)$codigomarcacion;
+    $codigocliente   = (int)$codigocliente;
+    $codigotruck     = (int)$codigotruck;
+    $codigopais      = (int)$codigopais;
+    $codigoagencia   = (int)$codigoagencia;
+
+    if($codigomarcacion <= 0)
+        return "Por favor seleccione la MARCACION";
+
+    // FK = 0 -> NULL en SQL (excepto CODIGOMARCACION que ya validamos > 0).
+    $valor_codigocliente = ($codigocliente == 0) ? "NULL" : $codigocliente;
+    $valor_codigotruck   = ($codigotruck   == 0) ? "NULL" : $codigotruck;
+    $valor_codigopais    = ($codigopais    == 0) ? "NULL" : $codigopais;
+    $valor_codigoagencia = ($codigoagencia == 0) ? "NULL" : $codigoagencia;
+
+    // Escape de strings (sobrescribir misma variable).
+    $fechavuelo    = mysqli_real_escape_string($link, $fechavuelo);
+    $guia          = mysqli_real_escape_string($link, $guia);
+    $observaciones = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+
+    if($codigo == 0)
+        {
+        // DESTINO queda en la BD pero la consola no lo escribe.
+        $sql = "INSERT INTO consolidado (
+            CODIGO, FECHAVUELO, GUIA, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
+            CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES,
+            ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            0, '".$fechavuelo."', '".$guia."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
+            ".$valor_codigoagencia.", ".$valor_codigopais.", '".$observaciones."',
+            ".$estado.", ".$codigo_usuario.", NOW()
+        )";
+        }
+    else
+        {
+        // DESTINO no se toca en el UPDATE.
+        $sql = "UPDATE consolidado SET
+            FECHAVUELO            = '".$fechavuelo."',
+            GUIA                  = '".$guia."',
+            CODIGOMARCACION       = ".$codigomarcacion.",
+            CODIGOCLIENTE         = ".$valor_codigocliente.",
+            CODIGOTRUCK           = ".$valor_codigotruck.",
+            CODIGOAGENCIA         = ".$valor_codigoagencia.",
+            CODIGOPAIS            = ".$valor_codigopais.",
+            OBSERVACIONES         = '".$observaciones."',
+            ESTADO                = ".$estado.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Eliminacion logica: ESTADO = -1. NO hace DELETE fisico.
+function elimina_consolidado_dsft($codigo, $codigo_usuario)
+    {
+    global $link;
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE consolidado SET
+        ESTADO                = -1,
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Devuelve HTML formateado con la trazabilidad (quien registro/modifico, cuando).
+function trazabilidad_consolidado_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "SELECT CODIGO, GUIA, FECHAVUELO,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO,
+        CODIGOUSUARIOMODIFICA, FECHAMODIFICACION
+        FROM consolidado WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return "Consolidado no encontrado";
+
+    $fila = mysqli_fetch_array($resultado);
+
+    $usuario_reg = (isset($fila['CODIGOUSUARIOREGISTRA']) && $fila['CODIGOUSUARIOREGISTRA'] !== null) ? $fila['CODIGOUSUARIOREGISTRA'] : "N/A";
+    $fecha_reg   = (isset($fila['FECHAREGISTRO'])         && $fila['FECHAREGISTRO']         !== null) ? $fila['FECHAREGISTRO']         : "N/A";
+    $usuario_mod = (isset($fila['CODIGOUSUARIOMODIFICA']) && $fila['CODIGOUSUARIOMODIFICA'] !== null) ? $fila['CODIGOUSUARIOMODIFICA'] : "N/A";
+    $fecha_mod   = (isset($fila['FECHAMODIFICACION'])     && $fila['FECHAMODIFICACION']     !== null) ? $fila['FECHAMODIFICACION']     : "N/A";
+
+    $html  = '<div style="font-size: 12px; line-height: 1.7;">';
+    $html .= '<b>Consolidado:</b> ('.$fila['CODIGO'].') GUIA: '.htmlspecialchars((string)$fila['GUIA'], ENT_QUOTES, 'UTF-8').' / FECHA VUELO: '.htmlspecialchars((string)$fila['FECHAVUELO'], ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Registrado por usuario:</b> '.htmlspecialchars((string)$usuario_reg, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha registro:</b> '.htmlspecialchars((string)$fecha_reg, ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Ultima modificacion por usuario:</b> '.htmlspecialchars((string)$usuario_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '<b>Fecha modificacion:</b> '.htmlspecialchars((string)$fecha_mod, ENT_QUOTES, 'UTF-8').'<br>';
+    $html .= '</div>';
+    return $html;
+    }
+
+
+// Retorna las options HTML del <select> de MARCACION filtradas por cliente.
+// Cada option lleva data-truck con el CODIGOTRUCK asociado, para que el
+// frontend pueda autopoblar el Select2 de TRUCK al elegir una marcacion.
+function opciones_marcaciones_por_cliente_dsft($codigo_cliente)
+    {
+    global $link;
+    $codigo_cliente = (int)$codigo_cliente;
+    $html = '<option value="0">-- SELECCIONE --</option>';
+    if($codigo_cliente <= 0)
+        return $html;
+
+    $sql = "SELECT CODIGO, NOMBREMARCACION, CODIGOTRUCK
+        FROM marcacion
+        WHERE CODIGOCLIENTE = ".$codigo_cliente."
+          AND ESTADO >= 0
+        ORDER BY NOMBREMARCACION";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $html;
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $f     = mysqli_fetch_assoc($res);
+        $truck = ($f["CODIGOTRUCK"] !== null) ? (int)$f["CODIGOTRUCK"] : 0;
+        $html .= '<option value="'.(int)$f["CODIGO"].'" data-truck="'.$truck.'">'.htmlspecialchars((string)$f["NOMBREMARCACION"], ENT_QUOTES, 'UTF-8').'</option>';
+        }
     return $html;
     }

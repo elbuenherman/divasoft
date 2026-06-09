@@ -17,6 +17,7 @@ consulta_permisos($_SESSION['s_codigo'],$permiso);
                             <ul class="dropdown-menu dark" data-role="dropdown">
                                 <li <?php echo $permiso[35];?>><a href="consola_importar_facturas.php">Importar facturas</a></li> 
                                	<li <?php echo $permiso[35];?>><a href="consola_gestion_correos_facturas.php">Correos / Facturas</a></li>
+                               	<li <?php echo $permiso[35];?>><a href="consola_consolidado.php">Consolidados</a></li>
                                	<li <?php echo $permiso[35];?>><a href="proceso_pedidos.php">Pedidos</a></li>
                                	<li <?php echo $permiso[44];?>><a href="proceso_awbs.php">Ingreso de AWBs</a></li>
                                	<li <?php echo $permiso[45];?>><a href="proceso_creditos_clientes.php">Aplicación de créditos</a></li>    
