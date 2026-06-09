@@ -1,5 +1,5 @@
 <?php
-           
+              
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
@@ -810,16 +810,15 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
-    $html .= '<th style="width: 5%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 14%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 15%;">FINCA</th>';
-    $html .= '<th style="width: 5%;">FULLES</th>';
-    // Columna sin header (25%) donde va el asunto en la fila de correo
-    // y el nombre de archivo en la fila de adjunto.
-    $html .= '<th style="width: 25%;"></th>';
-    $html .= '<th style="width: 108px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 30px; font-size:10px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">E'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 95px; text-align:center;">OPC</th>';
+    $html .= '<th style="width: 4%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 12%;">CONSOLIDADO</th>';
+    $html .= '<th style="width: 12%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 13%;">FINCA</th>';
+    $html .= '<th style="width: 4%;">FULLES</th>';
+    $html .= '<th style="width: 15%;">ARCHIVO</th>';
+    $html .= '<th style="width: 90px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 25px; font-size:10px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">E'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 80px; text-align:center;">OPC</th>';
     $html .= '</tr></thead>';
    
     for($i=1; $i<=$numero_correos; $i++)
@@ -853,6 +852,8 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         $html .= '<tbody id="id_grupo_correo_'.$codigo.'" class="grupo_correo" onclick="devuelve_correo('.$codigo.');">';
         $html .= '<tr>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><i class="icon-mail" title="'.$codigo.'" style="color:#c97b85; font-size:13px;"></i></td>';
+        // Celda CONSOLIDADO (vacia en la fila principal del correo). Va en segunda posicion, despues de COD.
+        $html .= '<td class="td_centro" style="'.$est_14.'"></td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
         $html .= '<td colspan="3" style="'.$est_asun.'">'.$asunto.'</td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
@@ -938,6 +939,8 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
                 $html .= '<tr class="fila_adjunto">';
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
+                // Celda CONSOLIDADO (vacia por ahora; futuro: CODIGO + FECHA cuando el adjunto tenga consolidado asignado). Va en segunda posicion, despues de COD.
+                $html .= '<td class="td_centro" style="'.$est_adj.'"></td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_cons.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_fulles.'</td>';

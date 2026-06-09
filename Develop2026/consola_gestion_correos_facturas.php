@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php"); 
 include("valida_sesion.php");
-// CHEQUEO PERMISOS       
+// CHEQUEO PERMISOS        
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
@@ -718,7 +718,7 @@ $(document).ready(function()
     // (solo visual: no dispara filtrado por ahora).
     $('#id_consolidado_filtro').select2(
         {
-        width: '350px',
+        width: '520px',
         minimumResultsForSearch: 3,
         placeholder: '-- Consolidado --'
         });
@@ -750,7 +750,7 @@ $(document).ready(function()
                         style="background-color:#ffffff; color:#000; border:1px solid #c0c0c0; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:bold; height:30px;">ACTUALIZAR</button>
                     <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="extraer_correos();"
                         style="padding:4px 12px; font-size:12px; font-weight:bold; height:30px;">EXTRAER</button>
-                    <select id="id_consolidado_filtro" style="width:350px;">
+                    <select id="id_consolidado_filtro" style="width:520px;">
                         <option value="0">-- Consolidado --</option>
                         <?php
                         for($i=0; $i<$numero_consolidados; $i++)
@@ -758,7 +758,7 @@ $(document).ready(function()
                             $cc = (int)$arreglo_consolidados[$i]['CODIGO'];
                             $cf = htmlspecialchars((string)$arreglo_consolidados[$i]['FECHAVUELO'], ENT_QUOTES, 'UTF-8');
                             $gc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['GUIAS']) ? $arreglo_consolidados[$i]['GUIAS'] : ''), ENT_QUOTES, 'UTF-8');
-                            $texto_opt = "COD: ".$cc." - ".$cf.($gc !== '' ? ' - '.$gc : '');
+                            $texto_opt = $cc." - ".$cf.($gc !== '' ? ' - '.$gc : '');
                             echo '<option value="'.$cc.'">'.$texto_opt.'</option>';
                             }
                         ?>
