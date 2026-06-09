@@ -1,9 +1,9 @@
 <?php
 include("variables_globales.php");
-include("funciones.php");
+include("funciones.php"); 
 include("valida_sesion.php");
-// CHEQUEO PERMISOS      
-$permiso[] = NULL;      
+// CHEQUEO PERMISOS       
+$permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
 
@@ -11,7 +11,30 @@ $usuario_web = $_SESSION['s_codigo'];
 // Los catalogos de FINCA y CONSOLIDADO, el listado real y el grabado se haran en la fase de funcionalidad.
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
-?> 
+
+// Cargar consolidados activos para el Select2 visual de la barra.
+// Mostramos "FECHAVUELO - GUIAS_CONCAT" en cada option.
+$link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
+mysqli_query($link, "SET CHARACTER SET utf8");
+$sql_consolidados = "SELECT c.CODIGO, c.FECHAVUELO,
+    (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
+        FROM guia_consolidado gc
+        INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+        WHERE gc.CODIGOCONSOLIDADO = c.CODIGO) AS GUIAS
+    FROM consolidado c
+    WHERE c.ESTADO >= 0
+    ORDER BY c.FECHAVUELO DESC";
+$resultado_consolidados = mysqli_query($link, $sql_consolidados);
+$numero_consolidados    = $resultado_consolidados ? mysqli_num_rows($resultado_consolidados) : 0;
+$arreglo_consolidados   = array();
+for($i=0; $i<$numero_consolidados; $i++)
+    {
+    $fila = mysqli_fetch_array($resultado_consolidados);
+    $arreglo_consolidados[$i]['CODIGO']     = $fila['CODIGO'];
+    $arreglo_consolidados[$i]['FECHAVUELO'] = $fila['FECHAVUELO'];
+    $arreglo_consolidados[$i]['GUIAS']      = $fila['GUIAS'];
+    }
+?>
 <!DOCTYPE html>
 <html> 
 <head>
@@ -345,13 +368,15 @@ function grabar_correo()
     }
 
 // ===== Extraer correos desde Gmail por rango de fechas =====
+// Lee el rango del Flatpickr de la barra (id_rango_filtro), no del input
+// oculto del ex-panel derecho.
 function extraer_correos()
     {
-    var rango = $("#id_rango_fechas").val();
-    var fechas = rango.match(/\d{4}-\d{2}-\d{2}/g);
+    var rango = $("#id_rango_filtro").val();
+    var fechas = rango ? rango.match(/\d{4}-\d{2}-\d{2}/g) : null;
     if(fechas == null || fechas.length < 2)
         {
-        messageBox("Por favor seleccione un rango de fechas (desde y hasta)");
+        messageBox("Seleccione un rango de fechas");
         return;
         }
     var fecha_desde = fechas[0];
@@ -689,12 +714,13 @@ $(document).ready(function()
             }
         });
 
-    // Rango de fechas ABAJO (extraccion desde Gmail) - Flatpickr en modo range
-    flatpickr("#id_rango_fechas",
+    // Select2 visual del filtro de consolidado en la barra de arriba
+    // (solo visual: no dispara filtrado por ahora).
+    $('#id_consolidado_filtro').select2(
         {
-        mode: "range",
-        dateFormat: "Y-m-d",
-        locale: "es"
+        width: '350px',
+        minimumResultsForSearch: 3,
+        placeholder: '-- Consolidado --'
         });
 
     boton_nuevo();
@@ -705,28 +731,45 @@ $(document).ready(function()
 <body class="metro">
     <header class="bg-dark" data-load="barra_navegacion.php"></header>
 
-    <!-- LAYOUT PRINCIPAL: listado a la izquierda + (datos / reportes) a la derecha -->
-    <div style="display: flex; flex-direction: row; align-items: flex-start; margin-top:10px; margin-left:0; gap: 8px;">
+    <!-- LAYOUT PRINCIPAL: solo el listado, ancho completo. -->
+    <div style="margin-top:10px; margin-left:0; margin-right:0;">
 
-        <!-- ===== COLUMNA IZQUIERDA: LISTADO DE CORREOS ===== -->
-        <div id="id_panel_listado" class="aida" style="width: 760px; height: 850px; overflow: hidden; display: flex; flex-direction: column;">
+        <!-- ===== PANEL UNICO: LISTADO DE CORREOS ===== -->
+        <div id="id_panel_listado" class="aida" style="width: 100%; height: 850px; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box;">
             <div class="ribbed-crimson" style="height: 2px;"></div>
             <span><center><strong><i class="icon-mail fg-darkRed"></i> LISTADO DE CORREOS DE FACTURAS</strong></center></span>
 
-            <!-- Buscador -->
-            <div style="padding: 5px 8px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9; overflow: hidden;">
-                <div style="float: left;">
-                    <button type="button" onclick="actualiza_listado();" style="background-color: #ffffff; color: #000000; border: 1px solid #c0c0c0; padding: 4px 12px; cursor: pointer; font-size: 12px; font-weight: bold; vertical-align: middle;">ACTUALIZAR</button>
-                </div>
-                <div style="float: right;">
-                    <i class="icon-calendar" style="color: #88010e; vertical-align: middle;" title="Filtrar por rango de fechas"></i>
-                    <input type="text" id="id_rango_filtro" style="width: 170px; font-size: 13px; display: inline-block; vertical-align: middle; margin-right: 10px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; height: 30px; box-sizing: border-box;" placeholder="Filtrar por rango" />
-                    <i class="icon-search" style="color: #88010e; vertical-align: middle;"></i>
-                    <input type="text" id="id_busqueda_listado" class="input_pequeno" style="width: 200px; display: inline-block; vertical-align: middle;" placeholder="Buscar..." onkeyup="filtrar_listado_local();" />
+            <!-- Barra de controles: calendario + rango + ACTUALIZAR + EXTRAER + consolidado + buscar -->
+            <div style="padding: 6px 10px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9;">
+                <div style="display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 8px;">
+                    <i class="icon-calendar" style="color:#88010e; font-size:16px;" title="Rango de fechas (filtra el listado y se usa al EXTRAER)"></i>
+                    <input type="text" id="id_rango_filtro" autocomplete="off"
+                        style="width:170px; font-size:13px; padding:5px 6px; border:1px solid #c0c0c0; border-radius:2px; height:30px; box-sizing:border-box;"
+                        placeholder="Rango de fechas" readonly />
+                    <button type="button" onclick="actualiza_listado();"
+                        style="background-color:#ffffff; color:#000; border:1px solid #c0c0c0; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:bold; height:30px;">ACTUALIZAR</button>
+                    <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="extraer_correos();"
+                        style="padding:4px 12px; font-size:12px; font-weight:bold; height:30px;">EXTRAER</button>
+                    <select id="id_consolidado_filtro" style="width:350px;">
+                        <option value="0">-- Consolidado --</option>
+                        <?php
+                        for($i=0; $i<$numero_consolidados; $i++)
+                            {
+                            $cc = (int)$arreglo_consolidados[$i]['CODIGO'];
+                            $cf = htmlspecialchars((string)$arreglo_consolidados[$i]['FECHAVUELO'], ENT_QUOTES, 'UTF-8');
+                            $gc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['GUIAS']) ? $arreglo_consolidados[$i]['GUIAS'] : ''), ENT_QUOTES, 'UTF-8');
+                            $texto_opt = "COD: ".$cc." - ".$cf.($gc !== '' ? ' - '.$gc : '');
+                            echo '<option value="'.$cc.'">'.$texto_opt.'</option>';
+                            }
+                        ?>
+                    </select>
+                    <i class="icon-search" style="color:#88010e; font-size:14px; margin-left:6px;"></i>
+                    <input type="text" id="id_busqueda_listado" autocomplete="off" class="input_pequeno"
+                        style="width:200px; flex: 0 0 200px;" placeholder="Buscar..." onkeyup="filtrar_listado_local();" />
                 </div>
             </div>
 
-            <!-- Listado de correos (maqueta con datos de ejemplo; en la siguiente fase se llena via AJAX) -->
+            <!-- Listado de correos -->
             <div id="id_listado_correos" style="flex: 1; overflow-y: auto; padding: 0;">
                 <table class="grid_correos">
                     <thead>
@@ -746,8 +789,10 @@ $(document).ready(function()
             </div>
         </div>
 
-        <!-- ===== COLUMNA DERECHA: DATOS (arriba) + REPORTES/OPCIONES (abajo) ===== -->
-        <div style="display: flex; flex-direction: column; width: 360px; height: 850px; gap: 8px;">
+        <!-- ===== PANEL DERECHO ELIMINADO (datos del correo + reportes/opciones). Las
+             funciones JS asociadas (devuelve_correo, grabar_correo, etc.) se mantienen
+             en el codigo por ahora pero no se invocan desde la UI. ===== -->
+        <div style="display: none;">
 
             <!-- ZONA 2: DATOS DEL CORREO -->
             <div id="id_formulario_correo" class="aida" style="width: 360px;">

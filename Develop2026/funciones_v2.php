@@ -1,11 +1,11 @@
 <?php
-         
+           
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
                 
-        
+         
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -686,9 +686,9 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
     // Set de adjuntos que ya fueron procesados (un solo query, no uno por adjunto).
     // Clave = CODIGOADJUNTO, valor = array con datos de factura_finca para mostrar
-    // en el grid (CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA).
+    // en el grid (CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA, FULLES).
     $adjuntos_procesados = array();
-    $sql_procesados = "SELECT CODIGOADJUNTO, CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA
+    $sql_procesados = "SELECT CODIGOADJUNTO, CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA, TOTALCAJASEQUIVALENTES
         FROM factura_finca WHERE CODIGOADJUNTO IS NOT NULL";
     $res_procesados = mysqli_query($link, $sql_procesados);
     if($res_procesados)
@@ -702,7 +702,8 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 "FINCA"            => $fila_p["FINCA"],
                 "CLIENTEMARCACION" => $fila_p["CLIENTEMARCACION"],
                 "NUMEROFACTURA"    => $fila_p["NUMEROFACTURA"],
-                "GUIA"             => $fila_p["GUIA"]
+                "GUIA"             => $fila_p["GUIA"],
+                "FULLES"           => $fila_p["TOTALCAJASEQUIVALENTES"]
                 );
             }
         }
@@ -809,10 +810,13 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
-    $html .= '<th style="width: 6%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 18%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 5%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 14%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 15%;">FINCA</th>';
-    $html .= '<th style="width: 29%; cursor:pointer;" onclick="ordenar_por(\'ASUNTO\')">ASUNTO'.indicador_orden("ASUNTO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 5%;">FULLES</th>';
+    // Columna sin header (25%) donde va el asunto en la fila de correo
+    // y el nombre de archivo en la fila de adjunto.
+    $html .= '<th style="width: 25%;"></th>';
     $html .= '<th style="width: 108px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 30px; font-size:10px; cursor:pointer;" onclick="ordenar_por(\'ESTADO\')">E'.indicador_orden("ESTADO", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 95px; text-align:center;">OPC</th>';
@@ -850,11 +854,11 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         $html .= '<tr>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><i class="icon-mail" title="'.$codigo.'" style="color:#c97b85; font-size:13px;"></i></td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
-        $html .= '<td colspan="2" style="'.$est_asun.'">'.$asunto.'</td>';
+        $html .= '<td colspan="3" style="'.$est_asun.'">'.$asunto.'</td>';
         $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
         $html .= '<td class="td_centro" style="background-color:#f2f2f2; font-size:10px;">'.$estado.'</td>';
         $html .= '<td class="td_opc" style="'.$est_14.' text-align:right;">';
-        $html .= '<a href="javascript: devuelve_correo('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+         // Icono lapiz (editar) removido: el panel derecho con el formulario ya no se muestra.
         $html .= '<a href="javascript: muestra_trazabilidad_correo('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="#" onclick="ver_cuerpo_correo('.$codigo.', \''.$asunto_js.'\'); return false;" title="Ver cuerpo del correo"><i class="icon-mail fg-darkRed"></i></a>';
         $html .= '<a href="javascript:void(0);" class="tooltip_correo" data-tooltip="'.$tooltip_departa.'" onclick="return false;"><i class="icon-user-2" style="color:#155a60;"></i></a>';
@@ -908,20 +912,25 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 // mostrar guiones y tamano normales.
                 $proc = isset($adjuntos_procesados[(int)$adj_codigo]) ? $adjuntos_procesados[(int)$adj_codigo] : null;
 
-                $celda_finca = $adj_finca;   // por defecto: "—" o codigo_finca de archivo_correo
-                $celda_cons  = $adj_cons;    // por defecto: "—" o codigo_consolidado de archivo_correo
-                $celda_tam   = $adj_tamano;  // por defecto: "38.8 KB"
-                $visor_title = $adj_visor_titulo_base;
+                $celda_finca  = $adj_finca;   // por defecto: "—" o codigo_finca de archivo_correo
+                $celda_cons   = $adj_cons;    // por defecto: "—" o codigo_consolidado de archivo_correo
+                $celda_tam    = $adj_tamano;  // por defecto: "38.8 KB"
+                $celda_fulles = '';           // TOTALCAJASEQUIVALENTES solo cuando esta procesado
+                $visor_title  = $adj_visor_titulo_base;
 
                 if($proc !== null)
                     {
-                    // Procesado: 2da celda = CLIENTEMARCACION, 3ra = FINCA, tam = GUIA.
-                    $cm   = isset($proc["CLIENTEMARCACION"]) ? trim((string)$proc["CLIENTEMARCACION"]) : '';
-                    $fn   = isset($proc["FINCA"])            ? trim((string)$proc["FINCA"])            : '';
-                    $guia = isset($proc["GUIA"])             ? trim((string)$proc["GUIA"])             : '';
+                    // Procesado: 2da celda = CLIENTEMARCACION, 3ra = FINCA, 4ta = FULLES, tam = GUIA.
+                    $cm     = isset($proc["CLIENTEMARCACION"]) ? trim((string)$proc["CLIENTEMARCACION"]) : '';
+                    $fn     = isset($proc["FINCA"])            ? trim((string)$proc["FINCA"])            : '';
+                    $guia   = isset($proc["GUIA"])             ? trim((string)$proc["GUIA"])             : '';
+                    $fulles = isset($proc["FULLES"])           ? $proc["FULLES"]                          : null;
                     if($cm   !== '') $celda_finca = htmlspecialchars($cm, ENT_QUOTES, 'UTF-8');
                     if($fn   !== '') $celda_cons  = htmlspecialchars($fn, ENT_QUOTES, 'UTF-8');
                     if($guia !== '') $celda_tam   = htmlspecialchars($guia, ENT_QUOTES, 'UTF-8');
+                    // FULLES: si es null o 0, dejar vacio.
+                    if($fulles !== null && (float)$fulles > 0)
+                        $celda_fulles = htmlspecialchars((string)$fulles, ENT_QUOTES, 'UTF-8');
                     // Visor con tamano en el title para no perder el dato del KB.
                     $visor_title = $adj_visor_titulo_base.' ('.$adj_tamano.')';
                     }
@@ -931,6 +940,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_cons.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_fulles.'</td>';
                 $html .= '<td style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
                 $html .= '<td colspan="2" class="td_centro" style="'.$est_adj.'">'.$celda_tam.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">';
@@ -2006,7 +2016,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     $sql = "SELECT c.CODIGO          AS CODIGO,
         c.FECHAVUELO       AS FECHAVUELO,
         (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
-            FROM guiaconsolidado gc
+            FROM guia_consolidado gc
             INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
             WHERE gc.CODIGOCONSOLIDADO = c.CODIGO) AS GUIAS_CONCAT,
         c.CODIGOMARCACION  AS CODIGOMARCACION,
@@ -2128,7 +2138,7 @@ function devuelve_consolidado_dsft($codigo)
 
 // INSERT si $codigo == 0, UPDATE si > 0. Los FK con valor 0 se guardan NULL.
 // La GUIA ya NO se escribe en consolidado.GUIA -> se maneja por la tabla
-// guiaconsolidado (uno a muchos). La columna legacy queda en la BD pero
+// guia_consolidado (uno a muchos). La columna legacy queda en la BD pero
 // no se toca desde esta consola.
 function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
     {
@@ -2287,14 +2297,14 @@ function opciones_marcaciones_por_cliente_dsft($codigo_cliente)
 // GUIAS DEL CONSOLIDADO (consola_consolidado.php).
 // Tablas:
 //   guia                (CODIGO PK, NUMEROGUIA, ESTADO, FECHAREGISTRO, ...)
-//   guiaconsolidado     (CODIGOGUIA, CODIGOCONSOLIDADO)  -- join NxN
+//   guia_consolidado     (CODIGOGUIA, CODIGOCONSOLIDADO)  -- join NxN
 // ============================================================================
 
 // Asocia una guia a un consolidado. $valor puede ser:
 //   - numerico puro -> es el CODIGO de una guia existente.
 //   - no numerico   -> es un NUMEROGUIA nuevo (el usuario lo escribio).
 // Si es nuevo, inserta en guia y luego usa el CODIGO autogenerado.
-// El INSERT en guiaconsolidado usa IGNORE para evitar duplicar el par.
+// El INSERT en guia_consolidado usa IGNORE para evitar duplicar el par.
 function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usuario)
     {
     global $link;
@@ -2353,7 +2363,7 @@ function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usua
         return "No se pudo determinar el CODIGO de guia";
 
     // Asociar al consolidado (IGNORE por si ya estaba).
-    $sql_aso = "INSERT IGNORE INTO guiaconsolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
+    $sql_aso = "INSERT IGNORE INTO guia_consolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
         VALUES (".$codigo_guia.", ".$codigo_consolidado.")";
     $r_aso = mysqli_query($link, $sql_aso);
     if(!$r_aso)
@@ -2371,7 +2381,7 @@ function quitar_guia_consolidado_dsft($codigo_consolidado, $codigo_guia)
     if($codigo_consolidado <= 0 || $codigo_guia <= 0)
         return "Codigos invalidos";
 
-    $sql = "DELETE FROM guiaconsolidado
+    $sql = "DELETE FROM guia_consolidado
         WHERE CODIGOGUIA = ".$codigo_guia."
           AND CODIGOCONSOLIDADO = ".$codigo_consolidado;
     $r = mysqli_query($link, $sql);
@@ -2390,7 +2400,7 @@ function lista_guias_consolidado_dsft($codigo_consolidado)
         return "";
 
     $sql = "SELECT g.CODIGO, g.NUMEROGUIA
-        FROM guiaconsolidado gc
+        FROM guia_consolidado gc
         INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
         WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado."
         ORDER BY g.NUMEROGUIA";

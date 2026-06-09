@@ -2,7 +2,7 @@
 include("variables_globales.php"); 
 include("funciones.php");
 include("valida_sesion.php");  
-// CHEQUEO PERMISOS  
+// CHEQUEO PERMISOS   
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);
 $usuario_web = $_SESSION['s_codigo'];
@@ -472,7 +472,7 @@ function grabar_consolidado()
         });
     }
 
-// ===== Guias del consolidado (tabla guiaconsolidado, NxN con guia) =====
+// ===== Guias del consolidado (tabla guia_consolidado, NxN con guia) =====
 // Asocia una guia al consolidado actual. Si la usuaria selecciono una guia
 // existente, el value es el CODIGO numerico. Si tipeo una nueva, Select2
 // (tags:true) la manda como id == el texto -> el backend la crea.
@@ -839,7 +839,7 @@ $(document).ready(function()
                             <input type="text" id="id_fechavuelo" autocomplete="off" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
                         </td>
                     </tr>
-                    <!-- 3) CLIENTE (GUIA pasa a ser una seccion separada con tabla guiaconsolidado) -->
+                    <!-- 3) CLIENTE (GUIA pasa a ser una seccion separada con tabla guia_consolidado) -->
                     <tr>
                         <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CLIENTE:</td>
                         <td style="padding-bottom: 8px;">
