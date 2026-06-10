@@ -1,11 +1,11 @@
 <?php
-              
+                  
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-                
-         
+                   
+           
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -678,6 +678,38 @@ function indicador_orden($campo, $orden_valido, $direccion_valida)
     }
 
 
+// Asigna una factura procesada a un consolidado: factura_finca.CODIGOCONSOLIDADO = $codigo_consolidado.
+function asignar_factura_consolidado_dsft($codigo_factura, $codigo_consolidado)
+    {
+    global $link;
+    $codigo_factura     = (int)$codigo_factura;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_factura <= 0 || $codigo_consolidado <= 0)
+        return "Codigos invalidos";
+    $sql = "UPDATE factura_finca SET CODIGOCONSOLIDADO = ".$codigo_consolidado."
+        WHERE CODIGO = ".$codigo_factura;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Quita la asignacion de consolidado de una factura: factura_finca.CODIGOCONSOLIDADO = NULL.
+function desasignar_factura_consolidado_dsft($codigo_factura)
+    {
+    global $link;
+    $codigo_factura = (int)$codigo_factura;
+    if($codigo_factura <= 0)
+        return "Codigo invalido";
+    $sql = "UPDATE factura_finca SET CODIGOCONSOLIDADO = NULL
+        WHERE CODIGO = ".$codigo_factura;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+
 // Lista los correos de correo_facturas_fincas de los ultimos 5 dias (HTML de la tabla).
 // Debajo de cada correo agrega una fila por cada adjunto guardado en archivo_correo.
 function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
@@ -688,7 +720,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
     // Clave = CODIGOADJUNTO, valor = array con datos de factura_finca para mostrar
     // en el grid (CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA, FULLES).
     $adjuntos_procesados = array();
-    $sql_procesados = "SELECT CODIGOADJUNTO, CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA, TOTALCAJASEQUIVALENTES
+    $sql_procesados = "SELECT CODIGOADJUNTO, CODIGO, FINCA, CLIENTEMARCACION, NUMEROFACTURA, GUIA, TOTALCAJASEQUIVALENTES, ESTADO, CODIGOCONSOLIDADO
         FROM factura_finca WHERE CODIGOADJUNTO IS NOT NULL";
     $res_procesados = mysqli_query($link, $sql_procesados);
     if($res_procesados)
@@ -698,18 +730,37 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
             {
             $fila_p = mysqli_fetch_assoc($res_procesados);
             $adjuntos_procesados[(int)$fila_p["CODIGOADJUNTO"]] = array(
-                "CODIGO"           => (int)$fila_p["CODIGO"],
-                "FINCA"            => $fila_p["FINCA"],
-                "CLIENTEMARCACION" => $fila_p["CLIENTEMARCACION"],
-                "NUMEROFACTURA"    => $fila_p["NUMEROFACTURA"],
-                "GUIA"             => $fila_p["GUIA"],
-                "FULLES"           => $fila_p["TOTALCAJASEQUIVALENTES"]
+                "CODIGO"            => (int)$fila_p["CODIGO"],
+                "FINCA"             => $fila_p["FINCA"],
+                "CLIENTEMARCACION"  => $fila_p["CLIENTEMARCACION"],
+                "NUMEROFACTURA"     => $fila_p["NUMEROFACTURA"],
+                "GUIA"              => $fila_p["GUIA"],
+                "FULLES"            => $fila_p["TOTALCAJASEQUIVALENTES"],
+                "ESTADO"            => $fila_p["ESTADO"],
+                "CODIGOCONSOLIDADO" => $fila_p["CODIGOCONSOLIDADO"]
                 );
             }
         }
 
+    // Lookup de consolidados (CODIGO -> FECHAVUELO) para mostrar "COD - FECHA"
+    // en la celda CONSOLIDADO de las filas de adjunto procesado.
+    $consolidados_lookup = array();
+    $sql_cl = "SELECT CODIGO, FECHAVUELO FROM consolidado WHERE ESTADO >= 0";
+    $res_cl = mysqli_query($link, $sql_cl);
+    if($res_cl)
+        {
+        $total_cl = mysqli_num_rows($res_cl);
+        for($cl=1; $cl<=$total_cl; $cl++)
+            {
+            $fila_cl = mysqli_fetch_assoc($res_cl);
+            $consolidados_lookup[(int)$fila_cl["CODIGO"]] = $fila_cl["FECHAVUELO"];
+            }
+        }
+
     // Validar campo y direccion de ordenamiento.
-    $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"ASUNTO", 5=>"FECHAHORA", 6=>"DE", 7=>"PARA", 8=>"ESTADO");
+    // CLIENTEMARCACION, FINCA_PROCESADA y ORD_CONSOLIDADO son alias logicos que
+    // apuntan a subqueries contra factura_finca (ver $map_orden).
+    $campos_permitidos = array(1=>"CODIGO", 2=>"CODIGOFINCA", 3=>"CODIGOCONSOLIDADO", 4=>"ASUNTO", 5=>"FECHAHORA", 6=>"DE", 7=>"PARA", 8=>"ESTADO", 9=>"CLIENTEMARCACION", 10=>"FINCA_PROCESADA", 11=>"ORD_CONSOLIDADO");
     $total_campos = count($campos_permitidos);
     $orden_valido = "FECHAHORA";
     for($c=1; $c<=$total_campos; $c++)
@@ -722,6 +773,22 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         }
     $direccion_valida = ($direccion_orden == "ASC") ? "ASC" : "DESC";
 
+    // Mapear alias logico a la expresion real para el ORDER BY.
+    $map_orden = array(
+        "CODIGO"            => "c.CODIGO",
+        "CODIGOFINCA"       => "c.CODIGOFINCA",
+        "CODIGOCONSOLIDADO" => "c.CODIGOCONSOLIDADO",
+        "ASUNTO"            => "c.ASUNTO",
+        "FECHAHORA"         => "c.FECHAHORA",
+        "DE"                => "c.DE",
+        "PARA"              => "c.PARA",
+        "ESTADO"            => "c.ESTADO",
+        "CLIENTEMARCACION"  => "ORD_MARCA",
+        "FINCA_PROCESADA"   => "ORD_FINCA",
+        "ORD_CONSOLIDADO"   => "ORD_CONSOLIDADO"
+        );
+    $columna_order_by = $map_orden[$orden_valido];
+
     // Filtro por rango de fechas: si vienen ambas, usar ese rango.
     // Si no, mantener el comportamiento por defecto (ultimos 5 dias).
     $valida_desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_desde);
@@ -730,27 +797,38 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         {
         $fecha_desde = mysqli_real_escape_string($link, $fecha_desde);
         $fecha_hasta = mysqli_real_escape_string($link, $fecha_hasta);
-        $where_fechas = "FECHAHORA >= '".$fecha_desde." 00:00:00' AND FECHAHORA <= '".$fecha_hasta." 23:59:59'";
+        $where_fechas = "c.FECHAHORA >= '".$fecha_desde." 00:00:00' AND c.FECHAHORA <= '".$fecha_hasta." 23:59:59'";
         }
     else
         {
-        $where_fechas = "FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)";
+        $where_fechas = "c.FECHAHORA >= DATE_SUB(NOW(), INTERVAL 5 DAY)";
         }
 
+    // Subqueries ORD_MARCA y ORD_FINCA: traen la marca/finca del PRIMER adjunto
+    // procesado del correo. LIMIT 1 evita ambiguedad si hay varios adjuntos.
     $sql = "SELECT
-        CODIGO AS CODIGO,
-        CODIGOFINCA AS CODIGOFINCA,
-        CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
-        IDCORREO AS IDCORREO,
-        FECHAHORA AS FECHAHORA,
-        DE AS DE,
-        PARA AS PARA,
-        ASUNTO AS ASUNTO,
-        ESTADO AS ESTADO,
-        OBSERVACIONES AS OBSERVACIONES
-        FROM correo_facturas_fincas
+        c.CODIGO AS CODIGO,
+        c.CODIGOFINCA AS CODIGOFINCA,
+        c.CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
+        c.IDCORREO AS IDCORREO,
+        c.FECHAHORA AS FECHAHORA,
+        c.DE AS DE,
+        c.PARA AS PARA,
+        c.ASUNTO AS ASUNTO,
+        c.ESTADO AS ESTADO,
+        c.OBSERVACIONES AS OBSERVACIONES,
+        (SELECT ff2.CLIENTEMARCACION FROM archivo_correo ac2
+            INNER JOIN factura_finca ff2 ON ff2.CODIGOADJUNTO = ac2.CODIGO
+            WHERE ac2.IDCORREO = c.IDCORREO LIMIT 1) AS ORD_MARCA,
+        (SELECT ff3.FINCA FROM archivo_correo ac3
+            INNER JOIN factura_finca ff3 ON ff3.CODIGOADJUNTO = ac3.CODIGO
+            WHERE ac3.IDCORREO = c.IDCORREO LIMIT 1) AS ORD_FINCA,
+        (SELECT ff4.CODIGOCONSOLIDADO FROM archivo_correo ac4
+            INNER JOIN factura_finca ff4 ON ff4.CODIGOADJUNTO = ac4.CODIGO
+            WHERE ac4.IDCORREO = c.IDCORREO LIMIT 1) AS ORD_CONSOLIDADO
+        FROM correo_facturas_fincas c
         WHERE ".$where_fechas."
-        ORDER BY ".$orden_valido." ".$direccion_valida;
+        ORDER BY ".$columna_order_by." ".$direccion_valida;
     $resultado = mysqli_query($link, $sql);
     $numero_correos = mysqli_num_rows($resultado);
 
@@ -811,9 +889,9 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
     $html = '<table class="grid_correos">';
     $html .= '<thead><tr>';
     $html .= '<th style="width: 4%; cursor:pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.indicador_orden("CODIGO", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 12%;">CONSOLIDADO</th>';
-    $html .= '<th style="width: 12%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CODIGOFINCA\')">MARCA'.indicador_orden("CODIGOFINCA", $orden_valido, $direccion_valida).'</th>';
-    $html .= '<th style="width: 13%;">FINCA</th>';
+    $html .= '<th style="width: 12%; cursor:pointer;" onclick="ordenar_por(\'ORD_CONSOLIDADO\')">CONSOLIDADO'.indicador_orden("ORD_CONSOLIDADO", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 12%; text-align:center; cursor:pointer;" onclick="ordenar_por(\'CLIENTEMARCACION\')">MARCA'.indicador_orden("CLIENTEMARCACION", $orden_valido, $direccion_valida).'</th>';
+    $html .= '<th style="width: 13%; cursor:pointer;" onclick="ordenar_por(\'FINCA_PROCESADA\')">FINCA'.indicador_orden("FINCA_PROCESADA", $orden_valido, $direccion_valida).'</th>';
     $html .= '<th style="width: 4%;">FULLES</th>';
     $html .= '<th style="width: 15%;">ARCHIVO</th>';
     $html .= '<th style="width: 90px; cursor:pointer;" onclick="ordenar_por(\'FECHAHORA\')">FH REC'.indicador_orden("FECHAHORA", $orden_valido, $direccion_valida).'</th>';
@@ -854,9 +932,10 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         $html .= '<td class="td_centro" style="'.$est_14.'"><i class="icon-mail" title="'.$codigo.'" style="color:#c97b85; font-size:13px;"></i></td>';
         // Celda CONSOLIDADO (vacia en la fila principal del correo). Va en segunda posicion, despues de COD.
         $html .= '<td class="td_centro" style="'.$est_14.'"></td>';
-        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$finca.'</strong></td>';
+         // Celda MARCA vacia en la fila principal: solo la fila de adjunto muestra CLIENTEMARCACION.
+        $html .= '<td class="td_centro" style="'.$est_14.'"></td>';
         $html .= '<td colspan="3" style="'.$est_asun.'">'.$asunto.'</td>';
-        $html .= '<td class="td_centro" style="'.$est_14.'"><strong>'.$fechahora.'</strong></td>';
+        $html .= '<td class="td_centro" style="'.$est_14.'">'.$fechahora.'</td>';
         $html .= '<td class="td_centro" style="background-color:#f2f2f2; font-size:10px;">'.$estado.'</td>';
         $html .= '<td class="td_opc" style="'.$est_14.' text-align:right;">';
          // Icono lapiz (editar) removido: el panel derecho con el formulario ya no se muestra.
@@ -903,35 +982,59 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                     $adj_visor_titulo_base = 'Ver adjunto';
                     $adj_visor_template = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="VISOR_TITLE"><i class="icon-file" style="color:#666; background:#fff;"></i></a>';
                     $adj_nombre_link = '<a target="_blank" href="ver_adjunto.php?codigo='.$adj_codigo.'" title="'.$adj_nombre.'" style="color:#003366; text-decoration:underline; cursor:pointer;">'.$adj_nombre.'</a>';
-                    }
+                    } 
                 $adj_tamano = number_format(((float)$adj['TAMANOBYTES']) / 1024, 1) . ' KB';
-
-                $est_adj = 'background-color:rgba(195,195,195,0.4); color:#000; font-size:13px; font-weight:normal;';
 
                 // Determinar las celdas de FINCA/CONS/TAMANO segun si esta procesado.
                 // Cuando ya esta procesado, mostrar datos de factura_finca; sino,
                 // mostrar guiones y tamano normales.
                 $proc = isset($adjuntos_procesados[(int)$adj_codigo]) ? $adjuntos_procesados[(int)$adj_codigo] : null;
 
-                $celda_finca  = $adj_finca;   // por defecto: "—" o codigo_finca de archivo_correo
-                $celda_cons   = $adj_cons;    // por defecto: "—" o codigo_consolidado de archivo_correo
-                $celda_tam    = $adj_tamano;  // por defecto: "38.8 KB"
-                $celda_fulles = '';           // TOTALCAJASEQUIVALENTES solo cuando esta procesado
-                $visor_title  = $adj_visor_titulo_base;
+                // Color de fondo de la fila de adjunto:
+                //  - procesado    -> verde pastel claro
+                //  - no procesado -> gris (default)
+                if($proc !== null)
+                    $est_adj_bg = 'rgba(143,188,143,0.2)';
+                else 
+                    $est_adj_bg = 'rgba(195,195,195,0.4)';
+                $est_adj = 'background-color:'.$est_adj_bg.'; color:#000; font-size:13px; font-weight:normal;';
+
+                $celda_finca       = $adj_finca;   // por defecto: "—" o codigo_finca de archivo_correo
+                $celda_cons        = $adj_cons;    // por defecto: "—" o codigo_consolidado de archivo_correo
+                $celda_tam         = $adj_tamano;  // por defecto: "38.8 KB"
+                $celda_fulles      = '';           // TOTALCAJASEQUIVALENTES solo cuando esta procesado
+                $celda_estado_adj  = '';           // ESTADO de factura_finca solo cuando esta procesado
+                $celda_consolidado = '';           // "COD - FECHAVUELO" solo si esta procesado y asignado
+                $visor_title       = $adj_visor_titulo_base;
 
                 if($proc !== null)
                     {
                     // Procesado: 2da celda = CLIENTEMARCACION, 3ra = FINCA, 4ta = FULLES, tam = GUIA.
+                    // Todo el contenido de las celdas del adjunto procesado va en <strong>
+                    // para distinguir visualmente del adjunto no procesado.
                     $cm     = isset($proc["CLIENTEMARCACION"]) ? trim((string)$proc["CLIENTEMARCACION"]) : '';
                     $fn     = isset($proc["FINCA"])            ? trim((string)$proc["FINCA"])            : '';
                     $guia   = isset($proc["GUIA"])             ? trim((string)$proc["GUIA"])             : '';
                     $fulles = isset($proc["FULLES"])           ? $proc["FULLES"]                          : null;
-                    if($cm   !== '') $celda_finca = htmlspecialchars($cm, ENT_QUOTES, 'UTF-8');
-                    if($fn   !== '') $celda_cons  = htmlspecialchars($fn, ENT_QUOTES, 'UTF-8');
-                    if($guia !== '') $celda_tam   = htmlspecialchars($guia, ENT_QUOTES, 'UTF-8');
+                    if($cm   !== '') $celda_finca = '<strong>'.htmlspecialchars($cm, ENT_QUOTES, 'UTF-8').'</strong>';
+                    if($fn   !== '') $celda_cons  = '<strong>'.htmlspecialchars($fn, ENT_QUOTES, 'UTF-8').'</strong>';
+                    if($guia !== '') $celda_tam   = '<strong>'.htmlspecialchars($guia, ENT_QUOTES, 'UTF-8').'</strong>';
                     // FULLES: si es null o 0, dejar vacio.
                     if($fulles !== null && (float)$fulles > 0)
-                        $celda_fulles = htmlspecialchars((string)$fulles, ENT_QUOTES, 'UTF-8');
+                        $celda_fulles = '<strong>'.htmlspecialchars((string)$fulles, ENT_QUOTES, 'UTF-8').'</strong>';
+                    // ESTADO de factura_finca (1=activo normal, 3=OK ambas Haiku coinciden, 4=REVISAR).
+                    $est_ff = isset($proc["ESTADO"]) ? (string)$proc["ESTADO"] : '';
+                    if($est_ff !== '')
+                        $celda_estado_adj = '<strong>'.htmlspecialchars($est_ff, ENT_QUOTES, 'UTF-8').'</strong>';
+                    // CONSOLIDADO asignado a la factura: "COD - FECHAVUELO".
+                    $cc_asignado = isset($proc["CODIGOCONSOLIDADO"]) ? (int)$proc["CODIGOCONSOLIDADO"] : 0;
+                    if($cc_asignado > 0 && isset($consolidados_lookup[$cc_asignado]))
+                        {
+                        $fechavuelo_lookup = htmlspecialchars((string)$consolidados_lookup[$cc_asignado], ENT_QUOTES, 'UTF-8');
+                        $celda_consolidado = '<strong>'.$cc_asignado.' - '.$fechavuelo_lookup.'</strong>';
+                        }
+                    // Agregar font-weight:bold al style del <a> del nombre del archivo.
+                    $adj_nombre_link = str_replace('color:#003366;', 'color:#003366; font-weight:bold;', $adj_nombre_link);
                     // Visor con tamano en el title para no perder el dato del KB.
                     $visor_title = $adj_visor_titulo_base.' ('.$adj_tamano.')';
                     }
@@ -939,20 +1042,36 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
                 $html .= '<tr class="fila_adjunto">';
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
-                // Celda CONSOLIDADO (vacia por ahora; futuro: CODIGO + FECHA cuando el adjunto tenga consolidado asignado). Va en segunda posicion, despues de COD.
-                $html .= '<td class="td_centro" style="'.$est_adj.'"></td>';
+                // Celda CONSOLIDADO: "COD - FECHAVUELO" si la factura tiene consolidado asignado, vacia si no.
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_consolidado.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_cons.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_fulles.'</td>';
                 $html .= '<td style="'.$est_adj.'">'.$adj_nombre_link.'</td>';
-                $html .= '<td colspan="2" class="td_centro" style="'.$est_adj.'">'.$celda_tam.'</td>';
+                // FH REC y E ya no van con colspan: FH REC muestra GUIA/tamano, E muestra ESTADO de factura_finca.
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_tam.'</td>';
+                $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_estado_adj.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">';
+                // Excluir packing lists y statements: no son facturas a procesar.
+                $nombre_lower = strtolower((string)$adj_nombre);
+                $es_excluido = (strpos($nombre_lower, 'packing') !== false
+                             || strpos($nombre_lower, 'statement') !== false);
+  
                 if($proc !== null)
                     {
-                    // Ya procesado: icono target verde pastel, clickeable.
-                    // Abre ver_factura_finca.php con el CODIGO de factura_finca en pestana nueva.
                     $codigo_ff = (int)$proc["CODIGO"];
+                    $cc_actual = isset($proc["CODIGOCONSOLIDADO"]) ? (int)$proc["CODIGOCONSOLIDADO"] : 0;
+                    // Si esta asignada a un consolidado, mostrar icono reply (quitar) a la izquierda.
+                    if($cc_actual > 0)
+                        $html .= '<a onclick="desasignar_consolidado('.$codigo_ff.');" title="Quitar del consolidado" style="cursor:pointer; color:#2e7d32; margin-right:4px;"><i class="icon-reply"></i></a>';
+                    // Icono forward (asignar al consolidado seleccionado en la barra).
+                    $html .= '<a onclick="asignar_consolidado('.$codigo_ff.');" title="Asignar a consolidado" style="cursor:pointer; color:#88010e; margin-right:4px;"><i class="icon-forward"></i></a>';
+                    // Icono target verde pastel: ver la factura procesada.
                     $html .= '<a onclick="window.open(\'ver_factura_finca.php?codigo='.$codigo_ff.'\', \'_blank\');" title="Procesada - factura_finca CODIGO: '.$codigo_ff.'" style="cursor:pointer; color:#8fbc8f; margin-right:6px;"><i class="icon-target"></i></a>';
+                    }
+                else if($es_excluido)
+                    {
+                    // Packing/statement: no se procesa como factura, no se muestra icono de procesar.
                     }
                 else
                     {
@@ -2414,21 +2533,41 @@ function lista_guias_consolidado_dsft($codigo_consolidado)
     $numero = mysqli_num_rows($resultado);
     if($numero == 0)
         return '<div style="font-size:12px; color:#888; padding:4px 0;">Sin guias asignadas</div>';
-
-    $html = '';
+  
+    // Tabla de 3 columnas: cada celda contiene un badge a ancho completo.
+    $html = '<table style="width:100%; border-collapse:collapse;">';
+    $col  = 0;
     for($i=1; $i<=$numero; $i++)
         {
-        $f         = mysqli_fetch_assoc($resultado);
-        $cg        = (int)$f["CODIGO"];
-        $numguia   = htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8');
-        // Cada badge envuelto en un <div> para que se muestren uno por linea.
-        $html .= '<div style="margin:3px 0;">';
-        $html .= '<span class="badge_guia" style="display:inline-block; background:#f2f2f2; border:1px solid #ccc; border-radius:4px; padding:3px 8px; font-size:13px;">';
+        $f       = mysqli_fetch_assoc($resultado);
+        $cg      = (int)$f["CODIGO"];
+        $numguia = htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8');
+
+        if($col == 0)
+            $html .= '<tr>';
+ 
+        $html .= '<td style="padding:2px 3px;">';
+        $html .= '<span class="badge_guia" style="display:inline-block; background:#f2f2f2; border:1px solid #ccc; border-radius:4px; padding:1px 4px; font-size:10px; width:100%; box-sizing:border-box; text-align:center;">';
         $html .= $numguia;
-        $html .= '<a onclick="quitar_guia_consolidado('.$cg.');" style="cursor:pointer; color:#88010e; margin-left:4px; font-weight:bold;" title="Quitar guia">&times;</a>';
+        $html .= ' <a onclick="quitar_guia_consolidado('.$cg.');" style="cursor:pointer; color:#88010e; margin-left:4px; font-weight:bold;" title="Quitar guia">&times;</a>';
         $html .= '</span>';
-        $html .= '</div>';
+        $html .= '</td>';
+
+        $col++;
+        if($col >= 3)
+            {
+            $html .= '</tr>';
+            $col = 0;
+            }
         }
+    // Si la ultima fila quedo incompleta, rellenar con celdas vacias.
+    if($col > 0)
+        {
+        for($j=$col; $j<3; $j++)
+            $html .= '<td></td>';
+        $html .= '</tr>';
+        }
+    $html .= '</table>';
     return $html;
     }
 

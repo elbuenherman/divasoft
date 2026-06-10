@@ -9,7 +9,7 @@ $usuario_web = $_SESSION['s_codigo'];
 $fecha_hora_hoy = date("Y-m-d H:i:s");
 ?>
 <!DOCTYPE html>
-<html>
+<html> 
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0">

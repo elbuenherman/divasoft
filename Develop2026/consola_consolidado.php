@@ -1,7 +1,7 @@
-<?php
-include("variables_globales.php"); 
+<?php 
+include("variables_globales.php");  
 include("funciones.php");
-include("valida_sesion.php");  
+include("valida_sesion.php");   
 // CHEQUEO PERMISOS   
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);
@@ -338,16 +338,8 @@ function devuelve_consolidado(codigo)
         var ag_val = (datos.CODIGOAGENCIA && parseInt(datos.CODIGOAGENCIA) > 0) ? datos.CODIGOAGENCIA.toString() : "0";
         $("#id_codigoagencia").val(ag_val).trigger('change');
         $("#id_observaciones").val(datos.OBSERVACIONES || "");
-        if(parseInt(datos.ESTADO) == 0)
-            {
-            $("#id_estado_activo").prop('checked', false);
-            $("#id_estado_inactivo").prop('checked', true);
-            }
-        else
-            {
-            $("#id_estado_activo").prop('checked', true);
-            $("#id_estado_inactivo").prop('checked', false);
-            }
+        // ESTADO: checkbox checked = activo (1), unchecked = inactivo (0).
+        $("#id_estado_consolidado").prop("checked", parseInt(datos.ESTADO) == 1);
 
         // CLIENTE primero: setear el select sin disparar el handler (para evitar
         // limpiar MARCACION/TRUCK). Luego pedir las marcaciones de ese cliente,
@@ -440,9 +432,7 @@ function grabar_consolidado()
         messageBox(mensaje);
         return;
         }
-    var estado_val = $('input[name="grp_estado"]:checked').val();
-    if(estado_val == null || estado_val == "")
-        estado_val = "1";
+    var estado_val = $("#id_estado_consolidado").is(":checked") ? "1" : "0";
     $("#id_espera").show();
     var url = "funciones_ajax.php?funcion=graba_consolidado_dsft"
         + "&parametro1="  + global_codigo_seleccionado
@@ -649,8 +639,8 @@ function boton_nuevo()
     $("#id_codigopais").val("0").trigger('change.select2');
     $("#id_codigoagencia").val("0").trigger('change.select2');
     $("#id_observaciones").val("");
-    $("#id_estado_activo").prop('checked', true);
-    $("#id_estado_inactivo").prop('checked', false);
+    // Nuevo registro = activo por defecto.
+    $("#id_estado_consolidado").prop("checked", true);
     $("#id_listado_consolidados .grupo_consolidado").removeClass("grupo_consolidado_seleccionado");
     // Limpiar la seccion GUIAS (allowClear necesita value = "").
     $("#id_lista_guias_consolidado").html("");
@@ -784,12 +774,12 @@ $(document).ready(function()
 </head>
 <body class="metro">
     <header class="bg-dark" data-load="barra_navegacion.php"></header>
-
+ 
     <!-- LAYOUT PRINCIPAL: listado a la izquierda + formulario a la derecha -->
     <div style="display: flex; flex-direction: row; align-items: flex-start; margin-top:10px; margin-left:0; gap: 8px;">
-
+ 
         <!-- ===== COLUMNA IZQUIERDA: LISTADO DE CONSOLIDADOS ===== -->
-        <div id="id_panel_listado" class="aida" style="width: 760px; height: 850px; overflow: hidden; display: flex; flex-direction: column;">
+        <div id="id_panel_listado" class="aida" style="width: 760px; height: 400px; overflow: hidden; display: flex; flex-direction: column;">
             <div class="ribbed-crimson" style="height: 2px;"></div>
             <span><center><strong><i class="icon-clipboard fg-darkRed"></i> LISTADO DE CONSOLIDADOS</strong></center></span>
 
@@ -813,36 +803,40 @@ $(document).ready(function()
                 <!-- Se llena via AJAX -->
             </div>
         </div>
-
-        <!-- ===== COLUMNA DERECHA: FORMULARIO ===== -->
-        <div id="id_formulario_consolidado" class="aida" style="width: 440px; height: auto;">
+ 
+        <!-- ===== COLUMNA DERECHA: FORMULARIO ===== -->  
+        <div id="id_formulario_consolidado" class="aida" style="width: 440px; height: 400px !important; overflow-y: auto;">
             <div class="ribbed-crimson" style="height: 2px;"></div>
-            <span><center><strong><i class="icon-clipboard fg-darkRed"></i> DATOS DEL CONSOLIDADO</strong></center></span>
+            <span><center><strong><i class="icon-clipboard fg-darkRed"></i> DATOS DEL CONSOLIDADO</strong>
+                <input type="text" id="id_codigo_consolidado" class="input_readonly" readonly
+                    style="height:22px; padding:2px 4px; width:50px; margin-left:10px; font-size:13px; display:inline-block; vertical-align:middle;"
+                    autocomplete="off" />
+            </center></span>
 
             <div style="padding: 12px;">
-                <table style="width: 100%; font-size: 13px;">
+                <!-- Layout 2 columnas con ancho identico. Cada fila tiene 2 campos lado a lado. -->
+                <table style="width: 100%; font-size: 13px; border-collapse: separate; border-spacing: 0; table-layout:fixed;">
                     <colgroup>
-                        <col style="width: 35%;">
-                        <col style="width: 65%;">
+                        <col style="width: 65px;">
+                        <col style="width: 50%;">
+                        <col style="width: 65px;">
+                        <col style="width: 50%;"> 
                     </colgroup>
-                    <!-- 1) CODIGO (readonly) -->
+                    <!-- Fila 1: VUELO + ACTIVO (checkbox) -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CODIGO:</td>
-                        <td style="padding-bottom: 8px;">
-                            <input type="text" id="id_codigo_consolidado" autocomplete="off" class="input_readonly" readonly />
-                        </td>
-                    </tr>
-                    <!-- 2) FECHA VUELO -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">FECHA VUELO:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">VUELO:</td>
+                        <td style="padding-right: 6px; padding-bottom: 5px;">
                             <input type="text" id="id_fechavuelo" autocomplete="off" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
                         </td>
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">ACTIVO:</td>
+                        <td style="padding-bottom: 5px;">
+                            <input type="checkbox" id="id_estado_consolidado" checked />
+                        </td>
                     </tr>
-                    <!-- 3) CLIENTE (GUIA pasa a ser una seccion separada con tabla guia_consolidado) -->
+                    <!-- Fila 2: CLIENTE + MARCA -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">CLIENTE:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">CLIENTE:</td>
+                        <td style="padding-right: 6px; padding-bottom: 5px;">
                             <select id="id_codigocliente" style="width: 100%;">
                                 <option value="0">-- SELECCIONE --</option>
                                 <?php
@@ -853,20 +847,17 @@ $(document).ready(function()
                                 ?>
                             </select>
                         </td>
-                    </tr>
-                    <!-- 5) MARCACION (vacio al inicio; se llena via AJAX cuando se elige CLIENTE) -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">MARCACION:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">MARCA:</td>
+                        <td style="padding-bottom: 5px;">
                             <select id="id_codigomarcacion" style="width: 100%;">
                                 <option value="0">-- SELECCIONE --</option>
                             </select>
                         </td>
                     </tr>
-                    <!-- 6) TRUCK (auto-llenado segun MARCACION elegida; visualmente readonly) -->
+                    <!-- Fila 3: TRUCK + AGN -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">TRUCK:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">TRUCK:</td>
+                        <td style="padding-right: 6px; padding-bottom: 5px;">
                             <select id="id_codigotruck" style="width: 100%;" class="select2_truck_readonly">
                                 <option value="0">-- SELECCIONE --</option>
                                 <?php
@@ -877,11 +868,8 @@ $(document).ready(function()
                                 ?>
                             </select>
                         </td>
-                    </tr>
-                    <!-- 7) AGENCIA -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">AGENCIA:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">AGN:</td>
+                        <td style="padding-bottom: 5px;">
                             <select id="id_codigoagencia" style="width: 100%;">
                                 <option value="0">-- SELECCIONE --</option>
                                 <?php
@@ -893,10 +881,10 @@ $(document).ready(function()
                             </select>
                         </td>
                     </tr>
-                    <!-- 8) PAIS -->
+                    <!-- Fila 4: PAIS + OBS -->
                     <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">PAIS:</td>
-                        <td style="padding-bottom: 8px;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">PAIS:</td>
+                        <td style="padding-right: 6px; padding-bottom: 5px;">
                             <select id="id_codigopais" style="width: 100%;">
                                 <option value="0">-- SELECCIONE --</option>
                                 <?php
@@ -907,58 +895,34 @@ $(document).ready(function()
                                 ?>
                             </select>
                         </td>
-                    </tr>
-                    <!-- OBSERVACIONES -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; vertical-align: top; white-space: nowrap;">OBSERVAC:</td>
-                        <td style="padding-bottom: 8px;">
-                            <textarea id="id_observaciones" maxlength="500" rows="4"
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; vertical-align: top; white-space: nowrap;">OBS:</td>
+                        <td style="padding-bottom: 5px;">
+                            <textarea id="id_observaciones" maxlength="500" rows="2"
                                 style="width: 100%; text-transform: uppercase; font-size: 12px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
                         </td>
                     </tr>
-                    <!-- ===== GUIAS: integrado al formulario como filas de la table ===== -->
+                    <!-- Fila 5: AWB ocupa el ancho completo (colspan=3) -->
                     <tr>
-                        <td colspan="2"><hr style="border:none; border-top:1px solid #ccc; margin:10px 0;"></td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">GUIAS:</td>
-                        <td style="padding-bottom: 8px; white-space: nowrap;">
-                            <select id="id_select_guia" style="width: 220px;">
-                                <option value=""></option>
-                                <?php
-                                for($i=0; $i<$numero_guias; $i++)
-                                    {
-                                    echo '<option value="'.(int)$arreglo_guias[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_guias[$i]['NUMEROGUIA'], ENT_QUOTES, 'UTF-8').'</option>';
-                                    }
-                                ?>
-                            </select>
-                            <a onclick="agregar_guia_consolidado();" title="Agregar guia"
-                                style="cursor:pointer; color:#88010e; margin-left:6px; font-size:16px; vertical-align:middle; display:inline-block;">
-                                <i class="icon-plus"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td></td>
-                        <td style="padding-bottom: 8px;">
-                            <div id="id_lista_guias_consolidado" style="padding: 4px 0;">
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; vertical-align: top; white-space: nowrap;">AWB:</td>
+                        <td colspan="3" style="padding-bottom: 5px;">
+                            <div style="white-space: nowrap;">
+                                <select id="id_select_guia" style="width: 220px;">
+                                    <option value=""></option>
+                                    <?php
+                                    for($i=0; $i<$numero_guias; $i++)
+                                        {
+                                        echo '<option value="'.(int)$arreglo_guias[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_guias[$i]['NUMEROGUIA'], ENT_QUOTES, 'UTF-8').'</option>';
+                                        }
+                                    ?>
+                                </select>
+                                <a onclick="agregar_guia_consolidado();" title="Agregar guia"
+                                    style="cursor:pointer; color:#88010e; margin-left:6px; font-size:16px; vertical-align:middle; display:inline-block;">
+                                    <i class="icon-plus"></i>
+                                </a>
+                            </div> 
+                            <div id="id_lista_guias_consolidado" style="height:100px; overflow-y:auto; padding:2px 0;">
                                 <!-- Llenado por cargar_guias_consolidado() cuando se selecciona un consolidado. -->
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2"><hr style="border:none; border-top:1px solid #ccc; margin:10px 0;"></td>
-                    </tr>
-                    <!-- ESTADO -->
-                    <tr>
-                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">ESTADO:</td>
-                        <td style="padding-bottom: 8px;">
-                            <div class="input-control radio default-style" data-role="input-control" style="display: inline-block; margin-right: 18px;">
-                                <label><input type="radio" id="id_estado_activo" name="grp_estado" value="1" checked /><span class="check"></span>ACTIVO</label>
-                            </div>
-                            <div class="input-control radio default-style" data-role="input-control" style="display: inline-block;">
-                                <label><input type="radio" id="id_estado_inactivo" name="grp_estado" value="0" /><span class="check"></span>INACTIVO</label>
-                            </div>
+                            </div> 
                         </td>
                     </tr>
                 </table>

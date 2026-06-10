@@ -432,6 +432,94 @@ function extraer_correos()
             msg += "Detalle: " + errorThrown;
         messageBox(msg);
         });
+    } 
+ 
+// ===== Asignar una factura ya procesada al consolidado seleccionado en la barra =====
+function asignar_consolidado(codigo_factura)
+    {
+    // Leer el consolidado seleccionado en la barra superior.
+    var cod_consolidado = $("#id_consolidado_filtro").val();
+    if(!cod_consolidado || cod_consolidado == "0")
+        {
+        messageBox("Primero seleccione un consolidado en la barra superior.");
+        return;
+        }
+    var texto_consolidado = $("#id_consolidado_filtro option:selected").text();
+
+    $("#id_dialog_confirma_factura").html(
+        "<p>Asignar factura <strong>" + codigo_factura + "</strong> al consolidado:</p>"
+        + "<p><strong>" + texto_consolidado + "</strong></p>"
+        );
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 450,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Asignar",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=asignar_factura_consolidado_dsft"
+                        + "&parametro1=" + codigo_factura
+                        + "&parametro2=" + cod_consolidado;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            actualiza_listado();
+                        else
+                            messageBox(data);
+                        });
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// ===== Quitar la factura del consolidado al que esta asignada =====
+function desasignar_consolidado(codigo_factura)
+    {
+    $("#id_dialog_confirma_factura").html(
+        "<p>Quitar la factura <strong>" + codigo_factura
+        + "</strong> del consolidado asignado?</p>"
+        );
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 420,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Quitar",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=desasignar_factura_consolidado_dsft"
+                        + "&parametro1=" + codigo_factura;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            actualiza_listado();
+                        else
+                            messageBox(data);
+                        });
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
     }
 
 // ===== Procesar una factura adjunta con IA (Claude/GLM via CLI) =====

@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-               
+                
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -308,6 +308,10 @@ if($funcion == 'progreso_extraccion')
     }
 if($funcion == 'procesar_factura_web')
     echo procesar_factura_web($parametro1);
+if($funcion == 'asignar_factura_consolidado_dsft')
+    echo asignar_factura_consolidado_dsft($parametro1, $parametro2);
+if($funcion == 'desasignar_factura_consolidado_dsft')
+    echo desasignar_factura_consolidado_dsft($parametro1);
 if($funcion == 'progreso_factura')
     {
     $ruta_progreso_fac = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026/tmp_progreso_factura.json";
