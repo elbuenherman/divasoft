@@ -415,7 +415,23 @@ if($funcion == 'trazabilidad_consolidado_dsft')
     echo trazabilidad_consolidado_dsft($parametro1);
 if($funcion == 'opciones_marcaciones_por_cliente_dsft')
     echo opciones_marcaciones_por_cliente_dsft($parametro1);
-if($funcion == 'agregar_guia_consolidado_dsft')
+if($funcion == 'detalle_consolidado_dsft')
+    echo detalle_consolidado_dsft($parametro1);   
+if($funcion == 'render_grid_factura_dsft')
+    echo render_grid_factura_dsft($parametro1); 
+if($funcion == 'actualizar_celda_detalle_dsft')
+    echo actualizar_celda_detalle_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'eliminar_linea_detalle_dsft')
+    echo eliminar_linea_detalle_dsft($parametro1);
+if($funcion == 'regenerar_detalle_factura_dsft')
+    echo regenerar_detalle_factura_dsft($parametro1);
+if($funcion == 'agregar_linea_a_caja_dsft')
+    echo agregar_linea_a_caja_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'agregar_caja_detalle_dsft')
+    echo agregar_caja_detalle_dsft($parametro1, $parametro2);
+if($funcion == 'confirmar_finca_factura_dsft')
+    echo confirmar_finca_factura_dsft($parametro1, $parametro2);
+if($funcion == 'agregar_guia_consolidado_dsft') 
     echo agregar_guia_consolidado_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'quitar_guia_consolidado_dsft')
     echo quitar_guia_consolidado_dsft($parametro1, $parametro2);

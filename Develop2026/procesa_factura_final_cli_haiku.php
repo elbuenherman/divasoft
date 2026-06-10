@@ -1,5 +1,5 @@
 <?php
-  
+   
 // ============================================================================
 //  procesa_factura_final_cli_haiku.php
 //  Variante CLI usando Claude Haiku 4.5 como formateador del fallback OCR
@@ -1391,6 +1391,19 @@ if($codigo_factura > 0)
     {
     $lineas_det = inserta_detalle_factura_finca($codigo_factura, $json_definitivo);
     log_dual("INSERT en detalle_factura_finca: ".$lineas_det." lineas\n");
+
+    // Guardar el JSON definitivo (limpio, ya estructurado) en RESPUESTACLAUDE2.
+    // Sirve para "Restaurar al original" en la consola de consolidados sin
+    // tener que re-parsear la respuesta cruda de Claude. Sobrescribe lo que
+    // haya quedado en RESPUESTACLAUDE2 desde el INSERT de la cabecera.
+    $json_def  = json_encode($json_definitivo, JSON_UNESCAPED_UNICODE);
+    $stmt_json = mysqli_prepare($link,
+        "UPDATE factura_finca SET RESPUESTACLAUDE2 = ? WHERE CODIGO = ?");
+    mysqli_stmt_bind_param($stmt_json, "si", $json_def, $codigo_factura);
+    mysqli_stmt_execute($stmt_json);
+    mysqli_stmt_close($stmt_json);
+    log_dual("JSON definitivo guardado en RESPUESTACLAUDE2 ("
+        .strlen($json_def)." bytes)\n");
     }
 
 // ----------------------------------------------------------------------------

@@ -1,11 +1,11 @@
 <?php
-                  
+                   
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================================================
-                   
-           
+                       
+            
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -1024,14 +1024,15 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                         $celda_fulles = '<strong>'.htmlspecialchars((string)$fulles, ENT_QUOTES, 'UTF-8').'</strong>';
                     // ESTADO de factura_finca (1=activo normal, 3=OK ambas Haiku coinciden, 4=REVISAR).
                     $est_ff = isset($proc["ESTADO"]) ? (string)$proc["ESTADO"] : '';
-                    if($est_ff !== '')
+                    if($est_ff !== '')  
                         $celda_estado_adj = '<strong>'.htmlspecialchars($est_ff, ENT_QUOTES, 'UTF-8').'</strong>';
-                    // CONSOLIDADO asignado a la factura: "COD - FECHAVUELO".
+                    // CONSOLIDADO asignado a la factura: "COD - FECHAVUELO" como link
+                    // a consola_consolidado.php?codigo=N (abre el consolidado).
                     $cc_asignado = isset($proc["CODIGOCONSOLIDADO"]) ? (int)$proc["CODIGOCONSOLIDADO"] : 0;
                     if($cc_asignado > 0 && isset($consolidados_lookup[$cc_asignado]))
                         {
                         $fechavuelo_lookup = htmlspecialchars((string)$consolidados_lookup[$cc_asignado], ENT_QUOTES, 'UTF-8');
-                        $celda_consolidado = '<strong>'.$cc_asignado.' - '.$fechavuelo_lookup.'</strong>';
+                        $celda_consolidado = '<a href="consola_consolidado.php?codigo='.$cc_asignado.'" style="color:#88010e; text-decoration:underline; cursor:pointer;" title="Ir al consolidado"><strong>'.$cc_asignado.' - '.$fechavuelo_lookup.'</strong></a>';
                         }
                     // Agregar font-weight:bold al style del <a> del nombre del archivo.
                     $adj_nombre_link = str_replace('color:#003366;', 'color:#003366; font-weight:bold;', $adj_nombre_link);
@@ -2382,6 +2383,605 @@ function trazabilidad_consolidado_dsft($codigo)
     $html .= '<b>Fecha modificacion:</b> '.htmlspecialchars((string)$fecha_mod, ENT_QUOTES, 'UTF-8').'<br>';
     $html .= '</div>';
     return $html;
+    }
+
+
+// Devuelve el HTML completo del detalle del consolidado: una "tarjeta" por
+// cada factura asignada (factura_finca.CODIGOCONSOLIDADO = $codigo_consolidado).
+// Cada tarjeta tiene: cabecera, metadata, grid posicional 60% + area PDF 40%,
+// y totales con check de cuadre subtotal-detalle vs total-cabecera.
+function detalle_consolidado_dsft($codigo_consolidado)
+    {   
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "Consolidado invalido";
+
+    $sql_ff = "SELECT ff.CODIGO, ff.FINCA, ff.CLIENTEMARCACION,
+        ff.NUMEROFACTURA, ff.FECHAFACTURACION, ff.PAISDESTINO,
+        ff.GUIA, ff.SUBTOTAL, ff.TOTAL, ff.CODIGOADJUNTO, ff.ESTADO,
+        ff.CODIGOFINCA,
+        ac.NOMBREARCHIVO, ac.MIMETYPE
+        FROM factura_finca ff
+        LEFT JOIN archivo_correo ac ON ff.CODIGOADJUNTO = ac.CODIGO
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+        ORDER BY ff.FINCA, ff.NUMEROFACTURA";
+    $res_ff = mysqli_query($link, $sql_ff);
+    if(!$res_ff || mysqli_num_rows($res_ff) == 0)
+        return "<p style='color:#888; text-align:center;'>No hay facturas asignadas a este consolidado.</p>";
+
+    // Opciones de finca (proveedor con codigo_tipo_proveedor = 1) reutilizadas
+    // en el Select2 de "Confirmar finca" del header de cada tarjeta.
+    $opciones_fincas = "";
+    $sql_fincas      = "SELECT p.codigo_proveedor AS CODIGO, p.nombre_proveedor AS NOMBRE
+        FROM proveedor p
+        WHERE p.codigo_tipo_proveedor = 1
+        ORDER BY p.nombre_proveedor";
+    $res_fincas      = mysqli_query($link, $sql_fincas);
+    if($res_fincas)
+        {
+        $total_fincas = mysqli_num_rows($res_fincas);
+        for($fi=1; $fi<=$total_fincas; $fi++)
+            {
+            $prov             = mysqli_fetch_assoc($res_fincas);
+            $opciones_fincas .= '<option value="'.(int)$prov["CODIGO"].'">'
+                .htmlspecialchars((string)$prov["NOMBRE"], ENT_QUOTES, "UTF-8")
+                .'</option>';
+            }
+        }
+
+    $total_ff = mysqli_num_rows($res_ff);
+    $html     = "";
+
+    for($f=1; $f<=$total_ff; $f++)
+        {
+        $ff         = mysqli_fetch_assoc($res_ff);
+        $codigo_ff  = (int)$ff["CODIGO"];
+        $finca      = htmlspecialchars((string)$ff["FINCA"], ENT_QUOTES, "UTF-8");
+        $marca      = htmlspecialchars((string)$ff["CLIENTEMARCACION"], ENT_QUOTES, "UTF-8");
+        $nfac       = htmlspecialchars((string)$ff["NUMEROFACTURA"], ENT_QUOTES, "UTF-8");
+        $fecha      = htmlspecialchars((string)$ff["FECHAFACTURACION"], ENT_QUOTES, "UTF-8");
+        $pais       = htmlspecialchars((string)$ff["PAISDESTINO"], ENT_QUOTES, "UTF-8");
+        $guia       = htmlspecialchars((string)$ff["GUIA"], ENT_QUOTES, "UTF-8");
+        $total_cab  = (float)$ff["TOTAL"];
+        $codigo_adj   = (int)$ff["CODIGOADJUNTO"];
+        $nombre_adj   = htmlspecialchars((string)$ff["NOMBREARCHIVO"], ENT_QUOTES, "UTF-8");
+        $es_pdf       = (stripos((string)$ff["MIMETYPE"], "pdf") !== false);
+        $codigo_finca = (int)$ff["CODIGOFINCA"];
+
+        // Auto-match: si la factura aun no tiene CODIGOFINCA pero la IA
+        // extrajo un texto en FINCA, buscar un proveedor cuyo nombre coincida
+        // exacto (case/spaces-insensitive) y pre-seleccionarlo.
+        if($codigo_finca == 0 && trim((string)$ff["FINCA"]) != "")
+            {
+            $finca_ia     = strtoupper(trim((string)$ff["FINCA"]));
+            $finca_ia_esc = mysqli_real_escape_string($link, $finca_ia);
+            $sql_match    = "SELECT codigo_proveedor AS CODIGO
+                FROM proveedor
+                WHERE codigo_tipo_proveedor = 1
+                  AND UPPER(TRIM(nombre_proveedor)) = '".$finca_ia_esc."'
+                LIMIT 1";
+            $res_match = mysqli_query($link, $sql_match);
+            if($res_match && mysqli_num_rows($res_match) > 0)
+                {
+                $fila_match   = mysqli_fetch_assoc($res_match);
+                $codigo_finca = (int)$fila_match["CODIGO"];
+                }
+            }
+
+        // Pre-seleccionar la finca actual en las opciones del select.
+        if($codigo_finca > 0)
+            $opciones_seleccionadas = str_replace(
+                'value="'.$codigo_finca.'"',
+                'value="'.$codigo_finca.'" selected',
+                $opciones_fincas
+                );
+        else
+            $opciones_seleccionadas = $opciones_fincas;
+
+        // Boton confirmar/cambiar segun si ya tiene CODIGOFINCA persistida.
+        // CODIGOFINCA > 0  -> "Cambiar" verde
+        // CODIGOFINCA == 0 -> "Confirmar" rojo (incluye el caso de auto-match que aun no se persistio)
+        $codigo_finca_persistido = (int)$ff["CODIGOFINCA"];
+        if($codigo_finca_persistido > 0)
+            {
+            $btn_texto = "Cambiar";
+            $btn_color = "#2e7d32";
+            }
+        else
+            {
+            $btn_texto = "Confirmar";
+            $btn_color = "#88010e";
+            }
+
+        // LINEA 1: titulo factura + iconos PDF/regenerar + select de finca a la derecha.
+        $html .= '<div style="background:#f2f2f2; padding:8px 12px; margin-top:10px; border:1px solid #ccc; border-radius:4px 4px 0 0; font-weight:bold; font-size:13px; color:#88010e; overflow:hidden;">';
+        $html .= '<div style="float:right; display:flex; align-items:center; gap:4px;">';
+        $html .= '<select id="id_select_finca_'.$codigo_ff.'" style="width:220px; font-size:11px;">';
+        $html .= '<option value="0">-- CONFIRMAR FINCA --</option>';
+        $html .= $opciones_seleccionadas;
+        $html .= '</select>';
+        $html .= '<button type="button" id="id_btn_finca_'.$codigo_ff.'" onclick="confirmar_finca('.$codigo_ff.');" style="font-size:11px; padding:2px 8px; background:'.$btn_color.'; color:#fff; border:none; border-radius:3px; cursor:pointer;">'.$btn_texto.'</button>';
+        $html .= '</div>';
+        $html .= 'FACTURA <strong>'.$nfac.' - '.$finca.'</strong>';
+        if($es_pdf && $codigo_adj > 0)
+            $html .= ' <a onclick="ver_pdf_consolidado('.$codigo_adj.', \''.$nombre_adj.'\', '.$codigo_ff.');" style="cursor:pointer; margin-left:10px;" title="Ver PDF original"><i class="icon-file-pdf" style="color:#88010e;"></i></a>';
+        // Icono regenerar: solo si hay adjunto asociado.
+        if($codigo_adj > 0)
+            $html .= ' <a onclick="regenerar_factura('.$codigo_ff.', '.$codigo_adj.', \''.$nombre_adj.'\');" style="cursor:pointer; color:#d4890e; margin-left:8px;" title="Regenerar factura (volver a procesar con IA)"><i class="icon-loop"></i></a>';
+        $html .= '</div>';
+  
+        // LINEA 2: metadata extraida. 
+        $html .= '<div style="background:#fafafa; padding:4px 12px; border-left:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; color:#555;">';
+        $html .= 'No.FAC: <strong>'.$nfac.'</strong>';
+        $html .= ' | SHIP: <strong>'.$fecha.'</strong>';
+        $html .= ' | MARCA: <strong>'.$marca.'</strong>';
+        $html .= ' | '.$pais;
+        $html .= ' | AWB: <strong>'.$guia.'</strong>';
+        $html .= '</div>';
+
+        // CONTENEDOR 60/40: grid posicional (envuelto en id_grid_factura_N
+        // para refresco granular) + area PDF.
+        $html .= '<div style="display:flex; border:1px solid #ccc; border-top:none; border-radius:0 0 4px 4px;">';
+        $html .= '<div style="width:65%; max-height:500px; overflow-y:auto; overflow-x:auto; padding:4px;">';
+        $html .= '<div id="id_grid_factura_'.$codigo_ff.'">';
+        $html .= render_grid_factura_dsft($codigo_ff);
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '<div id="id_pdf_area_'.$codigo_ff.'" style="width:35%; min-height:300px; background:#f9f9f9; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:13px; flex-direction:column;">';
+        $html .= '<i class="icon-file-pdf" style="font-size:40px;"></i><br>Click en el icono PDF para ver';
+        $html .= '</div>'; 
+        $html .= '</div>';
+        $html .= '<div style="margin-bottom:15px;"></div>';
+        }
+
+    return $html;
+    }
+
+// Renderiza el contenido refrescable de una factura: grid + boton agregar
+// + linea de totales (envuelta en id_totales_factura_N). Se llama desde
+// detalle_consolidado_dsft (carga inicial) y desde el AJAX cuando se
+// modifica una celda / linea (refresco granular).
+function render_grid_factura_dsft($codigo_ff)
+    { 
+    global $link;
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "Factura invalida";
+
+    // FINCA y TOTAL de la cabecera (para la columna FARM y para el cuadre).
+    $sql_cab = "SELECT FINCA, TOTAL FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    $res_cab = mysqli_query($link, $sql_cab);
+    if(!$res_cab || mysqli_num_rows($res_cab) == 0)
+        return "Factura no encontrada";
+    $fila_cab  = mysqli_fetch_assoc($res_cab);
+    $finca     = (string)$fila_cab["FINCA"];
+    $total_cab = (float)$fila_cab["TOTAL"];
+
+    $html  = _render_grid_factura($link, $codigo_ff, $finca);
+
+    // Suma del detalle (PRECIOTOTAL) para comparar con TOTAL de cabecera.
+    $sql_sum  = "SELECT SUM(PRECIOTOTAL) AS SUMA FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
+    $res_sum  = mysqli_query($link, $sql_sum);
+    $suma_det = 0;
+    if($res_sum) 
+        {
+        $fila_sum = mysqli_fetch_assoc($res_sum);
+        if($fila_sum)
+            $suma_det = (float)$fila_sum["SUMA"];
+        }
+    $cuadra = (abs($suma_det - $total_cab) < 0.01) ? ' style="color:green;"' : ' style="color:#88010e;"';
+
+    $html .= '<div id="id_totales_factura_'.$codigo_ff.'" style="padding:6px 12px; font-size:12px; border-top:1px solid #ccc; background:#fafafa; margin-top:6px;">';
+    $html .= 'SUBTOTAL DETALLE: <strong>$'.number_format($suma_det, 2).'</strong>';
+    $html .= ' | TOTAL CABECERA: <strong'.$cuadra.'>$'.number_format($total_cab, 2).'</strong>';
+    if(abs($suma_det - $total_cab) < 0.01)
+        $html .= ' <span style="color:green;">&#10003;</span>';
+    else
+        $html .= ' <span style="color:#88010e;">&#10007; DIFERENCIA: $'.number_format(abs($suma_det - $total_cab), 2).'</span>';
+    $html .= '</div>';
+
+    return $html;
+    }
+
+// Helper interno de detalle_consolidado_dsft. Renderiza el grid posicional
+// de detalle_factura_finca con columnas cm (40 a 150) y FB equivalente
+// (FB=1, HB=0.5, QB=0.25, OB/EB=0.125) en la primera linea de cada caja.
+function _render_grid_factura($link, $codigo_ff, $finca)
+    {
+    $sql = "SELECT * FROM detalle_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".(int)$codigo_ff."
+        ORDER BY NUMEROCAJA, INDICELINEA";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return "<p style='color:#888;'>Sin lineas de detalle.</p>";
+
+    $total = mysqli_num_rows($res);
+    $cms   = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $total_cms = count($cms);
+
+    $html  = '<table class="grid_factura_detalle" style="width:100%; border-collapse:collapse; font-size:11px;">';
+    $html .= '<tr style="background:#88010e; color:#fff;">';
+    $html .= '<th style="padding:2px 4px;">FB</th>';
+    $html .= '<th style="padding:2px 4px;">FARM</th>';
+    $html .= '<th style="padding:2px 4px;">VARIETY</th>'; 
+    for($c=0; $c<$total_cms; $c++)
+        $html .= '<th style="padding:2px 3px; width:35px; text-align:center;">'.$cms[$c].'</th>';
+    $html .= '<th style="padding:2px 4px; text-align:right;">ST PR</th>';
+    $html .= '<th style="padding:2px 4px; text-align:right;">TOT</th>';
+    $html .= '<th style="padding:2px 4px; width:25px;">A</th>';
+    $html .= '<th style="padding:2px 4px; width:40px;">OP</th>';
+    $html .= '</tr>';
+
+    $caja_anterior = -1;
+    for($i=1; $i<=$total; $i++)
+        {
+        $d            = mysqli_fetch_assoc($res);
+        $codigo_linea = (int)$d["CODIGO"];
+        $num_caja     = (int)$d["NUMEROCAJA"];
+        $tipo_caja    = strtoupper(trim((string)$d["TIPOCAJA"]));
+        $largo        = ($d["LARGO"] !== null) ? (int)$d["LARGO"] : null;
+        $tallos       = ($d["TALLOSTOTAL"] !== null) ? (int)$d["TALLOSTOTAL"] : null;
+
+        // FB solo en primera linea de cada caja. es_primera_caja se usa para
+        // decidir si pintamos el boton "+ agregar linea a esta caja".
+        $fb              = "";
+        $es_primera_caja = ($num_caja != $caja_anterior);
+        if($es_primera_caja)
+            {
+            if($tipo_caja == "FB")
+                $fb = "1";
+            else if($tipo_caja == "HB")
+                $fb = "0.5";
+            else if($tipo_caja == "QB")
+                $fb = "0.25";
+            else if($tipo_caja == "OB" || $tipo_caja == "EB")
+                $fb = "0.125";
+            $caja_anterior = $num_caja;
+            }
+
+        $bg = ($i % 2 == 0) ? "#f9f9f9" : "#fff";
+        $html .= '<tr data-codigo="'.$codigo_linea.'" style="background:'.$bg.';">';
+        // FB / FARM no editables. FARM se trunca a 8 chars con title para tooltip.
+        $html .= '<td style="padding:2px 4px; text-align:center; border:1px solid #ddd;">'.$fb.'</td>';
+        $html .= '<td style="padding:2px 4px; border:1px solid #ddd;" title="'.htmlspecialchars((string)$finca, ENT_QUOTES, "UTF-8").'">'.htmlspecialchars(substr((string)$finca, 0, 8), ENT_QUOTES, "UTF-8").'</td>';
+        // VARIEDAD editable, siempre en mayuscula.
+        $html .= '<td class="celda_editable" data-field="VARIEDAD" style="padding:2px 4px; border:1px solid #ddd;">'.htmlspecialchars(strtoupper((string)$d["VARIEDAD"]), ENT_QUOTES, "UTF-8").'</td>';
+
+        // Columnas cm: TODAS interactivas (vacias y con valor). Doble-click para
+        // mover/setear el valor en la columna cm correspondiente al LARGO.
+        for($c=0; $c<$total_cms; $c++)
+            {
+            $val = "";
+            if($largo !== null && $largo == $cms[$c] && $tallos !== null)
+                $val = (string)$tallos;
+            $html .= '<td class="celda_editable celda_cm" data-field="CM" data-cm="'.$cms[$c].'" style="padding:2px 3px; text-align:center; border:1px solid #ddd;">'.$val.'</td>';
+            }
+
+        $precio_u     = ($d["PRECIOUNITARIO"] !== null) ? number_format((float)$d["PRECIOUNITARIO"], 2) : "";
+        $precio_t     = ($d["PRECIOTOTAL"] !== null) ? number_format((float)$d["PRECIOTOTAL"], 2) : "";
+        $alerta_raw = (string)$d["ALERTA"];
+
+        // ST PRICE editable (PRECIOUNITARIO). TOTAL y ALERTA no editables.
+        $html .= '<td class="celda_editable" data-field="PRECIOUNITARIO" style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_u.'</td>';
+        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_t.'</td>';
+        // Columna ALERTA: icono warning naranja clickeable si hay alerta, icono check verde si no.
+        if(trim($alerta_raw) != "")
+            {
+            // Escape para uso dentro de onclick="messageBox('...')".
+            $alerta_js = str_replace(array("\\", "'", "\r\n", "\n", "\r"),
+                                     array("\\\\", "\\'", "\\n", "\\n", "\\n"),
+                                     $alerta_raw);
+            $alerta_js = htmlspecialchars($alerta_js, ENT_QUOTES, "UTF-8");
+            $html .= '<td style="padding:2px 4px; text-align:center; border:1px solid #ddd;"><a onclick="messageBox(\''.$alerta_js.'\');" style="cursor:pointer; color:#cc7700;" title="Ver alerta"><i class="icon-warning"></i></a></td>';
+            }
+        else
+            {
+            $html .= '<td style="padding:2px 4px; text-align:center; border:1px solid #ddd;"><span style="color:#2e7d32;"><i class="icon-checkmark"></i></span></td>';
+            }
+        // Columna de opciones: en la primera linea de cada caja, mostrar tambien
+        // un boton "+" que agrega una linea adicional a la MISMA caja (mismo
+        // NUMEROCAJA y TIPOCAJA). Siempre se muestra el "x" para eliminar.
+        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd;">';
+        if($es_primera_caja)
+            {
+            $tipo_caja_js = htmlspecialchars(addslashes($tipo_caja), ENT_QUOTES, "UTF-8");
+            $html .= '<a onclick="agregar_linea_a_caja('.(int)$codigo_ff.', '.$num_caja.', \''.$tipo_caja_js.'\');" style="cursor:pointer; color:#2e7d32; margin-right:4px;" title="Agregar linea a esta caja"><i class="icon-plus" style="font-size:10px;"></i></a>';
+            }
+        $html .= '<a onclick="eliminar_linea_detalle('.$codigo_linea.', '.(int)$codigo_ff.');" style="cursor:pointer; color:#88010e;" title="Eliminar linea"><i class="icon-cancel" style="font-size:10px;"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</table>';
+    // Boton agregar caja debajo de la tabla (abre dialog para elegir tipo).
+    $html .= '<div style="margin-top:6px;"><a onclick="agregar_caja_detalle('.(int)$codigo_ff.');" style="cursor:pointer; color:#88010e; font-size:12px;"><i class="icon-plus"></i> Agregar caja</a></div>';
+    return $html;
+    }
+
+
+// Actualiza un campo editable de una linea de detalle_factura_finca.
+// Lista blanca de campos: VARIEDAD, LARGO, TALLOSTOTAL, PRECIOUNITARIO.
+// Si el campo afecta el total (PRECIOUNITARIO o TALLOSTOTAL), recalcula
+// PRECIOTOTAL = TALLOSTOTAL * PRECIOUNITARIO en una segunda query.
+function actualizar_celda_detalle_dsft($codigo, $campo, $valor)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo <= 0)
+        return "Codigo invalido";
+
+    // Lista blanca de campos editables.
+    $editables = array("VARIEDAD", "LARGO", "TALLOSTOTAL", "PRECIOUNITARIO");
+    $campo     = strtoupper(trim((string)$campo));
+    $valido    = 0;
+    $total_ed  = count($editables);
+    for($k=0; $k<$total_ed; $k++)
+        {
+        if($editables[$k] == $campo)
+            {
+            $valido = 1;
+            break;
+            }
+        }
+    if($valido == 0)
+        return "Campo no editable";
+
+    // Construir el valor sanitizado segun el tipo de campo.
+    if($campo == "VARIEDAD")
+        {
+        $valor_sql = "'".mysqli_real_escape_string($link, strtoupper(trim((string)$valor)))."'";
+        }
+    else if($campo == "LARGO" || $campo == "TALLOSTOTAL")
+        {
+        $valor_int = (int)$valor;
+        if($valor_int < 0)
+            return "Valor invalido para ".$campo;
+        $valor_sql = (string)$valor_int;
+        }
+    else
+        {
+        // PRECIOUNITARIO: aceptar decimales.
+        $valor_float = (float)str_replace(",", ".", (string)$valor);
+        if($valor_float < 0)
+            return "Precio invalido";
+        $valor_sql = number_format($valor_float, 4, '.', '');
+        }
+
+    $sql = "UPDATE detalle_factura_finca
+        SET ".$campo." = ".$valor_sql.",
+            FECHAMODIFICACION     = NOW(),
+            CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+
+    // Si cambio el precio o los tallos, recalcular PRECIOTOTAL.
+    if($campo == "PRECIOUNITARIO" || $campo == "TALLOSTOTAL")
+        {
+        $sql_rec = "UPDATE detalle_factura_finca
+            SET PRECIOTOTAL = COALESCE(TALLOSTOTAL,0) * COALESCE(PRECIOUNITARIO,0),
+                FECHAMODIFICACION = NOW()
+            WHERE CODIGO = ".$codigo;
+        mysqli_query($link, $sql_rec);
+        }
+
+    return "OK";
+    }
+
+// Elimina (DELETE fisico) una linea de detalle_factura_finca por CODIGO.
+function eliminar_linea_detalle_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo <= 0)
+        return "Codigo invalido";
+    $sql = "DELETE FROM detalle_factura_finca WHERE CODIGO = ".$codigo;
+    $r   = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Restaura el detalle de una factura usando el JSON original guardado en
+// factura_finca.RESPUESTACLAUDE (la respuesta cruda de la IA). NO vuelve a
+// llamar a Claude/Haiku: solo reusa lo que la IA dijo la primera vez.
+// Borra detalle_factura_finca actual y vuelve a insertar desde el JSON.
+// Retorna "OK|N" donde N es el numero de lineas reinsertadas, o un mensaje
+// de error.
+function regenerar_detalle_factura_dsft($codigo_ff)
+    {
+    global $link;
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "Codigo invalido";
+
+    // 1) Leer el JSON definitivo (ya limpio y estructurado, guardado al
+    //    finalizar el procesamiento de Haiku/OCR/formateador).
+    $sql = "SELECT RESPUESTACLAUDE2 FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return "Factura no encontrada";
+    $fila     = mysqli_fetch_assoc($res);
+    $json_raw = (string)$fila["RESPUESTACLAUDE2"];
+    if(trim($json_raw) == "")
+        return "No hay JSON definitivo. Reprocese la factura.";
+
+    // 2) Decodificar directamente (es el JSON ya estructurado).
+    $arreglo = json_decode($json_raw, true);
+    if(!$arreglo || !isset($arreglo["CAJAS"]))
+        return "JSON definitivo invalido o sin CAJAS";
+
+    // 3) Eliminar el detalle actual.
+    $sql_del = "DELETE FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
+    mysqli_query($link, $sql_del);
+
+    // 4) Re-insertar lineas desde el JSON (misma logica que el flujo
+    //    original de inserta_detalle_factura_finca).
+    $cajas        = $arreglo["CAJAS"];
+    $total_cajas  = count($cajas);
+    $indice_linea = 0;
+    $lineas_ok    = 0;
+
+    for($i=0; $i<$total_cajas; $i++)
+        {
+        $numero_caja = isset($cajas[$i]["NUMERO_CAJA"]) ? $cajas[$i]["NUMERO_CAJA"] : null;
+        $tipo_caja   = isset($cajas[$i]["TIPO_CAJA"])   ? $cajas[$i]["TIPO_CAJA"]   : null;
+        $contenido   = isset($cajas[$i]["CONTENIDO"])   ? $cajas[$i]["CONTENIDO"]   : array();
+        $total_lin   = count($contenido);
+
+        for($j=0; $j<$total_lin; $j++)
+            {
+            $indice_linea++;
+            $L = $contenido[$j];
+ 
+            $producto     = isset($L["PRODUCTO"]) ? mysqli_real_escape_string($link, (string)$L["PRODUCTO"]) : "";
+            $variedad     = isset($L["VARIEDAD"]) ? mysqli_real_escape_string($link, (string)$L["VARIEDAD"]) : "";
+            $largo        = (isset($L["LARGO"]) && $L["LARGO"] !== null) ? (int)$L["LARGO"] : "NULL";
+            $grado        = (isset($L["GRADO"]) && $L["GRADO"] !== null) ? "'".mysqli_real_escape_string($link, (string)$L["GRADO"])."'" : "NULL";
+            $tallos_ramo  = (isset($L["TALLOS_POR_RAMO"]) && $L["TALLOS_POR_RAMO"] !== null) ? (int)$L["TALLOS_POR_RAMO"] : "NULL";
+            $ramos        = (isset($L["RAMOS"]) && $L["RAMOS"] !== null) ? (int)$L["RAMOS"] : "NULL";
+            $tallos_total = (isset($L["TALLOS_TOTAL"]) && $L["TALLOS_TOTAL"] !== null) ? (int)$L["TALLOS_TOTAL"] : "NULL";
+            $precio_u     = (isset($L["PRECIO_UNITARIO"]) && $L["PRECIO_UNITARIO"] !== null) ? (float)$L["PRECIO_UNITARIO"] : "NULL";
+            $precio_t     = (isset($L["PRECIO_TOTAL"]) && $L["PRECIO_TOTAL"] !== null) ? (float)$L["PRECIO_TOTAL"] : "NULL";
+            $alerta       = (isset($L["ALERTA"]) && $L["ALERTA"] !== null) ? "'".mysqli_real_escape_string($link, (string)$L["ALERTA"])."'" : "NULL";
+
+            $sql_ins = "INSERT INTO detalle_factura_finca (
+                CODIGO, ESTADO, CODIGOFACTURAFINCA, NUMEROCAJA, TIPOCAJA,
+                INDICELINEA, PRODUCTO, VARIEDAD, LARGO, GRADO,
+                TALLOSPORRAMO, RAMOS, TALLOSTOTAL,
+                PRECIOUNITARIO, PRECIOTOTAL, ALERTA,
+                CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+            ) VALUES (
+                0, 1, ".$codigo_ff.",
+                ".($numero_caja !== null ? (int)$numero_caja : "NULL").",
+                ".($tipo_caja !== null ? "'".mysqli_real_escape_string($link, (string)$tipo_caja)."'" : "NULL").",
+                ".$indice_linea.",
+                '".$producto."', '".$variedad."',
+                ".$largo.", ".$grado.",
+                ".$tallos_ramo.", ".$ramos.", ".$tallos_total.",
+                ".$precio_u.", ".$precio_t.", ".$alerta.",
+                0, NOW()
+            )";
+  
+            $r = mysqli_query($link, $sql_ins);
+            if($r)
+                $lineas_ok++;
+            }
+        }
+
+    return "OK|".$lineas_ok;
+    }
+
+// Helper interno: siguiente INDICELINEA para una factura.
+function _siguiente_indice_linea($codigo_ff)
+    {
+    global $link;
+    $sql = "SELECT COALESCE(MAX(INDICELINEA),0) AS MAXI FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".(int)$codigo_ff;
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return 1;
+    $fila = mysqli_fetch_assoc($res);
+    if(!$fila)
+        return 1;
+    return ((int)$fila["MAXI"]) + 1;
+    }
+
+// Helper interno: valida el TIPOCAJA contra la lista cerrada y lo retorna
+// en mayusculas, o "" si es invalido.
+function _valida_tipo_caja($tipo_caja)
+    {
+    $tipo_caja = strtoupper(trim((string)$tipo_caja));
+    if($tipo_caja == "FB" || $tipo_caja == "HB" || $tipo_caja == "QB"
+       || $tipo_caja == "OB" || $tipo_caja == "EB")
+        return $tipo_caja;
+    return "";
+    }
+
+// Agrega una linea adicional a una caja existente: misma NUMEROCAJA y
+// mismo TIPOCAJA. Usada por el icono "+" en la primera linea de cada caja.
+function agregar_linea_a_caja_dsft($codigo_ff, $numero_caja, $tipo_caja)
+    {
+    global $link;
+    $codigo_ff   = (int)$codigo_ff;
+    $numero_caja = (int)$numero_caja;
+    if($codigo_ff <= 0 || $numero_caja <= 0)
+        return "Codigos invalidos";
+
+    $tipo_caja = _valida_tipo_caja($tipo_caja);
+    if($tipo_caja == "")
+        return "Tipo de caja invalido";
+
+    $nuevo_ind     = _siguiente_indice_linea($codigo_ff);
+    $tipo_caja_sql = mysqli_real_escape_string($link, $tipo_caja);
+
+    $sql = "INSERT INTO detalle_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, TIPOCAJA, INDICELINEA, ESTADO, FECHAREGISTRO)
+        VALUES (".$codigo_ff.", ".$numero_caja.", '".$tipo_caja_sql."', ".$nuevo_ind.", 1, NOW())";
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Agrega una caja nueva al detalle: NUMEROCAJA = max+1 y TIPOCAJA elegido
+// por la usuaria (FB/HB/QB/OB).
+function agregar_caja_detalle_dsft($codigo_ff, $tipo_caja)
+    {
+    global $link;
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "Factura invalida";
+
+    $tipo_caja = _valida_tipo_caja($tipo_caja);
+    if($tipo_caja == "")
+        return "Tipo de caja invalido";
+
+    // Siguiente NUMEROCAJA.
+    $sql_max_caja = "SELECT COALESCE(MAX(NUMEROCAJA),0) AS MAXI FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
+    $res_max_caja = mysqli_query($link, $sql_max_caja);
+    $max_caja     = 0;
+    if($res_max_caja)
+        {
+        $fila_mc = mysqli_fetch_assoc($res_max_caja);
+        if($fila_mc)
+            $max_caja = (int)$fila_mc["MAXI"];
+        }
+    $nuevo_caja = $max_caja + 1;
+    $nuevo_ind  = _siguiente_indice_linea($codigo_ff);
+
+    $tipo_caja_sql = mysqli_real_escape_string($link, $tipo_caja);
+
+    $sql = "INSERT INTO detalle_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, TIPOCAJA, INDICELINEA, ESTADO, FECHAREGISTRO)
+        VALUES (".$codigo_ff.", ".$nuevo_caja.", '".$tipo_caja_sql."', ".$nuevo_ind.", 1, NOW())";
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Asigna la FINCA (proveedor codigo_tipo_proveedor=1) a una factura_finca.
+// Usado por el select + boton "Confirmar" del header de cada tarjeta de
+// factura en detalle_consolidado_dsft.
+function confirmar_finca_factura_dsft($codigo_ff, $codigo_finca)
+    {
+    global $link;
+    $codigo_ff    = (int)$codigo_ff;
+    $codigo_finca = (int)$codigo_finca;
+    if($codigo_ff <= 0 || $codigo_finca <= 0)
+        return "Parametros invalidos";
+
+    $sql = "UPDATE factura_finca
+        SET CODIGOFINCA = ".$codigo_finca.",
+            FECHAMODIFICACION = NOW(),
+            CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo_ff;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
     }
 
 

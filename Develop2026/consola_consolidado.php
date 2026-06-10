@@ -2,11 +2,11 @@
 include("variables_globales.php");  
 include("funciones.php");
 include("valida_sesion.php");   
-// CHEQUEO PERMISOS   
+// CHEQUEO PERMISOS       
 $permiso[] = NULL;       
-consulta_permisos($_SESSION['s_codigo'], $permiso);
+consulta_permisos($_SESSION['s_codigo'], $permiso);  
 $usuario_web = $_SESSION['s_codigo'];
-
+ 
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
 
@@ -213,6 +213,16 @@ textarea, input[type="text"] {
 .fg-darkRed { color: #88010e; }
 .fg-teal { color: #155a60; }
 
+/* Celdas editables del grid de detalle de factura. */
+.celda_editable
+    {
+    cursor: pointer;
+    }
+.celda_editable:hover
+    {
+    background-color: rgba(136,1,14,0.08) !important;
+    }
+
 /* ===== Select2 ===== */
 .select2-selection__rendered {
     font-size: 13px !important;
@@ -366,6 +376,7 @@ function devuelve_consolidado(codigo)
 
         // Cargar las guias asociadas a este consolidado.
         cargar_guias_consolidado(parseInt(datos.CODIGO));
+        cargar_detalle_consolidado(parseInt(datos.CODIGO));
 
         // No hacer focus al campo de fecha (abre el Flatpickr).
         });
@@ -572,6 +583,459 @@ function cargar_guias_consolidado(codigo_consolidado)
         });
     }
 
+// ===== Detalle del consolidado (facturas asignadas) =====
+// Carga el HTML del detalle (grids de cada factura + areas PDF) en el div
+// inferior id_detalle_consolidado. Se invoca al seleccionar un consolidado.
+function cargar_detalle_consolidado(codigo_consolidado)
+    {
+    if(codigo_consolidado <= 0)
+        {
+        $("#id_detalle_consolidado").hide().html("");
+        return;
+        }
+    $("#id_detalle_consolidado").show().html(
+        "<center><i class='icon-clock'></i> Cargando facturas...</center>");
+    var url = "funciones_ajax.php?funcion=detalle_consolidado_dsft"
+        + "&parametro1=" + codigo_consolidado;
+    $.get(url, function(data)
+        {
+        $("#id_detalle_consolidado").html(data);
+        // Inicializar Select2 en los selects de finca de cada tarjeta.
+        $("[id^='id_select_finca_']").select2(
+            {
+            width: '220px',
+            placeholder: '-- CONFIRMAR FINCA --'
+            });
+        });
+    }
+
+// Persiste la finca elegida en factura_finca.CODIGOFINCA.
+function confirmar_finca(codigo_ff)
+    {
+    var codigo_finca = $("#id_select_finca_" + codigo_ff).val();
+    if(!codigo_finca || codigo_finca == "0")
+        {
+        messageBox("Seleccione una finca primero");
+        return;
+        }
+    var url = "funciones_ajax.php?funcion=confirmar_finca_factura_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + codigo_finca;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            messageBox("Finca confirmada");
+            // Cambiar el boton a "Cambiar" verde sin recargar el grid.
+            var btn = $("#id_btn_finca_" + codigo_ff);
+            btn.text("Cambiar");
+            btn.css("background", "#2e7d32");
+            }
+        else
+            {
+            messageBox("Error: " + data);
+            }
+        });
+    }
+
+// Pinta el PDF en el area derecha de la tarjeta de factura.
+function ver_pdf_consolidado(codigo_adjunto, nombre_archivo, codigo_ff)
+    {
+    var area = $("#id_pdf_area_" + codigo_ff);
+    area.html('<iframe src="ver_adjunto.php?codigo=' + codigo_adjunto
+        + '" style="width:100%; height:500px; border:none;"></iframe>');
+    }
+
+// ===== EDICION CELDA POR CELDA DEL GRID DE DETALLE =====
+// Delegacion: el HTML del grid se carga por AJAX (id_detalle_consolidado),
+// por eso usamos $(document).on() en vez de bind directo.
+
+// Persiste un cambio: PHP valida el campo contra una lista blanca
+// (VARIEDAD/LARGO/TALLOSTOTAL/PRECIOUNITARIO).
+function guardar_celda_detalle(codigo, campo, valor, callback)
+    {
+    var url = "funciones_ajax.php?funcion=actualizar_celda_detalle_dsft"
+        + "&parametro1=" + codigo
+        + "&parametro2=" + encodeURIComponent(campo)
+        + "&parametro3=" + encodeURIComponent(valor);
+    $.get(url, function(data)
+        {
+        if(data != "OK")
+            messageBox("Error al guardar: " + data);
+        if(typeof callback === "function")
+            callback();
+        });
+    }
+
+// Recalculo del PRECIOTOTAL lo hace el servidor en el mismo UPDATE.
+// Aqui solo recargamos el grid de esa factura para mostrar el nuevo total.
+function recalcular_total_linea(codigo, tr)
+    {
+    recargar_grid_factura(tr);
+    }
+
+// Recarga SOLO el grid de la factura afectada (no todas las tarjetas).
+// elemento puede ser un tr, td o cualquier hijo del grid: buscamos hacia
+// arriba el ancestro con id="id_grid_factura_*" y extraemos el CODIGO_FF.
+function recargar_grid_factura(elemento)
+    {
+    var wrapper = $(elemento).closest("[id^='id_grid_factura_']");
+    if(wrapper.length == 0)
+        return;
+    var codigo_ff = wrapper.attr("id").replace("id_grid_factura_", "");
+    if(!codigo_ff)
+        return;
+    var url = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(data)
+        {
+        $("#id_grid_factura_" + codigo_ff).html(data);
+        });
+    }
+
+// Helper: recargar el grid de una factura por codigo_ff (sin necesidad de elemento DOM).
+function recargar_grid_factura_por_codigo(codigo_ff)
+    {
+    var url = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(data)
+        {
+        $("#id_grid_factura_" + codigo_ff).html(data);
+        });
+    }
+
+function eliminar_linea_detalle(codigo_detalle, codigo_ff)
+    {
+    $("#id_dialog_confirma_factura").html(
+        "<p>Eliminar esta linea del detalle?</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 350,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Eliminar",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=eliminar_linea_detalle_dsft"
+                        + "&parametro1=" + codigo_detalle;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            {
+                            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+                                + "&parametro1=" + codigo_ff;
+                            $.get(url2, function(data2)
+                                {
+                                $("#id_grid_factura_" + codigo_ff).html(data2);
+                                });
+                            }
+                        else
+                            messageBox(data);
+                        }); 
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                } 
+            ]
+        });
+    }
+
+// Agrega una linea adicional a una caja existente (mismo NUMEROCAJA y
+// TIPOCAJA). Se invoca desde el icono "+" verde en la primera linea de
+// cada caja.
+function agregar_linea_a_caja(codigo_ff, numero_caja, tipo_caja)
+    {
+    var url = "funciones_ajax.php?funcion=agregar_linea_a_caja_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + numero_caja
+        + "&parametro3=" + encodeURIComponent(tipo_caja);
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+                + "&parametro1=" + codigo_ff;
+            $.get(url2, function(data2)
+                {
+                $("#id_grid_factura_" + codigo_ff).html(data2);
+                });
+            }
+        else
+            messageBox(data);
+        }); 
+    }
+
+// Agrega una caja NUEVA: abre un dialog para que la usuaria elija el
+// tipo (HB/FB/QB/OB), y luego crea la primera linea de esa caja.
+function agregar_caja_detalle(codigo_ff)
+    {
+    var html_dialog = '<p>Tipo de caja:</p>'
+        + '<select id="id_select_tipo_caja_nueva" style="width:100%;">'
+        + '<option value="HB">HB (Half Box = 0.5)</option>'
+        + '<option value="FB">FB (Full Box = 1)</option>'
+        + '<option value="QB">QB (Quarter Box = 0.25)</option>'
+        + '<option value="OB">OB (Octave Box = 0.125)</option>'
+        + '</select>';
+    $("#id_dialog_confirma_factura").html(html_dialog);
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 350,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Crear",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    var tipo = $("#id_select_tipo_caja_nueva").val();
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=agregar_caja_detalle_dsft"
+                        + "&parametro1=" + codigo_ff
+                        + "&parametro2=" + encodeURIComponent(tipo);
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            {
+                            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+                                + "&parametro1=" + codigo_ff;
+                            $.get(url2, function(data2)
+                                {
+                                $("#id_grid_factura_" + codigo_ff).html(data2);
+                                });
+                            }
+                        else
+                            messageBox(data);
+                        });
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// ===== RESTAURAR FACTURA AL ORIGINAL DE LA IA =====
+// Reusa el JSON guardado en factura_finca.RESPUESTACLAUDE (no llama de
+// nuevo a Claude): elimina el detalle actual y lo recrea desde el JSON.
+// Es instantaneo, no requiere polling.
+function regenerar_factura(codigo_ff, codigo_adj, nombre_adj)
+    {
+    $("#id_dialog_confirma_factura").html(
+        "<p>Restaurar factura <strong>" + nombre_adj + "</strong> al original de la IA?</p>"
+        + "<p style='color:#88010e;'>Esto eliminara las modificaciones manuales y restaurara "
+        + "los datos exactos que extrajo la IA originalmente.</p>"
+        + "<p>Las ediciones manuales se perderan.</p>"
+        ); 
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 450,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Restaurar",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    ejecutar_regeneracion(codigo_ff, codigo_adj, nombre_adj);
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+ 
+function ejecutar_regeneracion(codigo_ff, codigo_adj, nombre_adj)
+    {
+    var url = "funciones_ajax.php?funcion=regenerar_detalle_factura_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(data)
+        {
+        var partes = data.split("|");
+        if(partes[0] == "OK")
+            {
+            messageBox("Factura restaurada al original de la IA ("
+                + partes[1] + " lineas).");
+            // Recargar solo el grid de esta factura.
+            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+                + "&parametro1=" + codigo_ff;
+            $.get(url2, function(data2)
+                {
+                $("#id_grid_factura_" + codigo_ff).html(data2);
+                // Scroll al grid restaurado.
+                $("html, body").animate(
+                    {
+                    scrollTop: $("#id_grid_factura_" + codigo_ff).offset().top - 50
+                    }, 300);
+                });
+            }
+        else
+            {
+            messageBox("Error: " + data);
+            }
+        });
+    }
+
+// Click en celda editable -> reemplazar texto por input. Las celdas cm
+// se manejan con dblclick (no con click simple), asi que retornamos.
+$(document).on("click", ".celda_editable", function()
+    {
+    var td = $(this);
+    if(td.data("field") == "CM")
+        return; // CM se maneja con dblclick
+    if(td.find("input, select").length > 0)
+        return; // ya editando
+
+    var field        = td.data("field");
+    var valor_actual = td.text().trim();
+
+    if(field == "PRECIOUNITARIO")
+        {
+        var input = '<input type="number" step="0.01" value="'+valor_actual+'" style="width:60px; font-size:11px; text-align:right;">';
+        td.html(input);
+        td.find("input").focus().select();
+        }
+    else if(field == "VARIEDAD")
+        {
+        var input = '<input type="text" value="'+valor_actual+'" style="width:100%; font-size:11px;">';
+        td.html(input);
+        td.find("input").focus().select();
+        }
+    });
+
+// Doble-click en celda cm: edita el numero. Si la fila ya tiene un
+// valor en otra columna cm, lo mueve a la columna del dblclick.
+$(document).on("dblclick", ".celda_cm", function()
+    {
+    var td = $(this);
+    if(td.find("input").length > 0)
+        return; // ya editando
+
+    var tr         = td.closest("tr");
+    var cm_destino = td.data("cm");
+
+    // Buscar si esta fila tiene un valor en alguna celda cm.
+    var celda_con_valor = null;
+    var tallos_actuales = "";
+    tr.find(".celda_cm").each(function()
+        {
+        var txt = $(this).text().trim();
+        if(txt != "" && !isNaN(txt))
+            {
+            celda_con_valor = $(this);
+            tallos_actuales = txt;
+            }
+        });
+
+    if(celda_con_valor)
+        {
+        var cm_origen = celda_con_valor.data("cm");
+        if(cm_origen == cm_destino)
+            {
+            // Mismo cm: solo editar el numero in-place.
+            var input = '<input type="number" value="' + tallos_actuales
+                + '" style="width:45px; font-size:11px; text-align:center;">';
+            td.html(input);
+            td.find("input").focus().select();
+            return;
+            }
+        // Mover el valor: limpiar origen, poner input en destino con el valor.
+        celda_con_valor.text("");
+        var input = '<input type="number" value="' + tallos_actuales
+            + '" style="width:45px; font-size:11px; text-align:center;">';
+        td.html(input);
+        td.find("input").focus().select();
+        }
+    else
+        {
+        // Fila sin datos cm: input vacio para tipear el numero.
+        var input = '<input type="number" value=""'
+            + ' style="width:45px; font-size:11px; text-align:center;"'
+            + ' placeholder="0">';
+        td.html(input);
+        td.find("input").focus();
+        }
+    });
+
+// Blur en celda cm: guardar LARGO + TALLOSTOTAL (o limpiar si vacio/0).
+$(document).on("blur", ".celda_cm input", function()
+    {
+    var td           = $(this).closest(".celda_cm");
+    var tr           = td.closest("tr");
+    var codigo       = tr.data("codigo");
+    var cm_destino   = td.data("cm");
+    var nuevo_tallos = $(this).val();
+
+    if(nuevo_tallos == "" || nuevo_tallos == "0")
+        {
+        // Vacio o cero: limpiar LARGO y TALLOSTOTAL.
+        guardar_celda_detalle(codigo, "LARGO", "", function()
+            {
+            guardar_celda_detalle(codigo, "TALLOSTOTAL", "", function()
+                {
+                recargar_grid_factura(tr);
+                });
+            });
+        return;
+        }
+
+    guardar_celda_detalle(codigo, "LARGO", cm_destino, function()
+        {
+        guardar_celda_detalle(codigo, "TALLOSTOTAL", nuevo_tallos, function()
+            {
+            recargar_grid_factura(tr);
+            });
+        });
+    });
+
+// Blur en VARIEDAD/PRECIOUNITARIO -> guardar. El handler tiene un
+// selector mas especifico que excluye CM (.celda_cm se maneja arriba).
+$(document).on("blur", ".celda_editable input, .celda_editable select", function()
+    {
+    var td = $(this).closest(".celda_editable");
+    if(td.hasClass("celda_cm"))
+        return; // CM tiene su propio handler
+
+    var codigo = td.closest("tr").data("codigo");
+    var field  = td.data("field");
+    var tr     = td.closest("tr");
+
+    var nuevo_valor = $(this).val();
+    guardar_celda_detalle(codigo, field, nuevo_valor, function()
+        {
+        if(field == "PRECIOUNITARIO")
+            recalcular_total_linea(codigo, tr);
+        else
+            recargar_grid_factura(tr);
+        });
+    });
+
+// Enter = guardar (trigger blur). Escape = cancelar (recarga el grid).
+// Aplica a inputs de cualquier celda editable, incluyendo .celda_cm.
+$(document).on("keydown", ".celda_editable input", function(e)
+    {
+    if(e.keyCode == 13)
+        $(this).blur();
+    if(e.keyCode == 27)
+        recargar_grid_factura($(this).closest("tr"));
+    });
+
 // ===== Ordenar por columna =====
 function ordenar_por(campo)
     {
@@ -645,6 +1109,8 @@ function boton_nuevo()
     // Limpiar la seccion GUIAS (allowClear necesita value = "").
     $("#id_lista_guias_consolidado").html("");
     $("#id_select_guia").val("").trigger('change.select2');
+    // Ocultar el detalle inferior de facturas.
+    $("#id_detalle_consolidado").hide().html("");
     // No hacer focus al campo de fecha (abre el Flatpickr).
     }
 
@@ -755,7 +1221,7 @@ $(document).ready(function()
             {
             $("#id_codigomarcacion").html(opts).trigger('change.select2');
             });
-        });
+        }); 
 
     // Cuando cambia MARCACION: leer data-truck de la option seleccionada
     // y setear TRUCK automaticamente.
@@ -769,6 +1235,18 @@ $(document).ready(function()
 
     boton_nuevo();
     actualiza_listado();
+
+    // Si viene ?codigo=N por URL, seleccionar ese consolidado automaticamente.
+    // Esperar un momento para que actualiza_listado termine de renderizar.
+    var params = new URLSearchParams(window.location.search);
+    var codigo_param = params.get("codigo");
+    if(codigo_param && parseInt(codigo_param) > 0)
+        {
+        setTimeout(function()
+            {
+            devuelve_consolidado(parseInt(codigo_param));
+            }, 600);
+        }
     });
 </script>
 </head>
@@ -937,8 +1415,13 @@ $(document).ready(function()
 
     </div>
 
+    <!-- DETALLE INFERIOR: facturas asignadas al consolidado seleccionado. -->
+    <div id="id_detalle_consolidado" style="width:100%; margin-top:10px; display:none;">
+    </div>
+
     <!-- DIALOGOS -->
     <div id="dialog" title="Alerta"></div>
+    <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
 </body>
