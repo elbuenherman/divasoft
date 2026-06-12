@@ -2,7 +2,15 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-                
+
+// Dispatch POST con archivo: detectado antes del flujo normal porque
+// usa $_FILES en vez de los $parametroN tradicionales.
+if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft")
+    {
+    echo subir_archivo_factura_dsft();
+    exit;
+    }
+
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -407,17 +415,17 @@ if($funcion == 'lista_consolidados_dsft')
     echo lista_consolidados_dsft($parametro1, $parametro2, $parametro3, $parametro4);
 if($funcion == 'devuelve_consolidado_dsft')
     echo devuelve_consolidado_dsft($parametro1);
-if($funcion == 'graba_consolidado_dsft')
+if($funcion == 'graba_consolidado_dsft') 
     echo graba_consolidado_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10);
 if($funcion == 'elimina_consolidado_dsft')
     echo elimina_consolidado_dsft($parametro1, $parametro2);
-if($funcion == 'trazabilidad_consolidado_dsft')
+if($funcion == 'trazabilidad_consolidado_dsft') 
     echo trazabilidad_consolidado_dsft($parametro1);
 if($funcion == 'opciones_marcaciones_por_cliente_dsft')
     echo opciones_marcaciones_por_cliente_dsft($parametro1);
 if($funcion == 'detalle_consolidado_dsft')
-    echo detalle_consolidado_dsft($parametro1);   
-if($funcion == 'render_grid_factura_dsft')
+    echo detalle_consolidado_dsft($parametro1);     
+if($funcion == 'render_grid_factura_dsft') 
     echo render_grid_factura_dsft($parametro1); 
 if($funcion == 'actualizar_celda_detalle_dsft')
     echo actualizar_celda_detalle_dsft($parametro1, $parametro2, $parametro3);
@@ -431,6 +439,16 @@ if($funcion == 'agregar_caja_detalle_dsft')
     echo agregar_caja_detalle_dsft($parametro1, $parametro2);
 if($funcion == 'confirmar_finca_factura_dsft')
     echo confirmar_finca_factura_dsft($parametro1, $parametro2);
+if($funcion == 'render_totales_factura_dsft')
+    echo render_totales_factura_dsft($parametro1);
+if($funcion == 'quitar_factura_consolidado_dsft')
+    echo quitar_factura_consolidado_dsft($parametro1);
+if($funcion == 'crear_factura_manual_dsft')
+    echo crear_factura_manual_dsft($parametro1, $parametro2, $parametro3, $parametro4);
+if($funcion == 'asignar_consolidado_factura_dsft')
+    echo asignar_consolidado_factura_dsft($parametro1, $parametro2, $parametro3, $parametro4);
+if($funcion == 'asignar_consolidado_post_ia_dsft')
+    echo asignar_consolidado_post_ia_dsft($parametro1, $parametro2);
 if($funcion == 'agregar_guia_consolidado_dsft') 
     echo agregar_guia_consolidado_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'quitar_guia_consolidado_dsft')

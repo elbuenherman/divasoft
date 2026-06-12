@@ -81,6 +81,27 @@ for($i=0; $i<$numero_guias; $i++)
     $arreglo_guias[$i]['CODIGO']     = $fila['CODIGO'];
     $arreglo_guias[$i]['NUMEROGUIA'] = $fila['NUMEROGUIA'];
     }
+
+// FINCAS (proveedor con codigo_tipo_proveedor = 1) para el Select2 del
+// dialog "Añadir factura". Se vuelca en una variable JS al inicio del
+// script para no requerir AJAX al abrir el dialog.
+$sql_fincas_js      = "SELECT codigo_proveedor AS CODIGO, nombre_proveedor AS NOMBRE
+    FROM proveedor
+    WHERE codigo_tipo_proveedor = 1
+    ORDER BY nombre_proveedor";
+$res_fincas_js      = mysqli_query($link, $sql_fincas_js);
+$opciones_fincas_js = '<option value="0">-- SELECCIONE FINCA --</option>';
+if($res_fincas_js)
+    {
+    $total_fincas_js = mysqli_num_rows($res_fincas_js);
+    for($fi=1; $fi<=$total_fincas_js; $fi++)
+        {
+        $prov                = mysqli_fetch_assoc($res_fincas_js);
+        $opciones_fincas_js .= '<option value="'.(int)$prov["CODIGO"].'">'
+            .htmlspecialchars((string)$prov["NOMBRE"], ENT_QUOTES, "UTF-8")
+            .'</option>';
+        }
+    }
 ?>
 <!DOCTYPE html>
 <html>
@@ -286,6 +307,7 @@ var global_codigo_seleccionado = 0;
 var global_ordenamiento = "FECHAVUELO";
 var global_direccion = "DESC";
 var global_codigo_usuario = <?php echo (int)$_SESSION['s_codigo']; ?>;
+var global_opciones_fincas = '<?php echo $opciones_fincas_js; ?>';
 var flatpickr_fechavuelo = null;
 var flatpickr_rango_filtro = null;
 
@@ -638,6 +660,402 @@ function confirmar_finca(codigo_ff)
         });
     }
 
+// ===== AÑADIR FACTURA A UN CONSOLIDADO =====
+// Dialog con dos opciones: "Crear a mano" (forma rapida) y "Subir archivo"
+// (proximamente). Se invoca desde el icono "+" verde de la columna OPC.
+// ===== DIALOG CREAR FACTURA MANUAL =====
+// Solo finca + numero de factura. Boton habilitado cuando ambos estan
+// completos. Llama a crear_factura_manual() que persiste la cabecera.
+function dialog_crear_factura_manual(codigo_consolidado)
+    {
+    var html = '<div style="text-align:center; padding:10px;">'
+        + '<p>Crear factura manual en consolidado <strong>#'
+        + codigo_consolidado + '</strong></p>'
+        + '<hr style="margin:10px 0;">'
+        + '<div style="margin-bottom:15px; text-align:left;">'
+        + '<label style="font-size:12px; display:block; margin-bottom:4px;">Finca / Proveedor:</label>'
+        + '<select id="id_nueva_finca_select" style="width:90%;">'
+        + global_opciones_fincas
+        + '</select>'
+        + '</div>'
+        + '<div style="margin-bottom:15px; text-align:left;">'
+        + '<label style="font-size:12px; display:block; margin-bottom:4px;">Numero de factura:</label>'
+        + '<input type="text" id="id_nuevo_nfac" onkeyup="validar_dialog_crear_manual();" style="width:90%; text-transform:uppercase; font-size:12px; padding:4px;" placeholder="Ej: F001234" autocomplete="off">'
+        + '</div>'
+        + '<hr style="margin:10px 0;">'
+        + '<button type="button" id="id_btn_crear_manual" onclick="crear_factura_manual('
+        + codigo_consolidado + ');"'
+        + ' class="button bg-darkRed bg-hover-red fg-white"'
+        + ' disabled style="margin-right:10px; opacity:0.5; cursor:not-allowed;">'
+        + '<i class="icon-pencil"></i> Crear</button>'
+        + '<button type="button" onclick="$(\'#id_dialog_confirma_factura\').dialog(\'close\');"'
+        + ' class="button bg-gray bg-hover-darkGray fg-white">'
+        + 'Cancelar</button>'
+        + '</div>';
+    $("#id_dialog_confirma_factura").html(html);
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 420,
+        dialogClass: 'myTitleClass',
+        buttons: []
+        });
+    setTimeout(function()
+        {
+        $("#id_nueva_finca_select").select2(
+            {
+            width: '90%',
+            placeholder: '-- SELECCIONE FINCA --',
+            dropdownParent: $("#id_dialog_confirma_factura")
+            });
+        $("#id_nueva_finca_select").on("change", function()
+            {
+            validar_dialog_crear_manual();
+            });
+        }, 100);
+    }
+
+// Habilita/deshabilita el boton "Crear" segun finca + nfac.
+function validar_dialog_crear_manual()
+    {
+    var finca_ok = false;
+    var nfac_ok  = false;
+
+    var val_finca = $("#id_nueva_finca_select").val();
+    if(val_finca && val_finca != "0")
+        finca_ok = true;
+
+    var val_nfac = $("#id_nuevo_nfac").val();
+    if(val_nfac && val_nfac.trim() != "")
+        nfac_ok = true;
+
+    if(finca_ok && nfac_ok)
+        $("#id_btn_crear_manual").prop("disabled", false).css({"opacity":"1", "cursor":"pointer"});
+    else
+        $("#id_btn_crear_manual").prop("disabled", true).css({"opacity":"0.5", "cursor":"not-allowed"});
+    }
+  
+// Crea una factura "a mano" en la BD y, si el consolidado destino es el
+// seleccionado actualmente, recarga el detalle para verla.
+function crear_factura_manual(codigo_consolidado)
+    {
+    var codigo_finca = $("#id_nueva_finca_select").val();
+    var nombre_finca = $("#id_nueva_finca_select option:selected").text().trim();
+    var nfac         = $("#id_nuevo_nfac").val().trim().toUpperCase();
+    $("#id_dialog_confirma_factura").dialog("close");
+
+    var url = "funciones_ajax.php?funcion=crear_factura_manual_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=" + codigo_finca
+        + "&parametro3=" + encodeURIComponent(nombre_finca)
+        + "&parametro4=" + encodeURIComponent(nfac);
+    $.get(url, function(data)
+        {
+        var partes = data.split("|");
+        if(partes[0] == "OK")
+            {
+            messageBox("Factura creada. Codigo: " + partes[1]);
+            if(global_codigo_seleccionado == codigo_consolidado)
+                cargar_detalle_consolidado(codigo_consolidado);
+            }
+        else
+            {
+            messageBox("Error: " + data);
+            }
+        });
+    }
+
+// ===== DIALOG SUBIR ARCHIVO (sin finca: la IA la extrae) =====
+function dialog_subir_archivo(codigo_consolidado)
+    {
+    var html = '<div style="text-align:center; padding:10px;">'
+        + '<p>Subir archivo al consolidado <strong>#'
+        + codigo_consolidado + '</strong></p>'
+        + '<p style="font-size:11px; color:#666;">La IA extraera '
+        + 'automaticamente los datos de la factura.</p>'
+        + '<hr style="margin:10px 0;">'
+        + '<div id="id_zona_drop" style="border:2px dashed #ccc; border-radius:6px; padding:20px; text-align:center; color:#888; font-size:12px; cursor:pointer; margin-bottom:8px; transition:all 0.2s;">'
+        + '<i class="icon-upload" style="font-size:24px; display:block; margin-bottom:6px;"></i>'
+        + 'Arrastre un archivo aqui<br>o haga click para seleccionar'
+        + '<input type="file" id="id_archivo_factura" accept=".pdf,.xlsx,.xls" style="display:none;">'
+        + '<div id="id_nombre_archivo_sel" style="margin-top:8px; color:#88010e; font-weight:bold; display:none;"></div>'
+        + '</div>'
+        + '<button type="button" id="id_btn_subir_procesar"'
+        + ' onclick="subir_archivo_factura(' + codigo_consolidado + ');"'
+        + ' class="button bg-darkRed bg-hover-red fg-white"'
+        + ' disabled style="opacity:0.5; cursor:not-allowed;">'
+        + '<i class="icon-upload"></i> Subir y procesar con IA</button>'
+        + ' <button type="button" onclick="$(\'#id_dialog_confirma_factura\').dialog(\'close\');"'
+        + ' class="button bg-gray bg-hover-darkGray fg-white">'
+        + 'Cancelar</button>'
+        + '</div>';
+    $("#id_dialog_confirma_factura").html(html);
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 420,
+        dialogClass: 'myTitleClass',
+        buttons: []
+        });
+
+    // Handlers drag-and-drop. off().on() para idempotencia si el dialog
+    // se abre y cierra varias veces.
+    setTimeout(function()
+        {
+        $(document).off("click", "#id_zona_drop");
+        $(document).on("click", "#id_zona_drop", function(e)
+            {
+            if(e.target.tagName != "INPUT")
+                $("#id_archivo_factura").click();
+            });
+
+        $(document).off("dragover", "#id_zona_drop");
+        $(document).on("dragover", "#id_zona_drop", function(e)
+            {
+            e.preventDefault();
+            $(this).css({"border-color":"#88010e", "background":"#fff5f5"});
+            });
+
+        $(document).off("dragleave", "#id_zona_drop");
+        $(document).on("dragleave", "#id_zona_drop", function(e)
+            {
+            e.preventDefault();
+            $(this).css({"border-color":"#ccc", "background":"transparent"});
+            });
+
+        $(document).off("drop", "#id_zona_drop");
+        $(document).on("drop", "#id_zona_drop", function(e)
+            {
+            e.preventDefault();
+            $(this).css({"border-color":"#ccc", "background":"transparent"});
+            var files = e.originalEvent.dataTransfer.files;
+            if(files.length > 0)
+                {
+                var archivo = files[0];
+                var ext = archivo.name.split(".").pop().toLowerCase();
+                if(ext != "pdf" && ext != "xlsx" && ext != "xls")
+                    {
+                    messageBox("Solo archivos PDF o Excel");
+                    return;
+                    }
+                var dt = new DataTransfer();
+                dt.items.add(archivo);
+                document.getElementById("id_archivo_factura").files = dt.files;
+                $("#id_nombre_archivo_sel").text(archivo.name).show();
+                $("#id_btn_subir_procesar").prop("disabled", false)
+                    .css({"opacity":"1", "cursor":"pointer"});
+                }
+            });
+
+        $(document).off("change", "#id_archivo_factura");
+        $(document).on("change", "#id_archivo_factura", function()
+            {
+            var archivo = this.files[0];
+            if(archivo)
+                {
+                var ext = archivo.name.split(".").pop().toLowerCase();
+                if(ext != "pdf" && ext != "xlsx" && ext != "xls")
+                    {
+                    messageBox("Solo archivos PDF o Excel");
+                    this.value = "";
+                    $("#id_nombre_archivo_sel").hide();
+                    return;
+                    }
+                $("#id_nombre_archivo_sel").text(archivo.name).show();
+                $("#id_btn_subir_procesar").prop("disabled", false)
+                    .css({"opacity":"1", "cursor":"pointer"});
+                }
+            });
+        }, 100);
+    }
+
+// ===== PROGRESO FLOTANTE MODAL =====
+// Overlay translucido + caja crimson centrada. Bloquea la interaccion
+// durante upload + procesamiento con IA. Mismo patron que la consola
+// de correos.
+function mostrar_progreso_flotante(html)
+    {
+    $("#id_flotante_contenido").html(html);
+    $("#id_overlay_procesando").show();
+    $("#id_flotante_procesando").show();
+    }
+
+function ocultar_progreso_flotante()
+    {
+    $("#id_overlay_procesando").hide();
+    $("#id_flotante_procesando").hide();
+    }
+
+// ===== SUBIR ARCHIVO PDF/EXCEL Y PROCESAR CON IA =====
+// 1) Cierra el dialog.
+// 2) Muestra el progreso flotante modal.
+// 3) POST multipart con codigo_consolidado + archivo.
+// 4) Lanza procesar_factura_web (CLI background).
+// 5) Polling a progreso_factura cada 3s, actualizando el contador.
+// 6) Al "finalizado": asignar_consolidado_post_ia_dsft + recarga detalle.
+function subir_archivo_factura(codigo_consolidado)
+    {
+    var archivo = document.getElementById("id_archivo_factura").files[0];
+    if(!archivo)
+        return;
+
+    var ext = archivo.name.split(".").pop().toLowerCase();
+    if(ext != "pdf" && ext != "xlsx" && ext != "xls")
+        return;
+
+    $("#id_dialog_confirma_factura").dialog("close");
+
+    var formData = new FormData();
+    formData.append("funcion", "subir_archivo_factura_dsft");
+    formData.append("archivo", archivo);
+    formData.append("codigo_consolidado", codigo_consolidado);
+
+    mostrar_progreso_flotante(
+        '<strong style="color:#88010e;">'
+        + '<i class="icon-upload"></i> Subiendo '
+        + archivo.name + '...</strong>');
+
+    $.ajax(
+        {
+        url: "funciones_ajax.php",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(data)
+            {
+            var partes = data.split("|");
+            if(partes[0] == "OK")
+                {
+                var codigo_adj = parseInt(partes[1]);
+
+                var hora_inicio = new Date();
+                var hora_str    = hora_inicio.toTimeString().substr(0, 8);
+                mostrar_progreso_flotante(
+                    '<strong style="color:#88010e;">'
+                    + '<i class="icon-clock"></i> Procesando con IA...</strong><br>'
+                    + '<span style="font-size:12px; color:#555;">'
+                    + archivo.name + '</span><br>'
+                    + '<span id="id_tiempo_progreso" style="font-size:12px; color:#555;">'
+                    + 'Inicio: ' + hora_str + ' | Transcurrido: 0s</span>');
+
+                // Disparar procesamiento background.
+                $.get("funciones_ajax.php?funcion=procesar_factura_web"
+                    + "&parametro1=" + codigo_adj, function() {});
+
+                // Polling de progreso cada 3s.
+                var intervalo = setInterval(function()
+                    {
+                    var ahora = new Date();
+                    var segs  = Math.round((ahora - hora_inicio) / 1000);
+                    // Refrescar contador inmediatamente.
+                    $("#id_tiempo_progreso").text(
+                        'Inicio: ' + hora_str + ' | Transcurrido: ' + segs + 's');
+                    $.get("funciones_ajax.php?funcion=progreso_factura"
+                        + "&parametro1=" + codigo_adj, function(data3)
+                        {
+                        try
+                            {
+                            var p = JSON.parse(data3);
+                            if(p.estado == "finalizado")
+                                {
+                                clearInterval(intervalo);
+                                // Asignar consolidado al factura_finca creado por la IA.
+                                $.get("funciones_ajax.php"
+                                    + "?funcion=asignar_consolidado_post_ia_dsft"
+                                    + "&parametro1=" + codigo_adj
+                                    + "&parametro2=" + codigo_consolidado,
+                                    function(data4)
+                                    {
+                                    ocultar_progreso_flotante();
+                                    messageBox("Factura " + archivo.name
+                                        + " procesada (" + segs + "s).");
+                                    cargar_detalle_consolidado(codigo_consolidado);
+                                    });
+                                }
+                            else if(p.estado == "error")
+                                {
+                                clearInterval(intervalo);
+                                ocultar_progreso_flotante();
+                                messageBox("Error: " + (p.mensaje || "desconocido"));
+                                }
+                            }
+                        catch(e) {}
+                        });
+                    }, 3000);
+                }
+            else
+                {
+                ocultar_progreso_flotante();
+                messageBox("Error: " + data);
+                }
+            },
+        error: function()
+            {
+            ocultar_progreso_flotante();
+            messageBox("Error de conexion al subir el archivo");
+            }
+        });
+    }
+
+// Desasocia una factura del consolidado actual (UPDATE CODIGOCONSOLIDADO = NULL).
+// La factura no se elimina, solo se quita del consolidado.
+function quitar_factura_consolidado(codigo_ff, descripcion)
+    {
+    $("#id_dialog_confirma_factura").html(
+        "<p>Quitar factura <strong>" + descripcion
+        + "</strong> de este consolidado?</p>"
+        + "<p>La factura no se elimina, solo se desasocia.</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 400,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "Quitar",
+                class: 'cancelButton',
+                click: function()
+                    { 
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=quitar_factura_consolidado_dsft"
+                        + "&parametro1=" + codigo_ff;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            cargar_detalle_consolidado(global_codigo_seleccionado);
+                        else
+                            messageBox("Error: " + data);
+                        });
+                    }
+                },
+                {
+                text: "Cancelar",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// Minimiza/expande el contenido (metadata + grid + PDF) de una tarjeta de
+// factura. La linea de totales queda siempre visible (esta fuera del div).
+function toggle_tarjeta_factura(codigo_ff)
+    {
+    var contenido = $("#id_contenido_factura_" + codigo_ff);
+    var icono     = $("#id_toggle_icon_" + codigo_ff);
+    if(contenido.is(":visible"))
+        {
+        contenido.slideUp(200);
+        icono.removeClass("icon-arrow-up").addClass("icon-arrow-down");
+        }
+    else
+        {
+        contenido.slideDown(200);
+        icono.removeClass("icon-arrow-down").addClass("icon-arrow-up");
+        }
+    }
+
 // Pinta el PDF en el area derecha de la tarjeta de factura.
 function ver_pdf_consolidado(codigo_adjunto, nombre_archivo, codigo_ff)
     {
@@ -677,7 +1095,7 @@ function recalcular_total_linea(codigo, tr)
 // Recarga SOLO el grid de la factura afectada (no todas las tarjetas).
 // elemento puede ser un tr, td o cualquier hijo del grid: buscamos hacia
 // arriba el ancestro con id="id_grid_factura_*" y extraemos el CODIGO_FF.
-function recargar_grid_factura(elemento)
+function recargar_grid_factura(elemento) 
     {
     var wrapper = $(elemento).closest("[id^='id_grid_factura_']");
     if(wrapper.length == 0)
@@ -685,15 +1103,11 @@ function recargar_grid_factura(elemento)
     var codigo_ff = wrapper.attr("id").replace("id_grid_factura_", "");
     if(!codigo_ff)
         return;
-    var url = "funciones_ajax.php?funcion=render_grid_factura_dsft"
-        + "&parametro1=" + codigo_ff;
-    $.get(url, function(data)
-        {
-        $("#id_grid_factura_" + codigo_ff).html(data);
-        });
+    recargar_grid_factura_por_codigo(codigo_ff);
     }
 
-// Helper: recargar el grid de una factura por codigo_ff (sin necesidad de elemento DOM).
+// Helper: recargar el grid + los totales (que estan fuera del colapsable)
+// de una factura por codigo_ff.
 function recargar_grid_factura_por_codigo(codigo_ff)
     {
     var url = "funciones_ajax.php?funcion=render_grid_factura_dsft"
@@ -701,6 +1115,13 @@ function recargar_grid_factura_por_codigo(codigo_ff)
     $.get(url, function(data)
         {
         $("#id_grid_factura_" + codigo_ff).html(data);
+        // Refrescar tambien los totales (estan fuera del grid).
+        var url_tot = "funciones_ajax.php?funcion=render_totales_factura_dsft"
+            + "&parametro1=" + codigo_ff;
+        $.get(url_tot, function(data_tot)
+            {
+            $("#id_totales_factura_" + codigo_ff).html(data_tot);
+            });
         });
     }
 
@@ -1423,6 +1844,13 @@ $(document).ready(function()
     <div id="dialog" title="Alerta"></div>
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
+
+    <!-- Progreso flotante modal: overlay + caja crimson centrada. Bloquea
+         la interaccion del usuario durante upload+procesamiento con IA. -->
+    <div id="id_overlay_procesando" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:9998;"></div>
+    <div id="id_flotante_procesando" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border:2px solid #88010e; border-radius:8px; padding:20px 30px; z-index:9999; min-width:350px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+        <div id="id_flotante_contenido"></div>
+    </div>
 
 </body>
 </html>

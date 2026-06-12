@@ -2188,13 +2188,13 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
     $html .= '<th style="width: 10%; cursor: pointer;" onclick="ordenar_por(\'FECHAVUELO\')">FECHA VUELO'.$ind_fecha.'</th>';
     $html .= '<th style="width: 30%; cursor: pointer;" onclick="ordenar_por(\'GUIA\')">GUIA'.$ind_guia.'</th>';
-    $html .= '<th style="width: 18%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
+    $html .= '<th style="width: 17%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
     $html .= '<th style="width: 17%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">CLIENTE'.$ind_cliente.'</th>';
-    $html .= '<th style="width: 7%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
-    $html .= '<th style="width: 13%;">OPC</th>';
+    $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 16%;">OPC</th>';
     $html .= '</tr></thead>';
     $html .= '<tbody>';
-
+ 
     for($i=0; $i<$numero; $i++)
         {
         $codigo  = (int)$arreglo[$i]['CODIGO'];
@@ -2215,7 +2215,9 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $html .= '<td title="'.$marca.'" onclick="devuelve_consolidado('.$codigo.');">'.$marca.'</td>';
         $html .= '<td title="'.$cliente.'" onclick="devuelve_consolidado('.$codigo.');">'.$cliente.'</td>';
         $html .= '<td class="td_centro">'.$estado_label.'</td>';
-        $html .= '<td class="td_opc">';
+        $html .= '<td class="td_opc">';  
+        $html .= '<a onclick="dialog_crear_factura_manual('.$codigo.');" style="cursor:pointer; color:#2e7d32; margin-right:4px;" title="Crear factura manual"><i class="icon-clipboard-2"></i></a>';
+        $html .= '<a onclick="dialog_subir_archivo('.$codigo.');" style="cursor:pointer; color:#88010e; margin-right:4px;" title="Subir archivo y procesar con IA"><i class="icon-upload"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
         $html .= '<a href="javascript: elimina_consolidado_dsft('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
@@ -2495,6 +2497,9 @@ function detalle_consolidado_dsft($codigo_consolidado)
             }
 
         // LINEA 1: titulo factura + iconos PDF/regenerar + select de finca a la derecha.
+        // Descripcion compacta para el dialog de "Quitar factura".
+        $descripcion_factura = addslashes($nfac.' - '.$finca);
+
         $html .= '<div style="background:#f2f2f2; padding:8px 12px; margin-top:10px; border:1px solid #ccc; border-radius:4px 4px 0 0; font-weight:bold; font-size:13px; color:#88010e; overflow:hidden;">';
         $html .= '<div style="float:right; display:flex; align-items:center; gap:4px;">';
         $html .= '<select id="id_select_finca_'.$codigo_ff.'" style="width:220px; font-size:11px;">';
@@ -2503,26 +2508,34 @@ function detalle_consolidado_dsft($codigo_consolidado)
         $html .= '</select>';
         $html .= '<button type="button" id="id_btn_finca_'.$codigo_ff.'" onclick="confirmar_finca('.$codigo_ff.');" style="font-size:11px; padding:2px 8px; background:'.$btn_color.'; color:#fff; border:none; border-radius:3px; cursor:pointer;">'.$btn_texto.'</button>';
         $html .= '</div>';
+        // Icono toggle al inicio: minimiza/expande el contenido de la tarjeta.
+        $html .= '<a onclick="toggle_tarjeta_factura('.$codigo_ff.');" style="cursor:pointer; color:#88010e; margin-right:6px;" title="Minimizar/Expandir"><i id="id_toggle_icon_'.$codigo_ff.'" class="icon-arrow-up"></i></a>';
         $html .= 'FACTURA <strong>'.$nfac.' - '.$finca.'</strong>';
         if($es_pdf && $codigo_adj > 0)
             $html .= ' <a onclick="ver_pdf_consolidado('.$codigo_adj.', \''.$nombre_adj.'\', '.$codigo_ff.');" style="cursor:pointer; margin-left:10px;" title="Ver PDF original"><i class="icon-file-pdf" style="color:#88010e;"></i></a>';
         // Icono regenerar: solo si hay adjunto asociado.
         if($codigo_adj > 0)
             $html .= ' <a onclick="regenerar_factura('.$codigo_ff.', '.$codigo_adj.', \''.$nombre_adj.'\');" style="cursor:pointer; color:#d4890e; margin-left:8px;" title="Regenerar factura (volver a procesar con IA)"><i class="icon-loop"></i></a>';
+        // Icono quitar: desasocia la factura del consolidado (no la borra).
+        $html .= ' <a onclick="quitar_factura_consolidado('.$codigo_ff.', \''.$descripcion_factura.'\');" style="cursor:pointer; color:#88010e; margin-left:8px;" title="Quitar factura de este consolidado"><i class="icon-remove"></i></a>';
         $html .= '</div>';
-  
-        // LINEA 2: metadata extraida. 
+
+        // Contenido colapsable: metadata + flex grid/PDF. Los totales quedan FUERA.
+        $html .= '<div id="id_contenido_factura_'.$codigo_ff.'">';
+
+
+        // LINEA 2: metadata extraida.
         $html .= '<div style="background:#fafafa; padding:4px 12px; border-left:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; color:#555;">';
         $html .= 'No.FAC: <strong>'.$nfac.'</strong>';
         $html .= ' | SHIP: <strong>'.$fecha.'</strong>';
         $html .= ' | MARCA: <strong>'.$marca.'</strong>';
         $html .= ' | '.$pais;
-        $html .= ' | AWB: <strong>'.$guia.'</strong>';
-        $html .= '</div>';
-
-        // CONTENEDOR 60/40: grid posicional (envuelto en id_grid_factura_N
+        $html .= ' | AWB: <strong>'.$guia.'</strong>'; 
+        $html .= '</div>';   
+    
+        // CONTENEDOR 65/35: grid posicional (envuelto en id_grid_factura_N
         // para refresco granular) + area PDF.
-        $html .= '<div style="display:flex; border:1px solid #ccc; border-top:none; border-radius:0 0 4px 4px;">';
+        $html .= '<div style="display:flex; border:1px solid #ccc; border-top:none;">';
         $html .= '<div style="width:65%; max-height:500px; overflow-y:auto; overflow-x:auto; padding:4px;">';
         $html .= '<div id="id_grid_factura_'.$codigo_ff.'">';
         $html .= render_grid_factura_dsft($codigo_ff);
@@ -2530,41 +2543,68 @@ function detalle_consolidado_dsft($codigo_consolidado)
         $html .= '</div>';
         $html .= '<div id="id_pdf_area_'.$codigo_ff.'" style="width:35%; min-height:300px; background:#f9f9f9; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:13px; flex-direction:column;">';
         $html .= '<i class="icon-file-pdf" style="font-size:40px;"></i><br>Click en el icono PDF para ver';
-        $html .= '</div>'; 
         $html .= '</div>';
+        $html .= '</div>';
+
+        $html .= '</div>'; // fin id_contenido_factura_N
+
+        // Linea de totales FUERA del colapsable (siempre visible).
+        $html .= '<div id="id_totales_factura_'.$codigo_ff.'" style="padding:6px 12px; font-size:12px; border:1px solid #ccc; border-top:none; border-radius:0 0 4px 4px; background:#fafafa;">';
+        $html .= render_totales_factura_dsft($codigo_ff);
+        $html .= '</div>';
+
         $html .= '<div style="margin-bottom:15px;"></div>';
         }
 
     return $html;
     }
 
-// Renderiza el contenido refrescable de una factura: grid + boton agregar
-// + linea de totales (envuelta en id_totales_factura_N). Se llama desde
+// Renderiza el grid posicional + boton "agregar caja" de una factura.
+// NO incluye los totales (esos van por render_totales_factura_dsft para
+// quedar fuera del area colapsable de la tarjeta). Se llama desde
 // detalle_consolidado_dsft (carga inicial) y desde el AJAX cuando se
 // modifica una celda / linea (refresco granular).
 function render_grid_factura_dsft($codigo_ff)
-    { 
+    {
     global $link;
     $codigo_ff = (int)$codigo_ff;
     if($codigo_ff <= 0)
         return "Factura invalida";
 
-    // FINCA y TOTAL de la cabecera (para la columna FARM y para el cuadre).
-    $sql_cab = "SELECT FINCA, TOTAL FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    // FINCA de la cabecera (para la columna FARM del grid).
+    $sql_cab = "SELECT FINCA FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    $res_cab = mysqli_query($link, $sql_cab);
+    if(!$res_cab || mysqli_num_rows($res_cab) == 0)
+        return "Factura no encontrada";
+    $fila_cab = mysqli_fetch_assoc($res_cab);
+    $finca    = (string)$fila_cab["FINCA"];
+
+    return _render_grid_factura($link, $codigo_ff, $finca);
+    }
+
+// Renderiza SOLO el contenido (innerHTML) del bloque de totales de una
+// factura: SUBTOTAL DETALLE vs TOTAL CABECERA + check de cuadre. El div
+// envoltura "id_totales_factura_N" lo pone detalle_consolidado_dsft.
+// Esta funcion se llama tambien por AJAX para refrescar los totales sin
+// recargar el grid completo.
+function render_totales_factura_dsft($codigo_ff)
+    {
+    global $link;
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "Factura invalida";
+
+    $sql_cab = "SELECT TOTAL FROM factura_finca WHERE CODIGO = ".$codigo_ff;
     $res_cab = mysqli_query($link, $sql_cab);
     if(!$res_cab || mysqli_num_rows($res_cab) == 0)
         return "Factura no encontrada";
     $fila_cab  = mysqli_fetch_assoc($res_cab);
-    $finca     = (string)$fila_cab["FINCA"];
     $total_cab = (float)$fila_cab["TOTAL"];
 
-    $html  = _render_grid_factura($link, $codigo_ff, $finca);
-
-    // Suma del detalle (PRECIOTOTAL) para comparar con TOTAL de cabecera.
     $sql_sum  = "SELECT SUM(PRECIOTOTAL) AS SUMA FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
     $res_sum  = mysqli_query($link, $sql_sum);
     $suma_det = 0;
-    if($res_sum) 
+    if($res_sum)
         {
         $fila_sum = mysqli_fetch_assoc($res_sum);
         if($fila_sum)
@@ -2572,15 +2612,12 @@ function render_grid_factura_dsft($codigo_ff)
         }
     $cuadra = (abs($suma_det - $total_cab) < 0.01) ? ' style="color:green;"' : ' style="color:#88010e;"';
 
-    $html .= '<div id="id_totales_factura_'.$codigo_ff.'" style="padding:6px 12px; font-size:12px; border-top:1px solid #ccc; background:#fafafa; margin-top:6px;">';
-    $html .= 'SUBTOTAL DETALLE: <strong>$'.number_format($suma_det, 2).'</strong>';
+    $html  = 'SUBTOTAL DETALLE: <strong>$'.number_format($suma_det, 2).'</strong>';
     $html .= ' | TOTAL CABECERA: <strong'.$cuadra.'>$'.number_format($total_cab, 2).'</strong>';
     if(abs($suma_det - $total_cab) < 0.01)
         $html .= ' <span style="color:green;">&#10003;</span>';
     else
         $html .= ' <span style="color:#88010e;">&#10007; DIFERENCIA: $'.number_format(abs($suma_det - $total_cab), 2).'</span>';
-    $html .= '</div>';
-
     return $html;
     }
 
@@ -2594,7 +2631,17 @@ function _render_grid_factura($link, $codigo_ff, $finca)
         ORDER BY NUMEROCAJA, INDICELINEA";
     $res = mysqli_query($link, $sql);
     if(!$res || mysqli_num_rows($res) == 0)
-        return "<p style='color:#888;'>Sin lineas de detalle.</p>";
+        {
+        // Sin lineas: mostrar mensaje + boton "Agregar caja" para que la
+        // usuaria pueda empezar a cargar (caso tipico de factura creada a mano).
+        $html  = "<p style='color:#888; font-size:11px;'>Sin lineas de detalle.</p>";
+        $html .= '<div style="margin-top:6px;">';
+        $html .= '<a onclick="agregar_caja_detalle('.(int)$codigo_ff.');"';
+        $html .= ' style="cursor:pointer; color:#88010e; font-size:12px;">';
+        $html .= '<i class="icon-plus"></i> Agregar caja</a>';
+        $html .= '</div>';
+        return $html;
+        }
 
     $total = mysqli_num_rows($res);
     $cms   = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
@@ -2982,6 +3029,189 @@ function confirmar_finca_factura_dsft($codigo_ff, $codigo_finca)
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
     return "OK";
+    }
+
+// Desasocia una factura del consolidado al que esta asignada (no la borra).
+// Usada por el icono icon-remove del header de cada tarjeta.
+function quitar_factura_consolidado_dsft($codigo_ff)
+    {
+    global $link;
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE factura_finca
+        SET CODIGOCONSOLIDADO = NULL,
+            FECHAMODIFICACION = NOW(),
+            CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo_ff;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Crea una factura "a mano" (sin pasar por la IA): cabecera con
+// CODIGOFINCA + FINCA (nombre) + NUMEROFACTURA, asociada al consolidado
+// indicado. El detalle queda vacio para que la usuaria lo cargue luego
+// con "+ Agregar caja" / dblclick en cm.
+// Retorna "OK|CODIGO_NUEVO" o un mensaje de error.
+function crear_factura_manual_dsft($codigo_consolidado, $codigo_finca, $nombre_finca, $nfac)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_finca       = (int)$codigo_finca;
+    if($codigo_consolidado <= 0)
+        return "Consolidado invalido";
+
+    $nombre_finca = mysqli_real_escape_string($link, strtoupper(trim((string)$nombre_finca)));
+    $nfac         = mysqli_real_escape_string($link, strtoupper(trim((string)$nfac)));
+
+    $sql = "INSERT INTO factura_finca (
+        CODIGOCONSOLIDADO, CODIGOFINCA, FINCA, NUMEROFACTURA,
+        ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+    ) VALUES (
+        ".$codigo_consolidado.",
+        ".$codigo_finca.",
+        '".$nombre_finca."',
+        '".$nfac."',
+        1, 0, NOW()
+    )";
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK|".(int)mysqli_insert_id($link);
+    }
+
+// Recibe un archivo PDF/Excel del POST y lo guarda como archivo_correo con
+// IDCORREO = "UPLOAD_MANUAL". NO crea factura_finca: eso lo hara el CLI de
+// procesa_factura_final_cli_haiku cuando se ejecute. Despues del CLI hay
+// que llamar a asignar_consolidado_factura_dsft para vincular el
+// factura_finca recien creado con el consolidado/finca elegidos.
+// Retorna "OK|CODIGO_ADJ" o un mensaje de error.
+function subir_archivo_factura_dsft()
+    {
+    global $link;
+    $codigo_consolidado = (int)$_POST["codigo_consolidado"];
+
+    if(!isset($_FILES["archivo"]) || $_FILES["archivo"]["error"] != 0)
+        return "Error al recibir el archivo";
+
+    $nombre_archivo = $_FILES["archivo"]["name"];
+    $tmp_path       = $_FILES["archivo"]["tmp_name"];
+    $tamano         = (int)$_FILES["archivo"]["size"];
+    $mimetype       = $_FILES["archivo"]["type"];
+
+    $binario = file_get_contents($tmp_path);
+    if($binario === false)
+        return "Error al leer el archivo temporal";
+
+    $hash = md5($binario);
+
+    // INSERT en archivo_correo. ARCHIVO es BLOB -> usar prepared statement
+    // con send_long_data para soportar archivos grandes (>1 MB). El
+    // CODIGOCONSOLIDADO se guarda aqui para tener trazabilidad del destino.
+    $sql_adj = "INSERT INTO archivo_correo (
+        IDCORREO, CODIGOFINCA, CODIGOCONSOLIDADO,
+        NOMBREARCHIVO, MIMETYPE, TAMANOBYTES,
+        HASHARCHIVO, ARCHIVO, RUTA, FECHAGUARDADO
+    ) VALUES (
+        'UPLOAD_MANUAL', NULL, ".$codigo_consolidado.",
+        ?, ?, ?, ?, ?, NULL, NOW()
+    )";
+
+    $stmt = mysqli_prepare($link, $sql_adj);
+    if(!$stmt)
+        return "Error preparando INSERT archivo: ".mysqli_error($link);
+
+    $null_blob = NULL;
+    mysqli_stmt_bind_param($stmt, "ssisb", $nombre_archivo, $mimetype, $tamano, $hash, $null_blob);
+    mysqli_stmt_send_long_data($stmt, 4, $binario);
+    $r = mysqli_stmt_execute($stmt);
+    if(!$r)
+        {
+        $err = mysqli_stmt_error($stmt);
+        mysqli_stmt_close($stmt);
+        return "Error al insertar archivo: ".$err;
+        }
+    $codigo_adj = (int)mysqli_stmt_insert_id($stmt);
+    mysqli_stmt_close($stmt);
+
+    if($codigo_adj <= 0)
+        return "Error al obtener CODIGO de archivo";
+
+    return "OK|".$codigo_adj;
+    }
+
+// Llamada DESPUES de que procesar_factura_web termina: vincula el
+// factura_finca recien creado (identificado por CODIGOADJUNTO) con el
+// consolidado y la finca que la usuaria eligio en el dialog de upload.
+function asignar_consolidado_factura_dsft($codigo_adj, $codigo_consolidado, $codigo_finca, $nombre_finca)
+    {
+    global $link;
+    $codigo_adj         = (int)$codigo_adj;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_finca       = (int)$codigo_finca;
+    if($codigo_adj <= 0 || $codigo_consolidado <= 0)
+        return "Parametros invalidos";
+
+    // Buscar el factura_finca que el CLI creo para este adjunto.
+    $sql_busca = "SELECT CODIGO FROM factura_finca WHERE CODIGOADJUNTO = ".$codigo_adj." LIMIT 1";
+    $res_busca = mysqli_query($link, $sql_busca);
+    if(!$res_busca || mysqli_num_rows($res_busca) == 0)
+        return "No se encontro la factura procesada";
+    $fila_busca = mysqli_fetch_assoc($res_busca);
+    $codigo_ff  = (int)$fila_busca["CODIGO"];
+
+    $nombre_finca_sql = mysqli_real_escape_string($link, strtoupper(trim((string)$nombre_finca)));
+
+    // Si codigo_finca > 0 lo seteamos, sino dejamos lo que haya puesto la IA.
+    $set_finca = ($codigo_finca > 0) ? "CODIGOFINCA = ".$codigo_finca."," : "";
+    $set_nombre = ($nombre_finca_sql !== "") ? "FINCA = '".$nombre_finca_sql."'," : "";
+
+    $sql_upd = "UPDATE factura_finca SET
+        CODIGOCONSOLIDADO = ".$codigo_consolidado.",
+        ".$set_finca."
+        ".$set_nombre."
+        FECHAMODIFICACION = NOW(),
+        CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo_ff;
+    $r = mysqli_query($link, $sql_upd);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK|".$codigo_ff;
+    }
+
+// Llamada DESPUES de procesar_factura_web cuando la usuaria subio el
+// archivo SIN preseleccionar finca: la IA ya extrajo todo (incluyendo
+// FINCA y CODIGOFINCA si pudo matchear). Aqui solo le asignamos el
+// CODIGOCONSOLIDADO al factura_finca recien creado.
+function asignar_consolidado_post_ia_dsft($codigo_adj, $codigo_consolidado)
+    {
+    global $link;
+    $codigo_adj         = (int)$codigo_adj;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_adj <= 0 || $codigo_consolidado <= 0)
+        return "Parametros invalidos";
+
+    $sql = "SELECT CODIGO FROM factura_finca
+        WHERE CODIGOADJUNTO = ".$codigo_adj."
+        ORDER BY CODIGO DESC LIMIT 1";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return "No se encontro factura para adjunto ".$codigo_adj;
+    $fila      = mysqli_fetch_assoc($res);
+    $codigo_ff = (int)$fila["CODIGO"];
+
+    $sql2 = "UPDATE factura_finca
+        SET CODIGOCONSOLIDADO = ".$codigo_consolidado.",
+            FECHAMODIFICACION = NOW(),
+            CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo_ff;
+    $r = mysqli_query($link, $sql2);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK|".$codigo_ff;
     }
 
 
