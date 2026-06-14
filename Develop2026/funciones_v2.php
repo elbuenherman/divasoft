@@ -1,5 +1,5 @@
 <?php
-                   
+                    
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
@@ -3423,4 +3423,216 @@ function opciones_guias_recientes_dsft()
         $html .= '<option value="'.(int)$f["CODIGO"].'">'.htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8').'</option>';
         }
     return $html;
+    }
+
+
+// ============================================================================
+// TIPO DE PRODUCTO - consola nueva (_dsft). CRUD con borrado logico (ESTADO=-1).
+// ============================================================================
+
+// Helper interno para indicador de ordenamiento (triangulo ASC/DESC).
+function _ind_orden_tipo_producto($campo, $orden_valido, $direccion_valida)
+    {
+    if($orden_valido != $campo)
+        return "";
+    return ($direccion_valida == "ASC") ? " &#9650;" : " &#9660;";
+    }
+
+// Lista el grid de tipos de producto (HTML completo: thead + tbody + total).
+function lista_tipo_producto_dsft($campo_orden = "NOMBRE", $direccion_orden = "ASC")
+    {
+    global $link;
+
+    // Validar campo y direccion contra lista blanca.
+    $campos_permitidos = array(1=>"CODIGO", 2=>"NOMBRE", 3=>"NOMBREINGLES", 4=>"ESTADO");
+    $total_campos = count($campos_permitidos);
+    $orden_valido = "NOMBRE";
+    for($c=1; $c<=$total_campos; $c++)
+        {
+        if($campos_permitidos[$c] == $campo_orden)
+            {
+            $orden_valido = $campo_orden;
+            break;
+            }
+        }
+    $direccion_valida = ($direccion_orden == "DESC") ? "DESC" : "ASC";
+
+    $sql = "SELECT CODIGO, NOMBRE, NOMBREINGLES, NOMBRERUSO, ESTADO
+        FROM tipo_producto
+        WHERE ESTADO >= 0
+        ORDER BY ".$orden_valido." ".$direccion_valida;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado)
+        return '<div style="padding: 10px; color: #88010e;">Error SQL: '.htmlspecialchars(mysqli_error($link)).'</div>';
+    $numero = mysqli_num_rows($resultado);
+
+    $arreglo = array();
+    for($i=1; $i<=$numero; $i++)
+        {
+        $fila = mysqli_fetch_array($resultado);
+        $arreglo[$i]['CODIGO']       = $fila['CODIGO'];
+        $arreglo[$i]['NOMBRE']       = $fila['NOMBRE'];
+        $arreglo[$i]['NOMBREINGLES'] = $fila['NOMBREINGLES'];
+        $arreglo[$i]['NOMBRERUSO']   = $fila['NOMBRERUSO'];
+        $arreglo[$i]['ESTADO']       = $fila['ESTADO'];
+        }
+
+    // Indicadores de ordenamiento por columna.
+    $ind_codigo = _ind_orden_tipo_producto("CODIGO",       $orden_valido, $direccion_valida);
+    $ind_nombre = _ind_orden_tipo_producto("NOMBRE",       $orden_valido, $direccion_valida);
+    $ind_ingles = _ind_orden_tipo_producto("NOMBREINGLES", $orden_valido, $direccion_valida);
+    $ind_estado = _ind_orden_tipo_producto("ESTADO",       $orden_valido, $direccion_valida);
+
+    $html  = '<table class="grid_tipos">';
+    $html .= '<thead><tr>';
+    $html .= '<th style="width: 7%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
+    $html .= '<th style="width: 30%; cursor: pointer;" onclick="ordenar_por(\'NOMBRE\')">NOMBRE'.$ind_nombre.'</th>';
+    $html .= '<th style="width: 26%; cursor: pointer;" onclick="ordenar_por(\'NOMBREINGLES\')">INGLES'.$ind_ingles.'</th>';
+    $html .= '<th style="width: 20%;">RUSO</th>';
+    $html .= '<th style="width: 8%; cursor: pointer;" onclick="ordenar_por(\'ESTADO\')">EST'.$ind_estado.'</th>';
+    $html .= '<th style="width: 9%;">OPC</th>';
+    $html .= '</tr></thead>';
+    $html .= '<tbody>';
+
+    for($i=1; $i<=$numero; $i++)
+        {
+        $codigo = (int)$arreglo[$i]['CODIGO'];
+        $nombre = htmlspecialchars((string)$arreglo[$i]['NOMBRE'], ENT_QUOTES, 'UTF-8');
+        $ingles = htmlspecialchars((string)$arreglo[$i]['NOMBREINGLES'], ENT_QUOTES, 'UTF-8');
+        $ruso   = htmlspecialchars((string)$arreglo[$i]['NOMBRERUSO'], ENT_QUOTES, 'UTF-8');
+        $estado_n = (int)$arreglo[$i]['ESTADO'];
+        if($estado_n == 1)
+            $estado_label = '<span style="color: #2e7d32; font-weight: bold;">ACT</span>';
+        else
+            $estado_label = '<span style="color: #888;">INA</span>';
+
+        $html .= '<tr class="grupo_tipo" id="id_grupo_tipo_'.$codigo.'">';
+        $html .= '<td class="td_centro">'.$codigo.'</td>';
+        $html .= '<td title="'.$nombre.'" onclick="devuelve_tipo_producto('.$codigo.');"><strong>'.$nombre.'</strong></td>';
+        $html .= '<td title="'.$ingles.'" onclick="devuelve_tipo_producto('.$codigo.');">'.$ingles.'</td>';
+        $html .= '<td title="'.$ruso.'" onclick="devuelve_tipo_producto('.$codigo.');">'.$ruso.'</td>';
+        $html .= '<td class="td_centro">'.$estado_label.'</td>';
+        $html .= '<td class="td_opc">';
+        $html .= '<a href="javascript: devuelve_tipo_producto('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
+        $html .= '<a href="javascript: elimina_tipo_producto('.$codigo.');" title="Eliminar"><i class="icon-cancel fg-darkRed"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '</tbody></table>';
+    $html .= '<div style="text-align: right; font-size: 11px; color: #666; padding: 5px;">Total: '.$numero.' registros</div>';
+    return $html;
+    }
+
+// Devuelve un tipo de producto como JSON para llenar el formulario.
+function devuelve_tipo_producto_dsft($codigo)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo == 0)
+        return json_encode(array("ERROR" => "Codigo invalido"));
+
+    $sql = "SELECT CODIGO, NOMBRE, NOMBREINGLES, NOMBRERUSO, OBSERVACIONES, ESTADO
+        FROM tipo_producto
+        WHERE CODIGO = ".$codigo;
+    $resultado = mysqli_query($link, $sql);
+    if(!$resultado || mysqli_num_rows($resultado) == 0)
+        return json_encode(array("ERROR" => "Tipo de producto no encontrado"));
+
+    $fila = mysqli_fetch_array($resultado);
+    $respuesta = array();
+    $respuesta['CODIGO']        = $fila['CODIGO'];
+    $respuesta['NOMBRE']        = $fila['NOMBRE'];
+    $respuesta['NOMBREINGLES']  = $fila['NOMBREINGLES'];
+    $respuesta['NOMBRERUSO']    = $fila['NOMBRERUSO'];
+    $respuesta['OBSERVACIONES'] = $fila['OBSERVACIONES'];
+    $respuesta['ESTADO']        = $fila['ESTADO'];
+
+    return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
+    }
+
+// INSERT si $codigo == 0, UPDATE si > 0. Valida NOMBRE obligatorio y unico.
+// Retorna "OK|CODIGO" en exito, o mensaje de error.
+function grabar_tipo_producto_dsft($codigo, $nombre, $nombre_ingles, $nombre_ruso, $observaciones, $estado, $codigo_usuario)
+    {
+    global $link;
+
+    // Validacion: NOMBRE obligatorio (identica al JS).
+    $nombre = strtoupper(trim((string)$nombre));
+    if($nombre == "")
+        return "Por favor ingrese el NOMBRE del tipo de producto";
+
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    $estado         = (int)$estado;
+
+    // Escape de strings (sobrescribir misma variable).
+    $nombre        = mysqli_real_escape_string($link, $nombre);
+    $nombre_ingles = mysqli_real_escape_string($link, strtoupper(trim((string)$nombre_ingles)));
+    $nombre_ruso   = mysqli_real_escape_string($link, trim((string)$nombre_ruso));
+    $observaciones = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+
+    // Validacion: NOMBRE unico (la columna es UNIQUE; chequear todos los registros
+    // excluyendo el actual si es edicion).
+    $sql_dup = "SELECT CODIGO
+        FROM tipo_producto
+        WHERE NOMBRE = '".$nombre."'";
+    if($codigo > 0)
+        $sql_dup .= " AND CODIGO <> ".$codigo;
+    $res_dup = mysqli_query($link, $sql_dup);
+    if($res_dup && mysqli_num_rows($res_dup) > 0)
+        return "Ya existe un tipo de producto con el NOMBRE '".$nombre."'";
+
+    if($codigo == 0)
+        {
+        $sql = "INSERT INTO tipo_producto (
+            NOMBRE, NOMBREINGLES, NOMBRERUSO, OBSERVACIONES,
+            ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            '".$nombre."', '".$nombre_ingles."', '".$nombre_ruso."', '".$observaciones."',
+            ".$estado.", ".$codigo_usuario.", NOW()
+        )";
+        $r = mysqli_query($link, $sql);
+        if(!$r)
+            return "Error SQL: ".mysqli_error($link);
+        $codigo_final = mysqli_insert_id($link);
+        }
+    else
+        {
+        $sql = "UPDATE tipo_producto SET
+            NOMBRE                = '".$nombre."',
+            NOMBREINGLES          = '".$nombre_ingles."',
+            NOMBRERUSO            = '".$nombre_ruso."',
+            OBSERVACIONES         = '".$observaciones."',
+            ESTADO                = ".$estado.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()
+            WHERE CODIGO = ".$codigo;
+        $r = mysqli_query($link, $sql);
+        if(!$r)
+            return "Error SQL: ".mysqli_error($link);
+        $codigo_final = $codigo;
+        }
+
+    return "OK|".$codigo_final;
+    }
+
+// Eliminacion logica: ESTADO = -1. NO hace DELETE fisico.
+function elimina_tipo_producto_dsft($codigo, $codigo_usuario)
+    {
+    global $link;
+    $codigo         = (int)$codigo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo == 0)
+        return "Codigo invalido";
+
+    $sql = "UPDATE tipo_producto SET
+        ESTADO                = -1,
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
     }

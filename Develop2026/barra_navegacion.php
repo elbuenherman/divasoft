@@ -81,6 +81,7 @@ consulta_permisos($_SESSION['s_codigo'],$permiso);
                             	<li>
                                     <a href="#" class="dropdown-toggle">Productos</a>
                                     <ul class="dropdown-menu dark" data-role="dropdown">
+                                        <li <?php echo $permiso[35];?>><a href="consola_tipo_producto.php">Tipo Productos</a></li>
                                         <li <?php echo $permiso[33];?>><a href="consola_productos_quick.php">Productos</a></li>
                                         <li <?php echo $permiso[11];?>><a href="consola_productos.php">Productos Web</a></li>
                                         <li <?php echo $permiso[10];?>><a href="consola_categoria_productos.php">Categorías</a></li>

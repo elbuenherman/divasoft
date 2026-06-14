@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-
+ 
 // Dispatch POST con archivo: detectado antes del flujo normal porque
 // usa $_FILES en vez de los $parametroN tradicionales.
 if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft")
@@ -460,6 +460,16 @@ if($funcion == 'opciones_guias_recientes_dsft')
 // Tablita read-only en consola_clientes_dsft.php
 if($funcion == 'lista_marcaciones_por_cliente_dsft')
     echo lista_marcaciones_por_cliente_dsft($parametro1);
+
+// TIPO DE PRODUCTO (consola nueva _dsft)
+if($funcion == 'lista_tipo_producto_dsft')
+    echo lista_tipo_producto_dsft($parametro1, $parametro2);
+if($funcion == 'devuelve_tipo_producto_dsft')
+    echo devuelve_tipo_producto_dsft($parametro1);
+if($funcion == 'grabar_tipo_producto_dsft')
+    echo grabar_tipo_producto_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
+if($funcion == 'elimina_tipo_producto_dsft')
+    echo elimina_tipo_producto_dsft($parametro1, $parametro2);
 
 
 mysqli_close($link);
