@@ -2,7 +2,7 @@
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
- 
+  
 // Dispatch POST con archivo: detectado antes del flujo normal porque
 // usa $_FILES en vez de los $parametroN tradicionales.
 if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft")
@@ -439,6 +439,8 @@ if($funcion == 'agregar_caja_detalle_dsft')
     echo agregar_caja_detalle_dsft($parametro1, $parametro2);
 if($funcion == 'confirmar_finca_factura_dsft')
     echo confirmar_finca_factura_dsft($parametro1, $parametro2);
+if($funcion == 'confirmar_tipo_producto_dsft')
+    echo confirmar_tipo_producto_dsft($parametro1, $parametro2);
 if($funcion == 'render_totales_factura_dsft')
     echo render_totales_factura_dsft($parametro1);
 if($funcion == 'quitar_factura_consolidado_dsft')

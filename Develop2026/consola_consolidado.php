@@ -6,7 +6,7 @@ include("valida_sesion.php");
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);  
 $usuario_web = $_SESSION['s_codigo'];
- 
+  
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
 
@@ -628,6 +628,12 @@ function cargar_detalle_consolidado(codigo_consolidado)
             width: '220px',
             placeholder: '-- CONFIRMAR FINCA --'
             });
+        // Inicializar Select2 en los selects de tipo de producto de cada tarjeta.
+        $("[id^='id_select_tipo_']").select2(
+            {
+            width: '150px',
+            placeholder: '-- TIPO --'
+            });
         });
     }
 
@@ -650,6 +656,35 @@ function confirmar_finca(codigo_ff)
             messageBox("Finca confirmada");
             // Cambiar el boton a "Cambiar" verde sin recargar el grid.
             var btn = $("#id_btn_finca_" + codigo_ff);
+            btn.text("Cambiar");
+            btn.css("background", "#2e7d32");
+            }
+        else
+            {
+            messageBox("Error: " + data);
+            }
+        });
+    }
+
+// Persiste el tipo de producto elegido en factura_finca.CODIGOTIPOPRODUCTO.
+function confirmar_tipo_producto(codigo_ff)
+    {
+    var codigo_tipo = $("#id_select_tipo_" + codigo_ff).val();
+    if(!codigo_tipo || codigo_tipo == "0")
+        {
+        messageBox("Seleccione un tipo de producto");
+        return;
+        }
+    var url = "funciones_ajax.php?funcion=confirmar_tipo_producto_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + codigo_tipo;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            messageBox("Tipo de producto confirmado");
+            // Cambiar el boton a "Cambiar" verde sin recargar el grid.
+            var btn = $("#id_btn_tipo_" + codigo_ff);
             btn.text("Cambiar");
             btn.css("background", "#2e7d32");
             }

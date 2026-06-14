@@ -1,5 +1,5 @@
 <?php
-                    
+                     
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
@@ -2402,7 +2402,7 @@ function detalle_consolidado_dsft($codigo_consolidado)
     $sql_ff = "SELECT ff.CODIGO, ff.FINCA, ff.CLIENTEMARCACION,
         ff.NUMEROFACTURA, ff.FECHAFACTURACION, ff.PAISDESTINO,
         ff.GUIA, ff.SUBTOTAL, ff.TOTAL, ff.CODIGOADJUNTO, ff.ESTADO,
-        ff.CODIGOFINCA,
+        ff.CODIGOFINCA, ff.CODIGOTIPOPRODUCTO,
         ac.NOMBREARCHIVO, ac.MIMETYPE
         FROM factura_finca ff
         LEFT JOIN archivo_correo ac ON ff.CODIGOADJUNTO = ac.CODIGO
@@ -2432,6 +2432,26 @@ function detalle_consolidado_dsft($codigo_consolidado)
             }
         }
 
+    // Opciones de tipo de producto (activos) reutilizadas en el Select2 de
+    // "tipo" del header de cada tarjeta.
+    $sql_tipos = "SELECT CODIGO, NOMBRE
+        FROM tipo_producto
+        WHERE ESTADO = 1
+        ORDER BY NOMBRE";
+    $res_tipos      = mysqli_query($link, $sql_tipos);
+    $opciones_tipos = "";
+    if($res_tipos)
+        {
+        $total_tipos = mysqli_num_rows($res_tipos);
+        for($ti=1; $ti<=$total_tipos; $ti++)
+            {
+            $tipo            = mysqli_fetch_assoc($res_tipos);
+            $opciones_tipos .= '<option value="'.(int)$tipo["CODIGO"].'">'
+                .htmlspecialchars((string)$tipo["NOMBRE"], ENT_QUOTES, "UTF-8")
+                .'</option>';
+            }
+        }
+
     $total_ff = mysqli_num_rows($res_ff);
     $html     = "";
 
@@ -2448,7 +2468,8 @@ function detalle_consolidado_dsft($codigo_consolidado)
         $total_cab  = (float)$ff["TOTAL"];
         $codigo_adj   = (int)$ff["CODIGOADJUNTO"];
         $nombre_adj   = htmlspecialchars((string)$ff["NOMBREARCHIVO"], ENT_QUOTES, "UTF-8");
-        $es_pdf       = (stripos((string)$ff["MIMETYPE"], "pdf") !== false);
+        $es_pdf       = (stripos((string)$ff["MIMETYPE"], "pdf") !== false)
+            || (strtolower(substr((string)$ff["NOMBREARCHIVO"], -4)) == ".pdf");
         $codigo_finca = (int)$ff["CODIGOFINCA"];
 
         // Auto-match: si la factura aun no tiene CODIGOFINCA pero la IA
@@ -2496,12 +2517,84 @@ function detalle_consolidado_dsft($codigo_consolidado)
             $btn_color = "#88010e";
             }
 
+        // ---- TIPO DE PRODUCTO: auto-deteccion + preseleccion del header ----
+        $codigo_tipo     = (int)$ff["CODIGOTIPOPRODUCTO"];
+        $tipo_persistido = $codigo_tipo; // > 0 si ya esta confirmado en la BD.
+
+        if($codigo_tipo == 0)
+            {
+            // Buscar el producto dominante (mas frecuente) en el detalle.
+            $sql_dom = "SELECT PRODUCTO, COUNT(*) AS TOTAL
+                FROM detalle_factura_finca
+                WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+                  AND PRODUCTO IS NOT NULL AND PRODUCTO != ''
+                GROUP BY PRODUCTO
+                ORDER BY TOTAL DESC
+                LIMIT 1";
+            $res_dom = mysqli_query($link, $sql_dom);
+            if($res_dom && mysqli_num_rows($res_dom) > 0)
+                {
+                $fila_dom         = mysqli_fetch_assoc($res_dom);
+                $producto_dom     = strtoupper(trim((string)$fila_dom["PRODUCTO"]));
+                $producto_dom_esc = mysqli_real_escape_string($link, $producto_dom);
+                // Match flexible: exacto por NOMBRE/NOMBREINGLES, o por prefijo
+                // (LIKE 'X%') para que GYPSO matchee GYPSOPHILA y CARNATION
+                // matchee CLAVEL via NOMBREINGLES. SPRAY sin match queda en ROSA.
+                $sql_match_tipo   = "SELECT CODIGO 
+                    FROM tipo_producto
+                    WHERE ESTADO = 1
+                      AND (UPPER(TRIM(NOMBRE)) = '".$producto_dom_esc."'
+                           OR UPPER(TRIM(NOMBREINGLES)) = '".$producto_dom_esc."'
+                           OR UPPER(TRIM(NOMBRE)) LIKE '".$producto_dom_esc."%'
+                           OR UPPER(TRIM(NOMBREINGLES)) LIKE '".$producto_dom_esc."%')
+                    LIMIT 1";
+                $res_match_tipo = mysqli_query($link, $sql_match_tipo);
+                if($res_match_tipo && mysqli_num_rows($res_match_tipo) > 0)
+                    {
+                    $fila_match_tipo = mysqli_fetch_assoc($res_match_tipo);
+                    $codigo_tipo     = (int)$fila_match_tipo["CODIGO"];
+                    }
+                }
+            // Si sigue en 0, default a ROSA (CODIGO = 1).
+            if($codigo_tipo == 0)
+                $codigo_tipo = 1;
+            }
+
+        // Pre-seleccionar el tipo en las opciones del select (igual que fincas).
+        if($codigo_tipo > 0)
+            $opciones_tipos_sel = str_replace(
+                'value="'.$codigo_tipo.'"',
+                'value="'.$codigo_tipo.'" selected',
+                $opciones_tipos
+                );
+        else
+            $opciones_tipos_sel = $opciones_tipos;
+
+        // Boton confirmar/cambiar segun si el tipo ya esta persistido en la BD.
+        // tipo_persistido > 0 -> "Cambiar" verde ; == 0 (sugerido) -> "Confirmar" rojo.
+        if($tipo_persistido > 0)
+            {
+            $btn_tipo_texto = "Cambiar";
+            $btn_tipo_color = "#2e7d32";
+            }
+        else
+            {
+            $btn_tipo_texto = "Confirmar";
+            $btn_tipo_color = "#88010e";
+            }
+
         // LINEA 1: titulo factura + iconos PDF/regenerar + select de finca a la derecha.
         // Descripcion compacta para el dialog de "Quitar factura".
         $descripcion_factura = addslashes($nfac.' - '.$finca);
 
         $html .= '<div style="background:#f2f2f2; padding:8px 12px; margin-top:10px; border:1px solid #ccc; border-radius:4px 4px 0 0; font-weight:bold; font-size:13px; color:#88010e; overflow:hidden;">';
         $html .= '<div style="float:right; display:flex; align-items:center; gap:4px;">';
+        $html .= '<select id="id_select_tipo_'.$codigo_ff.'" style="width:150px; font-size:11px;">';
+        $html .= '<option value="0">-- TIPO --</option>';
+        $html .= $opciones_tipos_sel;
+        $html .= '</select>';
+        $html .= '<button type="button" id="id_btn_tipo_'.$codigo_ff.'" onclick="confirmar_tipo_producto('.$codigo_ff.');" style="font-size:10px; padding:2px 6px; background:'.$btn_tipo_color.'; color:#fff; border:none; border-radius:3px; cursor:pointer;">'.$btn_tipo_texto.'</button>';
+        $html .= '<span style="color:#ccc; margin:0 4px;">|</span>';
         $html .= '<select id="id_select_finca_'.$codigo_ff.'" style="width:220px; font-size:11px;">';
         $html .= '<option value="0">-- CONFIRMAR FINCA --</option>';
         $html .= $opciones_seleccionadas;
@@ -3028,6 +3121,27 @@ function confirmar_finca_factura_dsft($codigo_ff, $codigo_finca)
     $r = mysqli_query($link, $sql);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Asigna el TIPO DE PRODUCTO a una factura_finca. Usado por el select + boton
+// "Confirmar/Cambiar" de tipo del header de cada tarjeta en detalle_consolidado_dsft.
+function confirmar_tipo_producto_dsft($codigo_ff, $codigo_tipo)
+    {
+    global $link;
+    $codigo_ff   = (int)$codigo_ff;
+    $codigo_tipo = (int)$codigo_tipo;
+    if($codigo_ff <= 0 || $codigo_tipo <= 0)
+        return "Parametros invalidos";
+
+    $sql = "UPDATE factura_finca
+        SET CODIGOTIPOPRODUCTO = ".$codigo_tipo.",
+            FECHAMODIFICACION = NOW(),
+            CODIGOUSUARIOMODIFICA = 0
+        WHERE CODIGO = ".$codigo_ff;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return mysqli_error($link);
     return "OK";
     }
 
