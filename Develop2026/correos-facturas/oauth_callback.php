@@ -9,6 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $client = new Google\Client();
 $client->setAuthConfig('/home/u154-6g3keph3vtcn/credenciales_correos/client_secret.json');
 $client->addScope(Google\Service\Gmail::GMAIL_READONLY);
+$client->addScope(Google\Service\Drive::DRIVE_FILE);
 $client->setAccessType('offline'); // necesario para obtener refresh token
 $client->setPrompt('consent');      // fuerza devolver refresh token aunque ya haya autorizado
 

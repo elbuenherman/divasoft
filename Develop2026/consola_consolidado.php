@@ -1,8 +1,8 @@
-<?php 
+<?php   
 include("variables_globales.php");  
 include("funciones.php");
-include("valida_sesion.php");   
-// CHEQUEO PERMISOS       
+include("valida_sesion.php");    
+// CHEQUEO PERMISOS        
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);  
 $usuario_web = $_SESSION['s_codigo'];
@@ -99,6 +99,26 @@ if($res_fincas_js)
         $prov                = mysqli_fetch_assoc($res_fincas_js);
         $opciones_fincas_js .= '<option value="'.(int)$prov["CODIGO"].'">'
             .htmlspecialchars((string)$prov["NOMBRE"], ENT_QUOTES, "UTF-8")
+            .'</option>';
+        }
+    }
+
+// Opciones de tipo de producto (para el select inline del doble-click en PROD).
+// Orden por CAMPOE1 (orden de seccion) y luego NOMBRE.
+$sql_tipos_js      = "SELECT CODIGO, NOMBRE
+    FROM tipo_producto
+    WHERE ESTADO = 1
+    ORDER BY CAMPOE1, NOMBRE";
+$res_tipos_js      = mysqli_query($link, $sql_tipos_js);
+$opciones_tipos_js = "";
+if($res_tipos_js)
+    {
+    $total_tipos_js = mysqli_num_rows($res_tipos_js);
+    for($ti=1; $ti<=$total_tipos_js; $ti++)
+        {
+        $tipo               = mysqli_fetch_assoc($res_tipos_js);
+        $opciones_tipos_js .= '<option value="'.(int)$tipo["CODIGO"].'">'
+            .htmlspecialchars((string)$tipo["NOMBRE"], ENT_QUOTES, "UTF-8")
             .'</option>';
         }
     }
@@ -308,6 +328,7 @@ var global_ordenamiento = "FECHAVUELO";
 var global_direccion = "DESC";
 var global_codigo_usuario = <?php echo (int)$_SESSION['s_codigo']; ?>;
 var global_opciones_fincas = '<?php echo $opciones_fincas_js; ?>';
+var global_opciones_tipos_producto = '<?php echo $opciones_tipos_js; ?>';
 var flatpickr_fechavuelo = null;
 var flatpickr_rango_filtro = null;
 
@@ -683,16 +704,65 @@ function confirmar_tipo_producto(codigo_ff)
         if(data == "OK")
             {
             messageBox("Tipo de producto confirmado");
-            // Cambiar el boton a "Cambiar" verde sin recargar el grid.
+            // Cambiar el boton a "Cambiar" verde.
             var btn = $("#id_btn_tipo_" + codigo_ff);
             btn.text("Cambiar");
             btn.css("background", "#2e7d32");
+            // Recargar el grid: el detalle ahora muestra el nuevo PROD en cada linea.
+            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
+                + "&parametro1=" + codigo_ff;
+            $.get(url2, function(data2)
+                {
+                $("#id_grid_factura_" + codigo_ff).html(data2);
+                });
             }
         else
             {
             messageBox("Error: " + data);
             }
         });
+    }
+
+// Mini-menu flotante (Excel / PDF) anclado al icono puzzle del listado.
+function toggle_menu_formato(el, codigo)
+    {
+    var menu = $("#id_menu_formato");
+    // Si ya esta visible para este codigo, cerrarlo.
+    if(menu.is(":visible") && menu.data("codigo") == codigo)
+        {
+        menu.hide();
+        return;
+        }
+    // Posicionar debajo del icono.
+    var offset = $(el).offset();
+    menu.css(
+        {
+        top: offset.top + 20,
+        left: offset.left - 10,
+        position: "absolute"
+        });
+    menu.data("codigo", codigo);
+    // Asignar acciones a cada opcion.
+    $("#id_menu_excel").attr("onclick",
+        "descargar_consolidado(" + codigo + ", 'xlsx'); $('#id_menu_formato').hide();");
+    $("#id_menu_pdf").attr("onclick",
+        "descargar_consolidado(" + codigo + ", 'pdf'); $('#id_menu_formato').hide();");
+    menu.show();
+    }
+
+// Cerrar el menu si se hace click fuera de el o del icono puzzle.
+$(document).on("click", function(e)
+    {
+    if(!$(e.target).closest("#id_menu_formato, .icon-puzzle").length)
+        $("#id_menu_formato").hide();
+    });
+
+// Abre el endpoint de descarga en pestana nueva con el formato elegido.
+function descargar_consolidado(codigo_consolidado, formato)
+    {
+    window.open("funciones_ajax.php?funcion=generar_consolidado_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=" + formato, "_blank");
     }
 
 // ===== AÑADIR FACTURA A UN CONSOLIDADO =====
@@ -1348,6 +1418,53 @@ function ejecutar_regeneracion(codigo_ff, codigo_adj, nombre_adj)
         });
     }
 
+// Doble-click en celda PROD: abre un Select2 inline con los tipos de producto.
+// Al elegir, cambia el PRODUCTO de TODAS las lineas de esa caja.
+$(document).on("dblclick", ".celda_prod", function()
+    {
+    var td = $(this);
+    if(td.find("select").length > 0)
+        return; // ya editando
+
+    var select_html = '<select class="select_prod_inline" style="width:100%; font-size:10px;">'
+        + '<option value="">-- TIPO --</option>'
+        + global_opciones_tipos_producto
+        + '</select>';
+    td.html(select_html);
+    td.find(".select_prod_inline").select2(
+        {
+        width: '100%',
+        dropdownAutoWidth: true
+        }).select2("open");
+    });
+
+// Al elegir un tipo en el select inline: guardar y recargar el grid.
+$(document).on("change", ".select_prod_inline", function()
+    {
+    var td          = $(this).closest(".celda_prod");
+    var codigo_ff   = td.data("ff");
+    var numero_caja = td.data("caja");
+    var codigo_tipo = $(this).val();
+
+    if(!codigo_tipo || codigo_tipo == "")
+        {
+        recargar_grid_factura_por_codigo(codigo_ff);
+        return;
+        }
+
+    var url = "funciones_ajax.php?funcion=cambiar_producto_caja_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + numero_caja
+        + "&parametro3=" + codigo_tipo;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            recargar_grid_factura_por_codigo(codigo_ff);
+        else
+            messageBox("Error: " + data);
+        });
+    });
+
 // Click en celda editable -> reemplazar texto por input. Las celdas cm
 // se manejan con dblclick (no con click simple), asi que retornamos.
 $(document).on("click", ".celda_editable", function()
@@ -1879,6 +1996,12 @@ $(document).ready(function()
     <div id="dialog" title="Alerta"></div>
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
+
+    <!-- Mini-menu flotante de formato (Excel / PDF) del icono puzzle. -->
+    <div id="id_menu_formato" style="display:none; position:absolute; background:#fff; border:1px solid #ccc; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15); padding:4px; z-index:9999; white-space:nowrap;">
+        <a id="id_menu_excel" onclick="" style="cursor:pointer; color:#2e7d32; padding:4px 8px; display:inline-block;" title="Excel"><i class="icon-file-excel" style="font-size:16px;"></i></a>
+        <a id="id_menu_pdf" onclick="" style="cursor:pointer; color:#88010e; padding:4px 8px; display:inline-block;" title="PDF"><i class="icon-file-pdf" style="font-size:16px;"></i></a>
+    </div>
 
     <!-- Progreso flotante modal: overlay + caja crimson centrada. Bloquea
          la interaccion del usuario durante upload+procesamiento con IA. -->

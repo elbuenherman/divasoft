@@ -91,6 +91,7 @@ consulta_permisos($_SESSION['s_codigo'],$permiso);
                                 <li>
                                     <a class="dropdown-toggle" href="#">Proveedores</a>
                                     <ul class="dropdown-menu dark" data-role="dropdown">
+                                        <li <?php echo $permiso[5];?>><a href="consola_tipo_cobro.php">Tipo Cobro</a></li>
                                         <li <?php echo $permiso[5];?>><a href="consola_proveedores.php">Proveedores</a></li>
                                         <li <?php echo $permiso[6];?>><a href="consola_tipo_proveedores.php">Tipo de proveedor</a></li>
                                         <li <?php echo $permiso[7];?>><a href="consola_bancos.php">Bancos</a></li>

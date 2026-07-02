@@ -1,8 +1,9 @@
-<?php
+<?php 
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
-  
+// ini_set('display_errors', 1);
+// error_reporting(E_ALL);
 // Dispatch POST con archivo: detectado antes del flujo normal porque
 // usa $_FILES en vez de los $parametroN tradicionales.
 if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft")
@@ -441,6 +442,15 @@ if($funcion == 'confirmar_finca_factura_dsft')
     echo confirmar_finca_factura_dsft($parametro1, $parametro2);
 if($funcion == 'confirmar_tipo_producto_dsft')
     echo confirmar_tipo_producto_dsft($parametro1, $parametro2);
+// Descarga del consolidado (xlsx o pdf): NO hace echo, manda headers binarios
+// y termina con exit.
+if($funcion == 'generar_consolidado_dsft')
+    {
+    generar_consolidado_dsft($parametro1, $parametro2);
+    exit;
+    }
+if($funcion == 'cambiar_producto_caja_dsft')
+    echo cambiar_producto_caja_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'render_totales_factura_dsft')
     echo render_totales_factura_dsft($parametro1);
 if($funcion == 'quitar_factura_consolidado_dsft')
@@ -472,6 +482,16 @@ if($funcion == 'grabar_tipo_producto_dsft')
     echo grabar_tipo_producto_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
 if($funcion == 'elimina_tipo_producto_dsft')
     echo elimina_tipo_producto_dsft($parametro1, $parametro2);
+
+// TIPO DE COBRO (consola nueva _dsft)
+if($funcion == 'lista_tipo_cobro_dsft')
+    echo lista_tipo_cobro_dsft($parametro1, $parametro2);
+if($funcion == 'devuelve_tipo_cobro_dsft')
+    echo devuelve_tipo_cobro_dsft($parametro1);
+if($funcion == 'grabar_tipo_cobro_dsft')
+    echo grabar_tipo_cobro_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
+if($funcion == 'elimina_tipo_cobro_dsft')
+    echo elimina_tipo_cobro_dsft($parametro1, $parametro2);
 
 
 mysqli_close($link);
