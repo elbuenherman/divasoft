@@ -1,5 +1,5 @@
 <?php 
-                               
+                                
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
@@ -2818,7 +2818,7 @@ function _render_grid_factura($link, $codigo_ff, $finca)
 
         // ST PRICE editable (PRECIOUNITARIO). TOTAL y ALERTA no editables.
         $html .= '<td class="celda_editable" data-field="PRECIOUNITARIO" style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_u.'</td>';
-        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_t.'</td>';
+        $html .= '<td data-field="PRECIOTOTAL" style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_t.'</td>';
         // Columna ALERTA: icono warning naranja clickeable si hay alerta, icono check verde si no.
         if(trim($alerta_raw) != "")
             {
@@ -2890,7 +2890,11 @@ function actualizar_celda_detalle_dsft($codigo, $campo, $valor)
         {
         $valor_int = (int)$valor;
         if($valor_int < 0)
-            return "Valor invalido para ".$campo;
+            {
+            if($campo == "TALLOSTOTAL")
+                return "Los tallos no pueden ser negativos";
+            return "El valor no puede ser negativo";
+            }
         $valor_sql = (string)$valor_int;
         }
     else
@@ -2898,7 +2902,7 @@ function actualizar_celda_detalle_dsft($codigo, $campo, $valor)
         // PRECIOUNITARIO: aceptar decimales.
         $valor_float = (float)str_replace(",", ".", (string)$valor);
         if($valor_float < 0)
-            return "Precio invalido";
+            return "El precio no puede ser negativo";
         $valor_sql = number_format($valor_float, 4, '.', '');
         }
 

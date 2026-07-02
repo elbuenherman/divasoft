@@ -1,7 +1,7 @@
 <?php   
 include("variables_globales.php");  
 include("funciones.php");
-include("valida_sesion.php");    
+include("valida_sesion.php");      
 // CHEQUEO PERMISOS        
 $permiso[] = NULL;       
 consulta_permisos($_SESSION['s_codigo'], $permiso);  
@@ -1480,7 +1480,7 @@ $(document).on("click", ".celda_editable", function()
 
     if(field == "PRECIOUNITARIO")
         {
-        var input = '<input type="number" step="0.01" value="'+valor_actual+'" style="width:60px; font-size:11px; text-align:right;">';
+        var input = '<input type="number" step="0.01" value="'+valor_actual+'" data-orig="'+valor_actual+'" style="width:60px; font-size:11px; text-align:right;">';
         td.html(input);
         td.find("input").focus().select();
         }
@@ -1555,6 +1555,19 @@ $(document).on("blur", ".celda_cm input", function()
     var cm_destino   = td.data("cm");
     var nuevo_tallos = $(this).val();
 
+    // Validacion: no aceptar negativos. Recargar el grid restaura el estado real
+    // (incluida la celda origen si hubo un "mover" desde otra columna cm).
+    if(nuevo_tallos != "" && nuevo_tallos != "0")
+        {
+        var valor = parseInt(nuevo_tallos);
+        if(isNaN(valor) || valor < 0)
+            {
+            messageBox("El valor no puede ser negativo");
+            recargar_grid_factura(tr);
+            return;
+            }
+        }
+
     if(nuevo_tallos == "" || nuevo_tallos == "0")
         {
         // Vacio o cero: limpiar LARGO y TALLOSTOTAL.
@@ -1585,10 +1598,25 @@ $(document).on("blur", ".celda_editable input, .celda_editable select", function
     if(td.hasClass("celda_cm"))
         return; // CM tiene su propio handler
 
-    var codigo = td.closest("tr").data("codigo");
-    var field  = td.data("field");
     var tr     = td.closest("tr");
+    var codigo = tr.data("codigo");
+    var field  = td.data("field");
 
+    if(field == "PRECIOUNITARIO")
+        {
+        // Validacion: no aceptar negativos (mismo mensaje que el servidor).
+        var valor_original = $(this).data("orig");
+        var valor = parseFloat($(this).val());
+        if(isNaN(valor) || valor < 0)
+            {
+            messageBox("El precio no puede ser negativo");
+            td.text(valor_original);
+            return;
+            }
+        }
+
+    // Guardar y recargar el grid completo de la factura (para que dos personas
+    // editando el mismo consolidado vean los cambios de la otra al recargar).
     var nuevo_valor = $(this).val();
     guardar_celda_detalle(codigo, field, nuevo_valor, function()
         {
