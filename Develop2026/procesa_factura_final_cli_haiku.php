@@ -1,5 +1,5 @@
 <?php
-    
+     
 // ============================================================================
 //  procesa_factura_final_cli_haiku.php
 //  Variante CLI usando Claude Haiku 4.5 como formateador del fallback OCR
@@ -88,6 +88,37 @@ register_shutdown_function(function()
         else
             echo "\n".$msg."\n=== FIN ===\n";
         }
+    });
+
+// ----------------------------------------------------------------------------
+// LOCK POR ADJUNTO: este script lo ejecutan DOS caminos (el cron y el boton
+// manual de la consola). Los dos apuntan al mas reciente pendiente, asi que
+// pueden agarrar el MISMO adjunto casi a la vez y duplicar la factura (dos filas
+// en factura_finca con su detalle -> tallos/precios duplicados en el consolidado).
+// El lock aqui, dentro del script que ambos ejecutan, cubre los dos flujos.
+// ----------------------------------------------------------------------------
+$ruta_lock_adj = "/tmp/lock_factura_".$codigo.".txt";
+if(file_exists($ruta_lock_adj) && (time() - filemtime($ruta_lock_adj)) < 600)
+    {
+    // Menos de 10 min: otro proceso ya esta trabajando este adjunto. Salir
+    // LIMPIO, sin procesar ni llamar a la API. El texto "SALTADO" es reconocible
+    // por el cron para NO contar el intento como fallo.
+    log_dual("SALTADO: el adjunto ".$codigo." ya se esta procesando en otro proceso.\n");
+    log_dual("=== FIN ===\n");
+    if($fh_log) fclose($fh_log);
+    exit(0);
+    }
+// Existe pero >10 min = huerfano (proceso muerto): se continua. (El procesamiento
+// mas lento medido fue ~42 s, 10 min es holgado.) Crear/renovar el lock.
+file_put_contents($ruta_lock_adj, date("Y-m-d H:i:s")." pid=".getmypid());
+
+// Borrar el lock del adjunto en CUALQUIER salida (incluido fatal). Solo lo
+// registra el proceso duenio del lock (el que salteo ya hizo exit(0) arriba).
+register_shutdown_function(function()
+    {
+    global $ruta_lock_adj;
+    if(isset($ruta_lock_adj) && $ruta_lock_adj != "" && file_exists($ruta_lock_adj))
+        @unlink($ruta_lock_adj);
     });
 
 

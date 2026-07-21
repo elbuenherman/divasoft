@@ -3,7 +3,7 @@
 // ============================================================================
 //  cron_procesar_facturas.php  (CLI - cron cada 3 minutos en SiteGround)
 //  Procesa con IA UN adjunto pendiente por corrida (el mas reciente).
-//
+// 
 //  CONTROL DE COSTO (cada procesamiento cuesta dinero real):
 //   - Solo adjuntos de los ULTIMOS 7 DIAS.
 //   - Maximo 3 intentos por adjunto (CAMPOE1). Al 3er fallo se descarta
@@ -136,29 +136,41 @@ try
         $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
         mysqli_query($link, "SET CHARACTER SET utf8");
 
-        // Exito = se creo la fila en factura_finca con ese CODIGOADJUNTO.
-        $res_ok = mysqli_query($link, "SELECT CODIGO FROM factura_finca WHERE CODIGOADJUNTO = ".$codigo." LIMIT 1");
-        $exito  = ($res_ok && mysqli_num_rows($res_ok) > 0);
-
-        if($exito)
+        // Si el CLI salteo (el adjunto ya estaba lockeado por el flujo manual u
+        // otra corrida), NO es un fallo: revertir el incremento para no acercarlo
+        // al descarte por 3 fallos sin razon.
+        $texto_salida = implode("\n", $salida);
+        if(strpos($texto_salida, "SALTADO") !== false)
             {
-            mysqli_query($link, "UPDATE archivo_correo SET ESTADOIA = 2, FECHAPROCESADOIA = NOW(), CAMPOE1 = 0 WHERE CODIGO = ".$codigo);
-            log_cron($ruta_log, "OK codigo ".$codigo." (".$nombre.") en ".$tiempo."s (retorno CLI=".$retorno.").");
+            mysqli_query($link, "UPDATE archivo_correo SET CAMPOE1 = GREATEST(COALESCE(CAMPOE1, 0) - 1, 0) WHERE CODIGO = ".$codigo);
+            log_cron($ruta_log, "SALTADO codigo ".$codigo." (".$nombre."): ya en proceso por otro flujo. Intento NO contado.");
             }
         else
             {
-            // Fallo. Si ya agoto los 3 intentos, descartar (ESTADOIA=9).
-            $ultimas = implode(" | ", array_slice($salida, -6));
-            if($intento >= 3)
+            // Exito = se creo la fila en factura_finca con ese CODIGOADJUNTO.
+            $res_ok = mysqli_query($link, "SELECT CODIGO FROM factura_finca WHERE CODIGOADJUNTO = ".$codigo." LIMIT 1");
+            $exito  = ($res_ok && mysqli_num_rows($res_ok) > 0);
+
+            if($exito)
                 {
-                mysqli_query($link, "UPDATE archivo_correo SET ESTADOIA = 9 WHERE CODIGO = ".$codigo);
-                log_cron($ruta_log, "DESCARTADO codigo ".$codigo." (".$nombre.") tras 3 fallos - REVISAR MANUAL. retorno=".$retorno.", ".$tiempo."s.");
+                mysqli_query($link, "UPDATE archivo_correo SET ESTADOIA = 2, FECHAPROCESADOIA = NOW(), CAMPOE1 = 0 WHERE CODIGO = ".$codigo);
+                log_cron($ruta_log, "OK codigo ".$codigo." (".$nombre.") en ".$tiempo."s (retorno CLI=".$retorno.").");
                 }
             else
                 {
-                log_cron($ruta_log, "FALLO codigo ".$codigo." (intento ".$intento."/3), se reintentara. retorno=".$retorno.", ".$tiempo."s.");
+                // Fallo. Si ya agoto los 3 intentos, descartar (ESTADOIA=9).
+                $ultimas = implode(" | ", array_slice($salida, -6));
+                if($intento >= 3)
+                    {
+                    mysqli_query($link, "UPDATE archivo_correo SET ESTADOIA = 9 WHERE CODIGO = ".$codigo);
+                    log_cron($ruta_log, "DESCARTADO codigo ".$codigo." (".$nombre.") tras 3 fallos - REVISAR MANUAL. retorno=".$retorno.", ".$tiempo."s.");
+                    }
+                else
+                    {
+                    log_cron($ruta_log, "FALLO codigo ".$codigo." (intento ".$intento."/3), se reintentara. retorno=".$retorno.", ".$tiempo."s.");
+                    }
+                log_cron($ruta_log, "  Ultimas lineas CLI: ".$ultimas);
                 }
-            log_cron($ruta_log, "  Ultimas lineas CLI: ".$ultimas);
             }
         }
     }
