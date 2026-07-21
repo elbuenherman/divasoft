@@ -8,7 +8,14 @@
       "Bash(php -l consola_consolidado.php)",
       "Bash(awk 'NR>=406 && NR<=700 && /return/' funciones_v2.php)",
       "Bash(grep -niE 'timezone|DateTimeZone|America/|\\\\$tz')",
-      "Bash(php -l cron_extraer_correos.php)"
+      "Bash(php -l cron_extraer_correos.php)",
+      "Bash(grep -nE 'ARCHIVO|MIMETYPE|NOMBREARCHIVO|es_pdf|base64_encode|\"document\"|'\\\\''document'\\\\''|application/pdf|media_type|require_once|vendor/autoload|\\\\$prompt|PhpSpreadsheet|xlsx|xls|pathinfo|SELECT .*archivo_correo' procesa_factura_final_cli_haiku.php)",
+      "Bash(awk 'NR>=562 && NR<=960' procesa_factura_final_cli_haiku.php)",
+      "Bash(grep -nE 'return array|\"json_final\"|'\\\\''json_final'\\\\''|\"extraccion\"|json_final|=> \\\\$json|\"ok\"\\\\s*=>|\"estado\"|fallback|GLM|OCR|ejecuta_glmocr|resultado_ocr')",
+      "Bash(grep -nE 'resultado_haiku\\\\[|json_final|extraccion_final|\\\\$extraccion|guarda_factura|inserta.*factura|CAJAS' procesa_factura_final_cli_haiku.php)",
+      "Bash(awk -F: '$1>1080 && $1<1592')",
+      "Bash(php -l procesa_factura_final_cli_haiku.php)",
+      "Bash(grep -n 'hoja_block\\\\|===== HOJA\\\\|Linea de referencia\\\\|\\\\$ref\\\\|for\\($f=1\\\\|for\\($c=1\\\\|\\\\$texto .= \\\\$f' procesa_factura_final_cli_haiku.php)"
     ]
   }
 }

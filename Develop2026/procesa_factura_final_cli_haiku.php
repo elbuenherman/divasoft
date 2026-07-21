@@ -1,5 +1,5 @@
 <?php
-   
+    
 // ============================================================================
 //  procesa_factura_final_cli_haiku.php
 //  Variante CLI usando Claude Haiku 4.5 como formateador del fallback OCR
@@ -782,6 +782,283 @@ function ejecuta_haiku_doble($pdf_binario, $api_anthropic)
     }
 
 // ----------------------------------------------------------------------------
+// _haiku_texto - Haiku con el contenido de una hoja Excel como TEXTO. La API de
+// Anthropic NO acepta xlsx/xls como bloque document (solo PDF/imagenes), asi que
+// el volcado de la hoja va como bloque text. Mismo prompt + prefill "{".
+// ----------------------------------------------------------------------------
+function _haiku_texto($api_key, $texto_hoja, $prompt, $temperature)
+    {
+    $text_block = array(
+        "type"          => "text",
+        "text"          => $prompt,
+        "cache_control" => array("type" => "ephemeral")
+        );
+
+    $hoja_block = array(
+        "type" => "text",
+        "text" => "CONTENIDO DE LA FACTURA (volcado de la hoja Excel: una linea por fila, "
+                . "y en cada linea SOLO las celdas con valor, etiquetada cada una con su "
+                . "referencia real de Excel. Ejemplo: 'Fila 12: B12=ASHLY FLOWERS | "
+                . "C12=PINK FLOYD | F12=60 | M12=0.34 | N12=170'. La letra de columna esta "
+                . "pegada a cada dato, asi que NO hay ambiguedad de columnas aunque haya "
+                . "celdas vacias. IMPORTANTE para los largos en cm: usa la FILA DE "
+                . "ENCABEZADOS (la que trae 40cm, 50cm, 60cm, ...) para mapear columna->cm; "
+                . "el cm de un numero de tallos es el cm que su MISMA columna tiene en esa "
+                . "fila de encabezados. Ej: si el encabezado dice F10=60cm y una linea trae "
+                . "F12=170, esos 170 tallos son de 60cm):\n\n".$texto_hoja
+        );
+
+    $messages = array(
+        array(
+            "role"    => "user",
+            "content" => array($text_block, $hoja_block)
+            ),
+        array(
+            "role"    => "assistant",
+            "content" => "{"
+            )
+        );
+
+    $body = array(
+        "model"       => "claude-haiku-4-5-20251001",
+        "max_tokens"  => 32000,
+        "temperature" => $temperature,
+        "messages"    => $messages
+        );
+    $body_json = json_encode($body);
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "https://api.anthropic.com/v1/messages");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        "x-api-key: ".$api_key,
+        "anthropic-version: 2023-06-01",
+        "content-type: application/json"
+        ));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $body_json);
+
+    $response  = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_err  = curl_error($ch);
+    curl_close($ch);
+
+    if($curl_err != "")
+        return array("ok"=>false, "http_code"=>$http_code, "respuesta_cruda"=>"", "usage"=>array(), "texto"=>"", "error"=>$curl_err);
+    if($http_code != 200)
+        return array("ok"=>false, "http_code"=>$http_code, "respuesta_cruda"=>(string)$response, "usage"=>array(), "texto"=>"", "error"=>"HTTP ".$http_code);
+
+    $data  = json_decode((string)$response, true);
+    $usage = isset($data["usage"]) ? $data["usage"] : array();
+    $texto = isset($data["content"][0]["text"]) ? (string)$data["content"][0]["text"] : "";
+    return array(
+        "ok"              => true,
+        "http_code"       => $http_code,
+        "respuesta_cruda" => (string)$response,
+        "usage"           => $usage,
+        "texto"           => $texto,
+        "error"           => null
+        );
+    }
+
+// ----------------------------------------------------------------------------
+// ejecuta_haiku_doble_texto - dos llamadas Haiku con el texto de la hoja Excel
+// (temp 0 y 0.3). Mismo prompt y misma comparacion que ejecuta_haiku_doble, pero
+// SIN atajo de omitir-segunda y SIN fallback OCR (no hay PDF/imagen que OCRear).
+// Devuelve la MISMA estructura para que el pipeline downstream NO cambie.
+// ----------------------------------------------------------------------------
+function ejecuta_haiku_doble_texto($texto_hoja, $api_anthropic)
+    {
+    global $PROMPT_GRANDE;
+
+    $t1_inicio = microtime(true);
+    $r1        = _haiku_texto($api_anthropic, $texto_hoja, $PROMPT_GRANDE, 0.0);
+    $tiempo_1  = round(microtime(true) - $t1_inicio, 2);
+
+    $t2_inicio = microtime(true);
+    $r2        = _haiku_texto($api_anthropic, $texto_hoja, $PROMPT_GRANDE, 0.3);
+    $tiempo_2  = round(microtime(true) - $t2_inicio, 2);
+
+    $tiempo = round($tiempo_1 + $tiempo_2, 2);
+
+    if(!$r1["ok"] && !$r2["ok"])
+        return array(
+            "ok"     => false,
+            "error"  => "Ambas llamadas Haiku (texto) fallaron. R1: ".$r1["error"]." | R2: ".$r2["error"],
+            "r1"     => $r1,
+            "r2"     => $r2,
+            "tiempo" => $tiempo
+            );
+
+    // Solo una fallo: usar la exitosa como base, estado=4 (REVISAR).
+    if(!$r1["ok"] || !$r2["ok"])
+        {
+        if($r1["ok"])
+            {
+            $texto_base = extraer_json("{".$r1["texto"]);
+            $json_base  = json_decode($texto_base, true);
+            $msg_adv    = "R2 fallo (".$r2["error"]."), usando R1 como base. Estado=REVISAR.";
+            $usage_base = isset($r1["usage"]) ? $r1["usage"] : array();
+            }
+        else
+            {
+            $texto_base = extraer_json("{".$r2["texto"]);
+            $json_base  = json_decode($texto_base, true);
+            $msg_adv    = "R1 fallo (".$r1["error"]."), usando R2 como base. Estado=REVISAR.";
+            $usage_base = isset($r2["usage"]) ? $r2["usage"] : array();
+            }
+        if(is_array($json_base))
+            limpia_json_decimales($json_base);
+
+        $in_b = isset($usage_base["input_tokens"])                ? (int)$usage_base["input_tokens"]                : 0;
+        $ou_b = isset($usage_base["output_tokens"])               ? (int)$usage_base["output_tokens"]               : 0;
+        $cr_b = isset($usage_base["cache_read_input_tokens"])     ? (int)$usage_base["cache_read_input_tokens"]     : 0;
+        $cc_b = isset($usage_base["cache_creation_input_tokens"]) ? (int)$usage_base["cache_creation_input_tokens"] : 0;
+        $costo_b = ($in_b / 1000000.0) * 1.00 + ($ou_b / 1000000.0) * 5.00
+                 + ($cr_b / 1000000.0) * 0.10 + ($cc_b / 1000000.0) * 1.25;
+
+        return array(
+            "ok"                      => true,
+            "json_1"                  => is_array($json_base) ? $json_base : array(),
+            "json_2"                  => null,
+            "estado"                  => 4,
+            "discrepancias"           => array($msg_adv),
+            "tiempo"                  => $tiempo,
+            "tiempo_1"                => $tiempo_1,
+            "tiempo_2"                => $tiempo_2,
+            "costo"                   => $costo_b,
+            "r1_usage"                => isset($r1["usage"]) ? $r1["usage"] : array(),
+            "r2_usage"                => isset($r2["usage"]) ? $r2["usage"] : array(),
+            "respuesta1_cruda"        => isset($r1["respuesta_cruda"]) ? $r1["respuesta_cruda"] : null,
+            "respuesta2_cruda"        => isset($r2["respuesta_cruda"]) ? $r2["respuesta_cruda"] : null,
+            "omitida_segunda_llamada" => false,
+            "advertencia_parcial"     => $msg_adv
+            );
+        }
+
+    // Ambas ok: parsear y comparar (misma logica que ejecuta_haiku_doble).
+    $texto1 = extraer_json("{".$r1["texto"]);
+    $json1  = json_decode($texto1, true);
+    if(is_array($json1))
+        limpia_json_decimales($json1);
+
+    $texto2 = extraer_json("{".$r2["texto"]);
+    $json2  = json_decode($texto2, true);
+    if(is_array($json2))
+        limpia_json_decimales($json2);
+
+    if(is_array($json1) && is_array($json2))
+        $discrepancias = compara_extracciones($json1, $json2);
+    else
+        $discrepancias = array("Una de las respuestas no es JSON valido");
+
+    $estado = empty($discrepancias) ? 3 : 4;
+
+    $in1 = isset($r1["usage"]["input_tokens"])                ? (int)$r1["usage"]["input_tokens"]                : 0;
+    $ou1 = isset($r1["usage"]["output_tokens"])               ? (int)$r1["usage"]["output_tokens"]               : 0;
+    $cc1 = isset($r1["usage"]["cache_creation_input_tokens"]) ? (int)$r1["usage"]["cache_creation_input_tokens"] : 0;
+    $cr1 = isset($r1["usage"]["cache_read_input_tokens"])     ? (int)$r1["usage"]["cache_read_input_tokens"]     : 0;
+    $in2 = isset($r2["usage"]["input_tokens"])                ? (int)$r2["usage"]["input_tokens"]                : 0;
+    $ou2 = isset($r2["usage"]["output_tokens"])               ? (int)$r2["usage"]["output_tokens"]               : 0;
+    $cc2 = isset($r2["usage"]["cache_creation_input_tokens"]) ? (int)$r2["usage"]["cache_creation_input_tokens"] : 0;
+    $cr2 = isset($r2["usage"]["cache_read_input_tokens"])     ? (int)$r2["usage"]["cache_read_input_tokens"]     : 0;
+
+    $costo = ($in1 / 1000000.0) * 1.00 + ($ou1 / 1000000.0) * 5.00
+           + ($cr1 / 1000000.0) * 0.10 + ($cc1 / 1000000.0) * 1.25
+           + ($in2 / 1000000.0) * 1.00 + ($ou2 / 1000000.0) * 5.00
+           + ($cr2 / 1000000.0) * 0.10 + ($cc2 / 1000000.0) * 1.25;
+
+    return array(
+        "ok"                      => true,
+        "json_1"                  => is_array($json1) ? $json1 : array(),
+        "json_2"                  => is_array($json2) ? $json2 : array(),
+        "estado"                  => $estado,
+        "discrepancias"           => $discrepancias,
+        "tiempo"                  => $tiempo,
+        "tiempo_1"                => $tiempo_1,
+        "tiempo_2"                => $tiempo_2,
+        "costo"                   => $costo,
+        "r1_usage"                => $r1["usage"],
+        "r2_usage"                => $r2["usage"],
+        "respuesta1_cruda"        => $r1["respuesta_cruda"],
+        "respuesta2_cruda"        => $r2["respuesta_cruda"],
+        "omitida_segunda_llamada" => false
+        );
+    }
+
+// ----------------------------------------------------------------------------
+// xlsx_a_texto - vuelca un Excel (xlsx/xls) a texto plano tipo TSV, hoja por
+// hoja, preservando la estructura de filas/columnas (una linea por fila,
+// columnas separadas por tabulador, primera linea con las letras de columna).
+// Usa PhpSpreadsheet con setReadDataOnly(true). Salta filas totalmente vacias.
+// Si falla la apertura, deja el mensaje en $error (por referencia).
+// ----------------------------------------------------------------------------
+function xlsx_a_texto($binario, $ext, &$error)
+    {
+    $error = "";
+    require_once __DIR__ . '/vendor/autoload.php';
+
+    $ext = (strtolower(trim((string)$ext)) == "xls") ? "xls" : "xlsx";
+    $tmp = sys_get_temp_dir()."/facexcel_".uniqid("", true).".".$ext;
+    file_put_contents($tmp, (string)$binario);
+
+    $texto = "";
+    try
+        {
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($tmp);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($tmp);
+
+        $total_hojas = $spreadsheet->getSheetCount();
+        for($h=0; $h<$total_hojas; $h++)
+            {
+            $hoja        = $spreadsheet->getSheet($h);
+            $nombre_hoja = (string)$hoja->getTitle();
+            $max_fila    = (int)$hoja->getHighestDataRow();
+            $max_col     = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($hoja->getHighestDataColumn());
+
+            $texto .= "===== HOJA: ".$nombre_hoja." =====\n";
+
+            // Una linea por fila, SOLO las celdas con valor, etiquetada cada una
+            // con su referencia real de Excel (ej. "Fila 12: B12=ASHLY | F12=60 |
+            // M12=0.34 | N12=170"). Con la letra de columna pegada al dato, las
+            // celdas vacias no corren la cuenta de columnas (evita el problema del
+            // grid posicional). La fila de encabezados (40cm/50cm/...) sale igual.
+            for($f=1; $f<=$max_fila; $f++)
+                {
+                $partes = array();
+                for($c=1; $c<=$max_col; $c++)
+                    {
+                    $col_letra = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+                    $val       = $hoja->getCell($col_letra.$f)->getValue();
+                    if($val === null)
+                        continue;
+                    $val = trim((string)$val);
+                    if($val === "")
+                        continue;
+                    // Reemplazar separadores propios para no romper el formato.
+                    $val      = str_replace(array("\t", "\r", "\n", "|"), " ", $val);
+                    $partes[] = $col_letra.$f."=".$val;
+                    }
+                if(empty($partes))
+                    continue; // saltar filas totalmente vacias
+                $texto .= "Fila ".$f.": ".implode(" | ", $partes)."\n";
+                }
+            $texto .= "\n";
+            }
+        }
+    catch(\Throwable $e)
+        {
+        $error = $e->getMessage();
+        }
+
+    if(file_exists($tmp))
+        unlink($tmp);
+    return $texto;
+    }
+
+// ----------------------------------------------------------------------------
 // ejecuta_ocr_fallback - GLM-OCR -> Haiku formateador (markdown).
 // ----------------------------------------------------------------------------
 function ejecuta_ocr_fallback($pdf_binario, $api_zai, $api_anthropic)
@@ -987,9 +1264,12 @@ mysqli_stmt_close($stmt);
 
 $ext_arch = strtolower(pathinfo((string)$nombrearchivo, PATHINFO_EXTENSION));
 $es_pdf   = (stripos((string)$mimetype, 'pdf') !== false || $ext_arch == 'pdf');
-if(!$es_pdf)
+$es_xlsx  = ($ext_arch == 'xlsx' || $ext_arch == 'xls'
+          || stripos((string)$mimetype, 'spreadsheet') !== false
+          || stripos((string)$mimetype, 'excel') !== false);
+if(!$es_pdf && !$es_xlsx)
     {
-    log_dual("ERROR: el adjunto no es PDF (mime=".$mimetype.", ext=".$ext_arch.")\n");
+    log_dual("ERROR: el adjunto no es PDF ni Excel (mime=".$mimetype.", ext=".$ext_arch.")\n");
     log_dual("\n=== FIN ===\n");
     if($fh_log) fclose($fh_log);
     echo "\nLog guardado en: ".$archivo_log."\n";
@@ -1012,10 +1292,31 @@ log_dual("Conexion MySQL cerrada (inicio llamadas API).\n");
 // ----------------------------------------------------------------------------
 // EJECUTAR HAIKU DOBLE
 // ----------------------------------------------------------------------------
-log_dual("--- HAIKU DOBLE (PDF directo) ---\n");
-log_dual("Llamando Haiku (1 o 2 llamadas, segun atajo)...\n");
-
-$resultado_haiku = ejecuta_haiku_doble($archivo, $ANTHROPIC_API_KEY);
+if($es_pdf)
+    {
+    log_dual("--- HAIKU DOBLE (PDF directo) ---\n");
+    log_dual("Llamando Haiku (1 o 2 llamadas, segun atajo)...\n");
+    $resultado_haiku = ejecuta_haiku_doble($archivo, $ANTHROPIC_API_KEY);
+    }
+else
+    {
+    // Excel: la API no acepta xlsx como document. Volcar la hoja a texto y
+    // mandarla como bloque de texto con el MISMO prompt de extraccion.
+    log_dual("--- HAIKU DOBLE (Excel -> texto) ---\n");
+    $err_xlsx   = "";
+    $texto_hoja = xlsx_a_texto($archivo, $ext_arch, $err_xlsx);
+    if($err_xlsx != "" || trim($texto_hoja) == "")
+        {
+        log_dual("ERROR: no se pudo leer el Excel con PhpSpreadsheet".($err_xlsx != "" ? ": ".$err_xlsx : " (contenido vacio)")."\n");
+        log_dual("\n=== FIN ===\n");
+        if($fh_log) fclose($fh_log);
+        echo "\nLog guardado en: ".$archivo_log."\n";
+        exit(1);
+        }
+    log_dual("Excel volcado a texto: ".number_format(strlen($texto_hoja))." chars.\n");
+    log_dual("Llamando Haiku doble (texto)...\n");
+    $resultado_haiku = ejecuta_haiku_doble_texto($texto_hoja, $ANTHROPIC_API_KEY);
+    }
 
 // Guardar respuestas crudas Haiku.
 if(isset($resultado_haiku["respuesta1_cruda"]) && $resultado_haiku["respuesta1_cruda"] !== null)
@@ -1167,7 +1468,12 @@ $json_definitivo       = $json_1;
 $tipo_extraccion       = "HAIKU_DOBLE";
 $alerta_fallback       = "";
 
-if($disparar_fallback)
+// El fallback OCR (GLM-OCR sobre el PDF) solo aplica a PDF. Para Excel no hay
+// imagen/PDF que OCRear: se conserva la extraccion Haiku de texto.
+if($disparar_fallback && !$es_pdf)
+    log_dual("\nNOTA: senales de fallback OCR (".$motivo_disparo.") pero el adjunto es Excel; el OCR no aplica. Se usa la extraccion Haiku de texto tal cual.\n");
+
+if($disparar_fallback && $es_pdf)
     {
     log_dual("\n--- FALLBACK OCR ---\n");
     log_dual("Porcentaje largos null en json_1: ".number_format($porcentaje_null, 2)."% (umbral ".number_format($UMBRAL_PORCENTAJE_NULL, 0)."%)\n");
