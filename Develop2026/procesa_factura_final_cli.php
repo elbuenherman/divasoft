@@ -9,7 +9,16 @@
 //  Uso: php procesa_factura_final_cli.php <codigo> 
 //  Ejemplo: php procesa_factura_final_cli.php 79
 // ============================================================================
- 
+  
+// Solo por CLI: estos scripts viven en public_html (alcanzables por URL) y
+// llaman a APIs de pago. Si se abren por web -> 403 y salir.
+if(php_sapi_name() != "cli")
+    {
+    header("HTTP/1.1 403 Forbidden");
+    echo "Este script solo se ejecuta por linea de comandos (CLI).";
+    exit;
+    }
+
 ini_set("display_errors", "1");
 error_reporting(E_ALL);
 set_time_limit(0);

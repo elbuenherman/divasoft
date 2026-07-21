@@ -6,11 +6,20 @@
 //  (en lugar de Sonnet 4.5). Misma logica: Haiku doble sobre PDF directo +
 //  fallback GLM-OCR -> Haiku formateador si >20% nulls.
 //  Sin HTML, salida texto plano y log dual a archivo.
-//
+// 
 //  Uso: php procesa_factura_final_cli_haiku.php <codigo>
 //  Ejemplo: php procesa_factura_final_cli_haiku.php 79
 // ============================================================================
  
+// Solo por CLI: estos scripts viven en public_html (alcanzables por URL) y
+// llaman a APIs de pago. Si se abren por web -> 403 y salir.
+if(php_sapi_name() != "cli")
+    {
+    header("HTTP/1.1 403 Forbidden");
+    echo "Este script solo se ejecuta por linea de comandos (CLI).";
+    exit;
+    }
+
 ini_set("display_errors", "1");
 error_reporting(E_ALL);
 set_time_limit(0);

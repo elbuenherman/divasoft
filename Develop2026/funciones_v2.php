@@ -4,7 +4,7 @@
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================== ==============================
-
+ 
                   
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
@@ -866,7 +866,8 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
             CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
             NOMBREARCHIVO AS NOMBREARCHIVO,
             MIMETYPE AS MIMETYPE,
-            TAMANOBYTES AS TAMANOBYTES
+            TAMANOBYTES AS TAMANOBYTES,
+            ESTADOIA AS ESTADOIA
             FROM archivo_correo
             WHERE IDCORREO IN (".$in.")";
         $resultado_adj = mysqli_query($link, $sql_adj);
@@ -883,7 +884,8 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 'CODIGOCONSOLIDADO' => $fila['CODIGOCONSOLIDADO'],
                 'NOMBREARCHIVO'     => $fila['NOMBREARCHIVO'],
                 'MIMETYPE'          => $fila['MIMETYPE'],
-                'TAMANOBYTES'       => $fila['TAMANOBYTES']
+                'TAMANOBYTES'       => $fila['TAMANOBYTES'],
+                'ESTADOIA'          => $fila['ESTADOIA']
                 );
             }
         }
@@ -1078,6 +1080,12 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                     }
                 else
                     {
+                    // Descartado por el cron tras 3 fallos (ESTADOIA=9): icono bug
+                    // rojo ANTES del de procesar. El de procesar se mantiene para
+                    // poder reintentar a mano.
+                    $estadoia_adj = isset($adj['ESTADOIA']) ? (int)$adj['ESTADOIA'] : 0;
+                    if($estadoia_adj == 9)
+                        $html .= '<a title="Descartado: fallo 3 veces en el procesamiento con IA" style="cursor:help; color:#c62828; margin-right:6px;"><i class="icon-bug"></i></a>';
                     // No procesado: icono code rojo crimson con onclick para procesar.
                     $html .= '<a onclick="procesar_factura('.$adj_codigo.', \''.$adj_nombre_js.'\'); return false;" title="Procesar factura con IA" style="cursor:pointer; color:#88010e; margin-right:6px;"><i class="icon-code"></i></a>';
                     }

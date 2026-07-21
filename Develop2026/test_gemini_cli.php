@@ -1,5 +1,5 @@
 <?php
-
+  
 // ============================================================================
 //  test_gemini_cli.php
 //  Prueba CLI de Gemini 2.5 Pro de Google sobre facturas de flores.
@@ -8,6 +8,15 @@
 //  Uso: php test_gemini_cli.php <codigo>
 //  Ejemplo: php test_gemini_cli.php 47
 // ============================================================================
+
+// Solo por CLI: estos scripts viven en public_html (alcanzables por URL) y
+// llaman a APIs de pago. Si se abren por web -> 403 y salir.
+if(php_sapi_name() != "cli")
+    {
+    header("HTTP/1.1 403 Forbidden");
+    echo "Este script solo se ejecuta por linea de comandos (CLI).";
+    exit;
+    }
 
 ini_set("display_errors", "1");
 error_reporting(E_ALL);
