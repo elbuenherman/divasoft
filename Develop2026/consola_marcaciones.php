@@ -1,4 +1,4 @@
-<?php
+<?php 
 include("variables_globales.php"); 
 include("funciones.php");
 include("valida_sesion.php"); 
@@ -247,6 +247,9 @@ function devuelve_marcacion(codigo)
         var truck_val = (datos.CODIGOTRUCK && parseInt(datos.CODIGOTRUCK) > 0) ? datos.CODIGOTRUCK.toString() : "0";
         $("#id_codigotruck").val(truck_val).trigger('change');
         $("#id_observaciones").val(datos.OBSERVACIONES || "");
+        $("#id_porcentaje_comision").val(datos.PORCENTAJECOMISION || "");
+        $("#id_rango_invoice").val(datos.RANGOINVOICE || "");
+        $("#id_datos_bancarios").val(datos.DATOSBANCARIOS || "");
         if(parseInt(datos.ESTADO) == 0)
             {
             $("#id_estado_activo").prop('checked', false);
@@ -333,7 +336,10 @@ function grabar_marcacion()
         + "&parametro4=" + $("#id_codigotruck").val()
         + "&parametro5=" + encodeURIComponent($("#id_observaciones").val())
         + "&parametro6=" + estado_val
-        + "&parametro7=" + global_codigo_usuario;
+        + "&parametro7=" + global_codigo_usuario
+        + "&parametro8=" + encodeURIComponent($("#id_porcentaje_comision").val())
+        + "&parametro9=" + encodeURIComponent($("#id_rango_invoice").val())
+        + "&parametro10=" + encodeURIComponent($("#id_datos_bancarios").val());
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -393,6 +399,9 @@ function boton_nuevo()
     $("#id_codigocliente").val("0").trigger('change');
     $("#id_codigotruck").val("0").trigger('change');
     $("#id_observaciones").val("");
+    $("#id_porcentaje_comision").val("");
+    $("#id_rango_invoice").val("");
+    $("#id_datos_bancarios").val("");
     $("#id_estado_activo").prop('checked', true);
     $("#id_estado_inactivo").prop('checked', false);
     $("#id_listado_marcaciones .grupo_marcacion").removeClass("grupo_marcacion_seleccionado");
@@ -527,6 +536,34 @@ $(document).ready(function()
                         <td style="padding-bottom: 8px;">
                             <textarea id="id_observaciones" maxlength="500" rows="4"
                                 style="width: 100%; text-transform: uppercase; font-size: 12px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
+                        </td>
+                    </tr>
+                    <!-- % COMISION -->
+                    <tr>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">% COMISION:</td>
+                        <td style="padding-bottom: 8px;">
+                            <input type="text" id="id_porcentaje_comision" class="input_pequeno" maxlength="5"
+                                style="width: 80px; text-align: right;"
+                                placeholder="0.00"
+                                oninput="this.value = this.value.replace(/[^0-9.]/g, '');" />
+                        </td>
+                    </tr>
+                    <!-- RANGO INVOICE -->
+                    <tr>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; white-space: nowrap;">RANGO INV:</td>
+                        <td style="padding-bottom: 8px;">
+                            <input type="text" id="id_rango_invoice" class="input_pequeno" maxlength="10"
+                                style="width: 120px; text-align: right;"
+                                placeholder="100000"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '');" />
+                        </td>
+                    </tr>
+                    <!-- DATOS BANCARIOS -->
+                    <tr>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; vertical-align: top; white-space: nowrap;">DATOS BANCO:</td>
+                        <td style="padding-bottom: 8px;">
+                            <textarea id="id_datos_bancarios" maxlength="2000" rows="5"
+                                style="width: 100%; text-transform: uppercase; font-size: 11px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: vertical; font-family: monospace;"></textarea>
                         </td>
                     </tr>
                     <!-- ESTADO -->

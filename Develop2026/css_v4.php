@@ -78,5 +78,26 @@ $url = "";
     <link rel="stylesheet" href="<?php echo $url;?>css/dienersoft_comun.css">
     <script src="<?php echo $url;?>flatpickr/flatpickr.js"></script>
     <script src="<?php echo $url;?>flatpickr/es.js"></script>
+
+    <!-- ===== Barra de navegacion fija arriba (fixed) en todo el sistema ===== -->
+    <style>
+    /* Con position:sticky la barra se despegaba al bajar mucho (algun ancestro con
+       overflow/altura acotada rompe el sticky). Con fixed queda anclada a la
+       VENTANA y nunca se despega. La barra mide 45px (Metro: content height 45px),
+       asi que compensamos con padding-top en el body para no tapar el contenido.
+       z-index 90: por encima de los grids (thead sticky ~5) y del contenido, pero
+       por debajo de los dialogs jQuery UI (~100), Select2 (~1051) y Flatpickr, para
+       que el overlay/dialog modal siga cubriendo la barra. */
+    header.bg-dark {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 90;
+        }
+    body.metro {
+        padding-top: 45px;
+        }
+    </style>
 <?php
 ?>

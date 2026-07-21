@@ -1,11 +1,11 @@
-<?php 
-                                
+<?php  
+                                               
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
 // ============================================== ==============================
-                          
-             
+
+                  
 // Normaliza texto: minusculas y sin tildes/dieresis/enie. 
 function normalizar_texto_correo($texto)
     {
@@ -1405,7 +1405,8 @@ function devuelve_cliente_dsft($codigo)
         return json_encode(array("ERROR" => "Codigo invalido"));
 
     $sql = "SELECT CODIGO, NOMBRECLIENTE, NOMBRECORTO, CORREOFACTURAS, CORREOESTADOSCUENTA,
-        TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES, ESTADO
+        TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES,
+        DATOSBANCARIOS AS DATOSBANCARIOS, ESTADO
         FROM cliente
         WHERE CODIGO = ".$codigo;
     $resultado = mysqli_query($link, $sql);
@@ -1424,13 +1425,14 @@ function devuelve_cliente_dsft($codigo)
     $respuesta['CIUDAD']              = $fila['CIUDAD'];
     $respuesta['CODIGOPAIS']          = $fila['CODIGOPAIS'];
     $respuesta['OBSERVACIONES']       = $fila['OBSERVACIONES'];
+    $respuesta['DATOSBANCARIOS']      = $fila['DATOSBANCARIOS'];
     $respuesta['ESTADO']              = $fila['ESTADO'];
 
     return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
     }
 
 // INSERT si $codigo == 0, UPDATE si > 0. Eliminacion logica via ESTADO = -1.
-function graba_cliente_dsft($codigo, $nombrecliente, $nombrecorto, $correofacturas, $correoestadoscuenta, $telefono, $direccion, $ciudad, $observaciones, $estado, $codigo_usuario, $codigopais)
+function graba_cliente_dsft($codigo, $nombrecliente, $nombrecorto, $correofacturas, $correoestadoscuenta, $telefono, $direccion, $ciudad, $observaciones, $estado, $codigo_usuario, $codigopais, $datos_bancarios)
     {
     global $link;
 
@@ -1454,16 +1456,17 @@ function graba_cliente_dsft($codigo, $nombrecliente, $nombrecorto, $correofactur
     $direccion           = mysqli_real_escape_string($link, strtoupper(trim((string)$direccion)));
     $ciudad              = mysqli_real_escape_string($link, strtoupper(trim((string)$ciudad)));
     $observaciones       = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
+    $datos_bancarios_esc = mysqli_real_escape_string($link, strtoupper(trim((string)$datos_bancarios)));
 
     if($codigo == 0)
         {
         $sql = "INSERT INTO cliente (
             CODIGO, NOMBRECLIENTE, NOMBRECORTO, CORREOFACTURAS, CORREOESTADOSCUENTA,
-            TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES,
+            TELEFONO, DIRECCION, CIUDAD, CODIGOPAIS, OBSERVACIONES, DATOSBANCARIOS,
             ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
         ) VALUES (
             0, '".$nombrecliente."', '".$nombrecorto."', '".$correofacturas."', '".$correoestadoscuenta."',
-            '".$telefono."', '".$direccion."', '".$ciudad."', ".$valor_codigopais.", '".$observaciones."',
+            '".$telefono."', '".$direccion."', '".$ciudad."', ".$valor_codigopais.", '".$observaciones."', '".$datos_bancarios_esc."',
             ".$estado.", ".$codigo_usuario.", NOW()
         )";
         }
@@ -1479,6 +1482,7 @@ function graba_cliente_dsft($codigo, $nombrecliente, $nombrecorto, $correofactur
             CIUDAD              = '".$ciudad."',
             CODIGOPAIS          = ".$valor_codigopais.",
             OBSERVACIONES       = '".$observaciones."',
+            DATOSBANCARIOS      = '".$datos_bancarios_esc."',
             ESTADO              = ".$estado.",
             CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
             FECHAMODIFICACION   = NOW()
@@ -1902,7 +1906,15 @@ function devuelve_marcacion_dsft($codigo)
     if($codigo == 0)
         return json_encode(array("ERROR" => "Codigo invalido"));
 
-    $sql = "SELECT CODIGO, NOMBREMARCACION, CODIGOCLIENTE, CODIGOTRUCK, OBSERVACIONES, ESTADO
+    $sql = "SELECT CODIGO AS CODIGO,
+        NOMBREMARCACION AS NOMBREMARCACION,
+        CODIGOCLIENTE AS CODIGOCLIENTE,
+        CODIGOTRUCK AS CODIGOTRUCK,
+        OBSERVACIONES AS OBSERVACIONES,
+        PORCENTAJECOMISION AS PORCENTAJECOMISION,
+        RANGOINVOICE AS RANGOINVOICE,
+        DATOSBANCARIOS AS DATOSBANCARIOS,
+        ESTADO AS ESTADO
         FROM marcacion
         WHERE CODIGO = ".$codigo;
     $resultado = mysqli_query($link, $sql);
@@ -1911,18 +1923,21 @@ function devuelve_marcacion_dsft($codigo)
 
     $fila = mysqli_fetch_array($resultado);
     $respuesta = array();
-    $respuesta['CODIGO']          = $fila['CODIGO'];
-    $respuesta['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
-    $respuesta['CODIGOCLIENTE']   = $fila['CODIGOCLIENTE'];
-    $respuesta['CODIGOTRUCK']     = $fila['CODIGOTRUCK'];
-    $respuesta['OBSERVACIONES']   = $fila['OBSERVACIONES'];
-    $respuesta['ESTADO']          = $fila['ESTADO'];
+    $respuesta['CODIGO']             = $fila['CODIGO'];
+    $respuesta['NOMBREMARCACION']    = $fila['NOMBREMARCACION'];
+    $respuesta['CODIGOCLIENTE']      = $fila['CODIGOCLIENTE'];
+    $respuesta['CODIGOTRUCK']        = $fila['CODIGOTRUCK'];
+    $respuesta['OBSERVACIONES']      = $fila['OBSERVACIONES'];
+    $respuesta['PORCENTAJECOMISION'] = $fila['PORCENTAJECOMISION'];
+    $respuesta['RANGOINVOICE']       = $fila['RANGOINVOICE'];
+    $respuesta['DATOSBANCARIOS']     = $fila['DATOSBANCARIOS'];
+    $respuesta['ESTADO']             = $fila['ESTADO'];
 
     return json_encode($respuesta, JSON_UNESCAPED_UNICODE);
     }
 
 // INSERT si $codigo == 0, UPDATE si > 0. CODIGOTRUCK: 0 se guarda como NULL.
-function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigotruck, $observaciones, $estado, $codigo_usuario)
+function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigotruck, $observaciones, $estado, $codigo_usuario, $porcentaje_comision, $rango_invoice, $datos_bancarios)
     {
     global $link;
 
@@ -1942,6 +1957,13 @@ function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigo
 
     $valor_codigotruck = ($codigotruck == 0) ? "NULL" : $codigotruck;
 
+    // Campos nuevos del invoice: % comision, rango de numeracion y datos
+    // bancarios. Vacio o 0 -> NULL en la BD.
+    $valor_porcentaje      = ($porcentaje_comision == "" || $porcentaje_comision == "0") ? "NULL" : (float)$porcentaje_comision;
+    $valor_rango           = ($rango_invoice == "" || $rango_invoice == "0") ? "NULL" : (int)$rango_invoice;
+    $datos_bancarios       = mysqli_real_escape_string($link, strtoupper(trim((string)$datos_bancarios)));
+    $valor_datos_bancarios = ($datos_bancarios == "") ? "NULL" : "'".$datos_bancarios."'";
+
     // Escape de strings (sobrescribir misma variable).
     $nombremarcacion = mysqli_real_escape_string($link, $nombremarcacion);
     $observaciones   = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
@@ -1950,9 +1972,11 @@ function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigo
         {
         $sql = "INSERT INTO marcacion (
             CODIGO, NOMBREMARCACION, CODIGOCLIENTE, CODIGOTRUCK, OBSERVACIONES,
+            PORCENTAJECOMISION, RANGOINVOICE, DATOSBANCARIOS,
             ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
         ) VALUES (
             0, '".$nombremarcacion."', ".$codigocliente.", ".$valor_codigotruck.", '".$observaciones."',
+            ".$valor_porcentaje.", ".$valor_rango.", ".$valor_datos_bancarios.",
             ".$estado.", ".$codigo_usuario.", NOW()
         )";
         }
@@ -1963,6 +1987,9 @@ function graba_marcacion_dsft($codigo, $nombremarcacion, $codigocliente, $codigo
             CODIGOCLIENTE         = ".$codigocliente.",
             CODIGOTRUCK           = ".$valor_codigotruck.",
             OBSERVACIONES         = '".$observaciones."',
+            PORCENTAJECOMISION    = ".$valor_porcentaje.",
+            RANGOINVOICE          = ".$valor_rango.",
+            DATOSBANCARIOS        = ".$valor_datos_bancarios.",
             ESTADO                = ".$estado.",
             CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
             FECHAMODIFICACION     = NOW()
@@ -2221,7 +2248,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $html .= '<a onclick="dialog_crear_factura_manual('.$codigo.');" style="cursor:pointer; color:#2e7d32; margin-right:4px;" title="Crear factura manual"><i class="icon-clipboard-2"></i></a>';
         $html .= '<a onclick="dialog_subir_archivo('.$codigo.');" style="cursor:pointer; color:#88010e; margin-right:4px;" title="Subir archivo y procesar con IA"><i class="icon-upload"></i></a>';
         $html .= '<a onclick="toggle_menu_formato(this, '.$codigo.');" style="cursor:pointer; color:#2e7d32; margin-right:4px; position:relative;" title="Generar consolidado"><i class="icon-puzzle"></i></a>';
-        $html .= '<a onclick="messageBox(\'Factura cliente - proximamente\');" style="cursor:pointer; color:#2196F3; margin-right:4px;" title="Factura cliente"><i class="icon-dollar"></i></a>';
+        $html .= '<a onclick="abrir_factura_cliente('.$codigo.');" style="cursor:pointer; color:#2196F3; margin-right:4px;" title="Factura cliente"><i class="icon-dollar"></i></a>';
         $html .= '<a onclick="messageBox(\'Packing - proximamente\');" style="cursor:pointer; color:#d4890e; margin-right:4px;" title="Packing"><i class="icon-bus"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
@@ -4124,10 +4151,9 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
     $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
     $sheet       = $spreadsheet->getActiveSheet();
 
-    // Fondo blanco por defecto en toda la hoja. 
-    $spreadsheet->getDefaultStyle()->getFill()
-        ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-        ->getStartColor()->setRGB('FFFFFF');
+    // NOTA: el fondo blanco NO se aplica como estilo por defecto de toda la hoja
+    // porque eso marca todas las celdas como "usadas" y Google Drive genera
+    // paginas en blanco al exportar a PDF. Se aplica al final solo al rango real.
 
     $sheet->setTitle('Consolidado');
 
@@ -4440,6 +4466,26 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
         ));
     $sheet->getStyle('D'.$fila_actual.':K'.$fila_actual)->getAlignment()->setHorizontal('right');
 
+    // Eliminar filas vacias despues del contenido para que Google Drive no
+    // genere paginas en blanco al exportar a PDF. La super total es la ultima
+    // fila con datos ($fila_actual, no se incremento despues).
+    $ultima_fila = $fila_actual;
+    $max_fila_hoja = $sheet->getHighestRow();
+    if($max_fila_hoja > $ultima_fila)
+        {
+        $sheet->removeRow($ultima_fila + 1, $max_fila_hoja - $ultima_fila);
+        }
+
+    // Fondo blanco SOLO en el rango con datos (no en toda la hoja).
+    $sheet->getStyle('A1:Q'.$ultima_fila)->getFill()
+        ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        ->getStartColor()->setRGB('FFFFFF');
+
+    // Forzar dimensiones de impresion.
+    $sheet->getPageSetup()->setPrintArea('A1:Q'.$ultima_fila);
+    $sheet->getPageSetup()->setFitToWidth(1);
+    $sheet->getPageSetup()->setFitToHeight(0);
+
     // 4) Salida segun formato. Limpiar TODO buffer previo para no corromper el
     // binario (xlsx/pdf) con whitespace/warnings de los includes.
     $nombre_archivo = 'CONSOLIDADO_'.$codigo_consolidado.'_'
@@ -4547,5 +4593,1581 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
         $writer->save('php://output');
         }
 
+    exit;
+    }
+
+
+// ============================================================================
+// MODULO INVOICE CLIENTE (factura_cliente). El invoice es una COPIA del
+// consolidado con cobros adicionales (comision, precooling, transporte...).
+// ============================================================================
+
+// Helper: fraccion de FULL BOX segun el tipo de caja.
+// FB=1, HB=0.5, QB=0.25, OB/EB=0.125. Cualquier otro = 0.
+function _fb_por_tipo_caja_fc($tipo_caja)
+    {
+    $tipo_caja = strtoupper(trim((string)$tipo_caja));
+    if($tipo_caja == "FB")
+        return 1;
+    if($tipo_caja == "HB")
+        return 0.5;
+    if($tipo_caja == "QB")
+        return 0.25;
+    if($tipo_caja == "OB" || $tipo_caja == "EB")
+        return 0.125;
+    return 0;
+    }
+
+// Formatea un FB para mostrar sin ceros de mas (1, 0.5, 0.25, 0.125).
+function _fmt_fb_fc($fb)
+    {
+    $fb = (float)$fb;
+    if($fb == 0)
+        return "";
+    return rtrim(rtrim(number_format($fb, 3, '.', ''), '0'), '.');
+    }
+
+// Crea (o abre si ya existe) el INVOICE del cliente para un consolidado.
+// Retorna el CODIGO de factura_cliente (string) o "ERROR: ...".
+// Solo verifica si ya existen invoices para el consolidado (NO crea nada).
+// Retorna JSON: EXISTE = "SI"/"NO" y un arreglo INVOICES con TODOS los invoices
+// (no solo el ultimo), para poder listarlos en el dialog.
+function verifica_factura_cliente_dsft($codigo_consolidado)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $respuesta = array();
+    if($codigo_consolidado <= 0)
+        {
+        $respuesta['EXISTE'] = "NO";
+        $respuesta['INVOICES'] = array();
+        return json_encode($respuesta);
+        }
+
+    $sql = "SELECT
+        CODIGO AS CODIGO,
+        NUMEROINVOICE AS NUMEROINVOICE,
+        FECHAINVOICE AS FECHAINVOICE,
+        FECHAREGISTRO AS FECHAREGISTRO,
+        u.codigo_usuario AS CODIGOUSUARIO,
+        u.username_usuario AS USERNAME
+        FROM factura_cliente
+        LEFT JOIN usuario u ON factura_cliente.CODIGOUSUARIOREGISTRA = u.codigo_usuario
+        WHERE CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND ESTADO >= 0
+        ORDER BY CODIGO DESC";
+    $resultado = mysqli_query($link, $sql);
+    $numero    = ($resultado) ? mysqli_num_rows($resultado) : 0;
+
+    if($numero > 0)
+        {
+        $invoices = array();
+        for($i=1; $i<=$numero; $i++)
+            {
+            $fila = mysqli_fetch_assoc($resultado);
+            $invoices[$i] = array(
+                'CODIGO'        => (int)$fila['CODIGO'],
+                'NUMEROINVOICE' => (trim((string)$fila['NUMEROINVOICE']) != "") ? (string)$fila['NUMEROINVOICE'] : "",
+                'FECHAINVOICE'  => (string)$fila['FECHAINVOICE'],
+                'FECHAREGISTRO' => (string)$fila['FECHAREGISTRO'],
+                'CODIGOUSUARIO' => (int)$fila['CODIGOUSUARIO'],
+                'USERNAME'      => (string)$fila['USERNAME']
+                );
+            }
+        $respuesta['EXISTE']   = "SI";
+        $respuesta['INVOICES'] = $invoices;
+        }
+    else
+        {
+        $respuesta['EXISTE']   = "NO";
+        $respuesta['INVOICES'] = array();
+        }
+    return json_encode($respuesta);
+    }
+
+// Borrado FISICO (DELETE real) de un invoice y todo su detalle. Orden: cobros,
+// luego lineas de detalle, luego la cabecera. Retorna "OK" o el mysqli_error.
+function eliminar_factura_cliente_fisico_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "Codigo invalido";
+
+    $sql = "DELETE FROM cobro_factura_cliente WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return mysqli_error($link);
+
+    $sql = "DELETE FROM detalle_factura_cliente WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return mysqli_error($link);
+
+    $sql = "DELETE FROM factura_cliente WHERE CODIGO = ".$codigo_factura_cliente;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return mysqli_error($link);
+
+    return "OK";
+    }
+
+function crear_o_abrir_factura_cliente_dsft($codigo_consolidado)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "ERROR: Consolidado invalido";
+
+    // 1) Si ya existe una factura_cliente para este consolidado, retornarla.
+    $sql = "SELECT CODIGO AS CODIGO FROM factura_cliente
+        WHERE CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND ESTADO >= 0
+        ORDER BY CODIGO DESC
+        LIMIT 1";
+    $res = mysqli_query($link, $sql);
+    if($res && mysqli_num_rows($res) > 0)
+        {
+        $fila = mysqli_fetch_assoc($res);
+        return (string)(int)$fila["CODIGO"];
+        }
+
+    // Si no existe, delegar en la funcion que siempre crea uno nuevo.
+    return crear_factura_cliente_nueva_dsft($codigo_consolidado);
+    }
+
+// Crea SIEMPRE un invoice nuevo para el consolidado, SIN verificar si ya
+// existe. Se usa desde el boton "Crear Nuevo" (permite invoices adicionales).
+// crear_o_abrir_factura_cliente_dsft delega aqui cuando no hay ninguno.
+function crear_factura_cliente_nueva_dsft($codigo_consolidado, $codigo_usuario = 0)
+    {
+    global $link;
+ 
+    // PHP 8.1+ pone mysqli en modo excepciones por defecto: una query que falla
+    // lanza mysqli_sql_exception y, sin try/catch, tumba la peticion con un fatal
+    // 500 (pagina en blanco). Lo apagamos para que las queries devuelvan false y
+    // los if(!$r) de abajo devuelvan el error SQL real al navegador.
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_usuario     = (int)$codigo_usuario;
+    if($codigo_consolidado <= 0)
+        return "ERROR: Consolidado invalido";
+
+    // 2) Leer datos del consolidado (marcacion y pais legacy).
+    $sql_cons = "SELECT c.CODIGO AS CODIGO,
+        c.FECHAVUELO AS FECHAVUELO,
+        c.CODIGOMARCACION AS CODIGOMARCACION,
+        c.CODIGOCLIENTE AS CODIGOCLIENTE,
+        m.NOMBREMARCACION AS NOMBREMARCACION,
+        m.PORCENTAJECOMISION AS PORCENTAJECOMISION,
+        p.nombre_pais AS PAIS
+        FROM consolidado c
+        LEFT JOIN marcacion m ON c.CODIGOMARCACION = m.CODIGO
+        LEFT JOIN pais p ON c.CODIGOPAIS = p.codigo_pais
+        WHERE c.CODIGO = ".$codigo_consolidado;
+    $res_cons = mysqli_query($link, $sql_cons);
+    if(!$res_cons || mysqli_num_rows($res_cons) == 0)
+        return "ERROR: Consolidado no encontrado";
+    $cons = mysqli_fetch_assoc($res_cons);
+
+    $codigo_marcacion = (int)$cons["CODIGOMARCACION"];
+    $codigo_cliente   = (int)$cons["CODIGOCLIENTE"];
+    $fechavuelo       = (string)$cons["FECHAVUELO"];
+    $nombremarcacion  = strtoupper(trim((string)$cons["NOMBREMARCACION"]));
+    $pais             = strtoupper(trim((string)$cons["PAIS"]));
+    $porcentaje       = (float)$cons["PORCENTAJECOMISION"];
+
+    // 3) AWBs del consolidado, concatenados con ", ".
+    $sql_awb = "SELECT g.NUMEROGUIA AS NUMEROGUIA
+        FROM guia_consolidado gc
+        INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+        WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado;
+    $res_awb   = mysqli_query($link, $sql_awb);
+    $awbs      = array();
+    $total_awb = ($res_awb) ? mysqli_num_rows($res_awb) : 0;
+    for($a=1; $a<=$total_awb; $a++)
+        {
+        $fa     = mysqli_fetch_assoc($res_awb);
+        $awbs[] = (string)$fa["NUMEROGUIA"];
+        }
+    $awb_str = implode(", ", $awbs);
+
+    // Escapes para el INSERT de cabecera.
+    $fechavuelo_esc      = mysqli_real_escape_string($link, $fechavuelo);
+    $nombremarcacion_esc = mysqli_real_escape_string($link, $nombremarcacion);
+    $pais_esc            = mysqli_real_escape_string($link, $pais);
+    $awb_esc             = mysqli_real_escape_string($link, $awb_str);
+    $valor_fechavuelo    = (trim($fechavuelo) == "") ? "NULL" : "'".$fechavuelo_esc."'";
+    $valor_marcacion     = ($codigo_marcacion > 0) ? $codigo_marcacion : "NULL";
+
+    // NUMEROINVOICE correlativo POR CLIENTE: CODIGOCLIENTE + 5 digitos (00001,
+    // 00002, ...). factura_cliente NO tiene CODIGOCLIENTE; el cliente se obtiene
+    // via JOIN a consolidado (fc.CODIGOCONSOLIDADO = c.CODIGO). Se toma el maximo
+    // de los ultimos 5 digitos y se suma 1 (arranca en 00001 si no hay ninguno).
+    $numeroinvoice = "";
+    if($codigo_cliente > 0)
+        {
+        $prefijo_len = strlen((string)$codigo_cliente);
+        $sql_max = "SELECT MAX(CAST(SUBSTRING(fc.NUMEROINVOICE, ".$prefijo_len." + 1) AS UNSIGNED)) AS ULTIMO
+            FROM factura_cliente fc
+            INNER JOIN consolidado c ON fc.CODIGOCONSOLIDADO = c.CODIGO
+            WHERE c.CODIGOCLIENTE = ".$codigo_cliente."
+              AND fc.NUMEROINVOICE IS NOT NULL
+              AND fc.NUMEROINVOICE != ''
+              AND fc.NUMEROINVOICE LIKE '".$codigo_cliente."%'";
+        $res_max = mysqli_query($link, $sql_max);
+        $ultimo  = 0;
+        if($res_max && mysqli_num_rows($res_max) > 0)
+            {
+            $fila_max = mysqli_fetch_assoc($res_max);
+            $ultimo   = (int)$fila_max["ULTIMO"];
+            }
+        $correlativo   = $ultimo + 1;
+        $numeroinvoice = (string)$codigo_cliente.str_pad((string)$correlativo, 5, "0", STR_PAD_LEFT);
+        }
+    $valor_numeroinvoice = ($numeroinvoice != "") ? "'".mysqli_real_escape_string($link, $numeroinvoice)."'" : "NULL";
+
+    // 4) INSERT de la cabecera factura_cliente (SIN CODIGOCLIENTE: no existe en
+    // la tabla; el cliente se deduce por CODIGOCONSOLIDADO).
+    $sql_ins = "INSERT INTO factura_cliente (
+        ESTADO, CODIGOCONSOLIDADO, CODIGOMARCACION, NUMEROINVOICE,
+        FECHAINVOICE, FECHAVUELO, NOMBREMARCACION, PAIS, LABEL, AWB,
+        TOTALFLORES, TOTALCOBROS, TOTALINVOICE, TOTALFULLES, TOTALTALLOS, TOTALPESO,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+    ) VALUES (
+        1, ".$codigo_consolidado.", ".$valor_marcacion.", ".$valor_numeroinvoice.",
+        CURDATE(), ".$valor_fechavuelo.", '".$nombremarcacion_esc."', '".$pais_esc."', '".$nombremarcacion_esc."', '".$awb_esc."',
+        0, 0, 0, 0, 0, 0,
+        ".$codigo_usuario.", NOW()
+    )";
+    $r = mysqli_query($link, $sql_ins);
+    if(!$r)
+        return "ERROR: al crear invoice: ".mysqli_error($link);
+    $codigo_factura_cliente = (int)mysqli_insert_id($link);
+
+    // 5) Copiar todas las lineas del consolidado a detalle_factura_cliente.
+    $sql_det = "SELECT d.CODIGOTIPOPRODUCTO AS CODIGOTIPOPRODUCTO,
+        d.PRODUCTO AS PRODUCTO, d.VARIEDAD AS VARIEDAD, d.LARGO AS LARGO,
+        d.GRADO AS GRADO, d.TALLOSTOTAL AS TALLOSTOTAL,
+        d.PRECIOUNITARIO AS PRECIOUNITARIO, d.PRECIOTOTAL AS PRECIOTOTAL,
+        d.NUMEROCAJA AS NUMEROCAJA, d.TIPOCAJA AS TIPOCAJA, d.INDICELINEA AS INDICELINEA,
+        ff.FINCA AS FINCA
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND d.ESTADO >= 0
+        ORDER BY d.PRODUCTO, ff.FINCA, d.NUMEROCAJA, d.INDICELINEA";
+    $res_det   = mysqli_query($link, $sql_det);
+    $total_det = ($res_det) ? mysqli_num_rows($res_det) : 0;
+
+    $indice_global = 0;
+    $caja_key_ant  = "";
+    for($i=1; $i<=$total_det; $i++)
+        {
+        $d = mysqli_fetch_assoc($res_det);
+        $indice_global++;
+
+        $codigo_tipo = (int)$d["CODIGOTIPOPRODUCTO"];
+        $producto    = mysqli_real_escape_string($link, strtoupper(trim((string)$d["PRODUCTO"])));
+        $finca       = mysqli_real_escape_string($link, strtoupper(trim((string)$d["FINCA"])));
+        $variedad    = mysqli_real_escape_string($link, strtoupper(trim((string)$d["VARIEDAD"])));
+        $largo       = ($d["LARGO"] !== null) ? (int)$d["LARGO"] : "NULL";
+        $grado       = ($d["GRADO"] !== null && trim((string)$d["GRADO"]) != "") ? "'".mysqli_real_escape_string($link, (string)$d["GRADO"])."'" : "NULL";
+        $tallos      = ($d["TALLOSTOTAL"] !== null) ? (int)$d["TALLOSTOTAL"] : "NULL";
+        $precio_u    = ($d["PRECIOUNITARIO"] !== null) ? (float)$d["PRECIOUNITARIO"] : 0;
+        $precio_t    = ($d["PRECIOTOTAL"] !== null) ? (float)$d["PRECIOTOTAL"] : 0;
+        $num_caja    = (int)$d["NUMEROCAJA"];
+        $tipo_caja   = mysqli_real_escape_string($link, strtoupper(trim((string)$d["TIPOCAJA"])));
+
+        // FB solo en la primera linea de cada caja (clave FINCA|NUMEROCAJA) para
+        // no sobrecontar las cajas con varias lineas de detalle.
+        $caja_key = $finca."|".$num_caja;
+        if($caja_key != $caja_key_ant)
+            {
+            $fb           = _fb_por_tipo_caja_fc($d["TIPOCAJA"]);
+            $caja_key_ant = $caja_key;
+            }
+        else
+            {
+            $fb = 0;
+            }
+
+        $codigo_tipo_sql = ($codigo_tipo > 0) ? $codigo_tipo : "NULL";
+        // PRECIOFINCA = PRECIOUNITARIO, TOTALFINCA = PRECIOTOTAL (por ahora
+        // iguales, editables despues). GANANCIA = 0. INDICELINEA = indice global.
+        $sql_ins_det = "INSERT INTO detalle_factura_cliente (
+            ESTADO, CODIGOFACTURACLIENTE, CODIGOTIPOPRODUCTO, PRODUCTO, FINCA,
+            VARIEDAD, LARGO, GRADO, TALLOSTOTAL, PRECIOUNITARIO, PRECIOTOTAL,
+            PRECIOFINCA, TOTALFINCA, GANANCIA, FB, NUMEROCAJA, TIPOCAJA, INDICELINEA,
+            CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            1, ".$codigo_factura_cliente.", ".$codigo_tipo_sql.", '".$producto."', '".$finca."',
+            '".$variedad."', ".$largo.", ".$grado.", ".$tallos.", ".$precio_u.", ".$precio_t.",
+            ".$precio_u.", ".$precio_t.", 0, ".$fb.", ".$num_caja.", '".$tipo_caja."', ".$indice_global.",
+            0, NOW()
+        )";
+        mysqli_query($link, $sql_ins_det);
+        }
+
+    // 6) Totales de detalle en la cabecera (flores, fulles, tallos).
+    $sql_tot = "SELECT SUM(PRECIOTOTAL) AS TOTALFLORES,
+        SUM(FB) AS TOTALFULLES,
+        SUM(TALLOSTOTAL) AS TOTALTALLOS
+        FROM detalle_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0";
+    $res_tot      = mysqli_query($link, $sql_tot);
+    $total_flores = 0;
+    if($res_tot && mysqli_num_rows($res_tot) > 0)
+        {
+        $ft           = mysqli_fetch_assoc($res_tot);
+        $total_flores = (float)$ft["TOTALFLORES"];
+        }
+
+    // 7) Auto-agregar cobro COMISION si la marcacion tiene porcentaje > 0.
+    // CODIGOTIPOCOBRO = 1 es COMISION en tipo_cobro.
+    if($porcentaje > 0)
+        {
+        $monto_comision = round($total_flores * $porcentaje / 100, 2);
+        $sql_com = "INSERT INTO cobro_factura_cliente (
+            ESTADO, CODIGOFACTURACLIENTE, CODIGOTIPOCOBRO, NOMBRECOBRO,
+            MONTO, PORCENTAJE, BASEPORCENTAJE,
+            CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+        ) VALUES (
+            1, ".$codigo_factura_cliente.", 1, 'COMISION',
+            ".$monto_comision.", ".$porcentaje.", ".$total_flores.",
+            0, NOW()
+        )";
+        mysqli_query($link, $sql_com);
+        }
+
+    // 8) Recalcular todos los totales de la cabecera (incluye cobros).
+    recalcular_totales_factura_cliente_dsft($codigo_factura_cliente);
+
+    return (string)$codigo_factura_cliente;
+    }
+
+// Recalcula TOTALFLORES, TOTALFULLES, TOTALTALLOS, TOTALCOBROS y TOTALINVOICE
+// de una factura_cliente. Ademas refresca los cobros por porcentaje (ej.
+// COMISION) contra el nuevo total de flores.
+function recalcular_totales_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "ERROR: Invoice invalido";
+
+    // Totales del detalle.
+    $sql_det = "SELECT SUM(PRECIOTOTAL) AS TOTALFLORES,
+        SUM(FB) AS TOTALFULLES,
+        SUM(TALLOSTOTAL) AS TOTALTALLOS
+        FROM detalle_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0";
+    $res_det      = mysqli_query($link, $sql_det);
+    $total_flores = 0;
+    $total_fulles = 0;
+    $total_tallos = 0;
+    if($res_det && mysqli_num_rows($res_det) > 0)
+        {
+        $fd           = mysqli_fetch_assoc($res_det);
+        $total_flores = (float)$fd["TOTALFLORES"];
+        $total_fulles = (float)$fd["TOTALFULLES"];
+        $total_tallos = (int)$fd["TOTALTALLOS"];
+        }
+
+    // Refrescar cobros por porcentaje (COMISION y similares) sobre el total de
+    // flores actualizado.
+    $sql_pct = "UPDATE cobro_factura_cliente SET
+        BASEPORCENTAJE = ".$total_flores.",
+        MONTO = ".$total_flores." * PORCENTAJE / 100,
+        FECHAMODIFICACION = NOW()
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0
+          AND PORCENTAJE > 0";
+    mysqli_query($link, $sql_pct);
+
+    // Total de cobros.
+    $sql_cob = "SELECT SUM(MONTO) AS TOTALCOBROS
+        FROM cobro_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0";
+    $res_cob      = mysqli_query($link, $sql_cob);
+    $total_cobros = 0;
+    if($res_cob && mysqli_num_rows($res_cob) > 0)
+        {
+        $fcb          = mysqli_fetch_assoc($res_cob);
+        $total_cobros = (float)$fcb["TOTALCOBROS"];
+        }
+
+    $total_invoice = $total_flores + $total_cobros;
+
+    $sql_upd = "UPDATE factura_cliente SET
+        TOTALFLORES       = ".$total_flores.",
+        TOTALFULLES       = ".$total_fulles.",
+        TOTALTALLOS       = ".$total_tallos.",
+        TOTALCOBROS       = ".$total_cobros.",
+        TOTALINVOICE      = ".$total_invoice.",
+        FECHAMODIFICACION = NOW()
+        WHERE CODIGO = ".$codigo_factura_cliente;
+    mysqli_query($link, $sql_upd);
+
+    return "OK";
+    }
+
+// Actualiza un campo editable del header del invoice: NUMEROINVOICE o
+// FECHAINVOICE (SHIP DATE). Lista blanca de campos.
+function actualizar_cabecera_factura_cliente_dsft($codigo_factura_cliente, $campo, $valor)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "ERROR: Invoice invalido";
+
+    $campo = strtoupper(trim((string)$campo));
+    if($campo == "NUMEROINVOICE")
+        {
+        $valor_sql = "'".mysqli_real_escape_string($link, strtoupper(trim((string)$valor)))."'";
+        }
+    else if($campo == "FECHAINVOICE")
+        {
+        $valor = trim((string)$valor);
+        if($valor != "" && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor))
+            return "ERROR: Fecha con formato invalido (Y-m-d)";
+        $valor_sql = ($valor == "") ? "NULL" : "'".mysqli_real_escape_string($link, $valor)."'";
+        }
+    else
+        {
+        return "ERROR: Campo no editable";
+        }
+
+    $sql = "UPDATE factura_cliente SET
+        ".$campo." = ".$valor_sql.",
+        FECHAMODIFICACION = NOW()
+        WHERE CODIGO = ".$codigo_factura_cliente;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Actualiza una celda editable del grid del invoice. Campos:
+//   VARIEDAD        -> texto en mayuscula
+//   PRECIOUNITARIO  -> ST PRICE (recalcula PRECIOTOTAL)
+//   CM_<n>          -> setea LARGO=n y TALLOSTOTAL=valor (recalcula PRECIOTOTAL)
+// Al final recalcula los totales de la cabecera.
+function actualizar_celda_detalle_factura_cliente_dsft($codigo, $campo, $valor)
+    {
+    global $link;
+    $codigo = (int)$codigo;
+    if($codigo <= 0)
+        return "ERROR: Linea invalida";
+
+    $campo = strtoupper(trim((string)$campo));
+
+    // Codigo del invoice (para recalcular al final).
+    $sql_g = "SELECT CODIGOFACTURACLIENTE AS CODIGOFACTURACLIENTE
+        FROM detalle_factura_cliente WHERE CODIGO = ".$codigo;
+    $res_g = mysqli_query($link, $sql_g);
+    if(!$res_g || mysqli_num_rows($res_g) == 0)
+        return "ERROR: Linea no encontrada";
+    $fg = mysqli_fetch_assoc($res_g);
+    $codigo_factura_cliente = (int)$fg["CODIGOFACTURACLIENTE"];
+
+    if($campo == "VARIEDAD")
+        {
+        $valor_sql = "'".mysqli_real_escape_string($link, strtoupper(trim((string)$valor)))."'";
+        $sql = "UPDATE detalle_factura_cliente
+            SET VARIEDAD = ".$valor_sql.", FECHAMODIFICACION = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+    else if($campo == "PRECIOUNITARIO")
+        {
+        $valor_float = (float)str_replace(",", ".", (string)$valor);
+        if($valor_float < 0)
+            return "ERROR: El precio no puede ser negativo";
+        $valor_sql = number_format($valor_float, 4, '.', '');
+        $sql = "UPDATE detalle_factura_cliente
+            SET PRECIOUNITARIO = ".$valor_sql.",
+                PRECIOTOTAL    = COALESCE(TALLOSTOTAL,0) * ".$valor_sql.",
+                FECHAMODIFICACION = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+    else if(substr($campo, 0, 3) == "CM_")
+        {
+        $cm = (int)substr($campo, 3);
+        if($cm <= 0)
+            return "ERROR: Columna invalida";
+        $tallos = (int)$valor;
+        if($tallos < 0)
+            return "ERROR: Los tallos no pueden ser negativos";
+        $sql = "UPDATE detalle_factura_cliente
+            SET LARGO       = ".$cm.",
+                TALLOSTOTAL = ".$tallos.",
+                PRECIOTOTAL = ".$tallos." * COALESCE(PRECIOUNITARIO,0),
+                FECHAMODIFICACION = NOW()
+            WHERE CODIGO = ".$codigo;
+        }
+    else
+        {
+        return "ERROR: Campo no editable";
+        }
+
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "ERROR: ".mysqli_error($link);
+
+    recalcular_totales_factura_cliente_dsft($codigo_factura_cliente);
+    return "OK";
+    }
+
+// Agrega un cobro a la factura_cliente. El nombre se toma de tipo_cobro.
+function agregar_cobro_factura_cliente_dsft($codigo_factura_cliente, $codigo_tipo_cobro, $monto)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    $codigo_tipo_cobro      = (int)$codigo_tipo_cobro;
+    if($codigo_factura_cliente <= 0)
+        return "ERROR: Invoice invalido";
+    if($codigo_tipo_cobro <= 0)
+        return "ERROR: Seleccione un tipo de cobro";
+
+    $monto = (float)str_replace(",", ".", (string)$monto);
+    if($monto < 0)
+        return "ERROR: El monto no puede ser negativo";
+
+    // Nombre del cobro desde tipo_cobro.
+    $sql_t = "SELECT NOMBRE AS NOMBRE FROM tipo_cobro WHERE CODIGO = ".$codigo_tipo_cobro;
+    $res_t = mysqli_query($link, $sql_t);
+    if(!$res_t || mysqli_num_rows($res_t) == 0)
+        return "ERROR: Tipo de cobro no encontrado";
+    $ft     = mysqli_fetch_assoc($res_t);
+    $nombre = mysqli_real_escape_string($link, strtoupper(trim((string)$ft["NOMBRE"])));
+
+    $sql = "INSERT INTO cobro_factura_cliente (
+        ESTADO, CODIGOFACTURACLIENTE, CODIGOTIPOCOBRO, NOMBRECOBRO,
+        MONTO, PORCENTAJE, BASEPORCENTAJE,
+        CODIGOUSUARIOREGISTRA, FECHAREGISTRO
+    ) VALUES (
+        1, ".$codigo_factura_cliente.", ".$codigo_tipo_cobro.", '".$nombre."',
+        ".$monto.", 0, 0,
+        0, NOW()
+    )";
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "ERROR: al agregar cobro: ".mysqli_error($link);
+
+    recalcular_totales_factura_cliente_dsft($codigo_factura_cliente);
+    return "OK";
+    }
+
+// Elimina (ESTADO = -1) un cobro y recalcula los totales del invoice.
+function eliminar_cobro_factura_cliente_dsft($codigo_cobro)
+    {
+    global $link;
+    $codigo_cobro = (int)$codigo_cobro;
+    if($codigo_cobro <= 0)
+        return "ERROR: Cobro invalido";
+
+    $sql_g = "SELECT CODIGOFACTURACLIENTE AS CODIGOFACTURACLIENTE
+        FROM cobro_factura_cliente WHERE CODIGO = ".$codigo_cobro;
+    $res_g = mysqli_query($link, $sql_g);
+    if(!$res_g || mysqli_num_rows($res_g) == 0)
+        return "ERROR: Cobro no encontrado";
+    $fg = mysqli_fetch_assoc($res_g);
+    $codigo_factura_cliente = (int)$fg["CODIGOFACTURACLIENTE"];
+
+    $sql = "UPDATE cobro_factura_cliente SET
+        ESTADO = -1,
+        FECHAMODIFICACION = NOW()
+        WHERE CODIGO = ".$codigo_cobro;
+    $r = mysqli_query($link, $sql);
+    if(!$r)
+        return "ERROR: al eliminar cobro: ".mysqli_error($link);
+
+    recalcular_totales_factura_cliente_dsft($codigo_factura_cliente);
+    return "OK";
+    }
+
+// HTML de la tabla de cobros del invoice (con boton agregar y total).
+function lista_cobros_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "Invoice invalido";
+
+    $sql = "SELECT cf.CODIGO AS CODIGO, cf.CODIGOTIPOCOBRO AS CODIGOTIPOCOBRO,
+        cf.NOMBRECOBRO AS NOMBRECOBRO, cf.MONTO AS MONTO,
+        cf.PORCENTAJE AS PORCENTAJE, cf.BASEPORCENTAJE AS BASEPORCENTAJE,
+        tc.NOMBRE AS NOMBRETIPO
+        FROM cobro_factura_cliente cf
+        LEFT JOIN tipo_cobro tc ON cf.CODIGOTIPOCOBRO = tc.CODIGO
+        WHERE cf.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND cf.ESTADO >= 0
+        ORDER BY cf.CODIGO";
+    $res   = mysqli_query($link, $sql);
+    $total = ($res) ? mysqli_num_rows($res) : 0;
+
+    $html  = '<div style="margin-top:18px;">';
+    $html .= '<div style="display:flex; justify-content:space-between; align-items:center; background:#88010e; color:#fff; font-weight:bold; font-size:13px; padding:5px 10px; border-radius:4px 4px 0 0;">';
+    $html .= '<span>COBROS ADICIONALES</span>';
+    $html .= '<a onclick="dialog_agregar_cobro();" style="cursor:pointer; color:#fff; font-size:12px;" title="Agregar cobro"><i class="icon-plus"></i> Agregar cobro</a>';
+    $html .= '</div>';
+    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    $html .= '<tr style="background:#970202; color:#fff;">';
+    $html .= '<th style="padding:3px 6px; text-align:left;">TIPO</th>';
+    $html .= '<th style="padding:3px 6px; text-align:left;">NOMBRE</th>';
+    $html .= '<th style="padding:3px 6px; text-align:right;">MONTO</th>';
+    $html .= '<th style="padding:3px 6px; text-align:right; width:60px;">%</th>';
+    $html .= '<th style="padding:3px 6px; text-align:right; width:90px;">BASE</th>';
+    $html .= '<th style="padding:3px 6px; text-align:center; width:40px;">OPC</th>';
+    $html .= '</tr>';
+
+    if($total == 0)
+        $html .= '<tr><td colspan="6" style="padding:8px; text-align:center; color:#888;">Sin cobros adicionales.</td></tr>';
+
+    $suma = 0;
+    for($i=1; $i<=$total; $i++)
+        {
+        $c        = mysqli_fetch_assoc($res);
+        $codigo_c = (int)$c["CODIGO"];
+        $tipo     = htmlspecialchars((string)$c["NOMBRETIPO"], ENT_QUOTES, "UTF-8");
+        $nombre   = htmlspecialchars((string)$c["NOMBRECOBRO"], ENT_QUOTES, "UTF-8");
+        $monto    = (float)$c["MONTO"];
+        $pct      = (float)$c["PORCENTAJE"];
+        $base     = (float)$c["BASEPORCENTAJE"];
+        $suma    += $monto;
+
+        $bg = ($i % 2 == 0) ? "#f9f9f9" : "#fff";
+        $html .= '<tr style="background:'.$bg.';">';
+        $html .= '<td style="padding:3px 6px; border:1px solid #ddd;">'.$tipo.'</td>';
+        $html .= '<td style="padding:3px 6px; border:1px solid #ddd;">'.$nombre.'</td>';
+        $html .= '<td style="padding:3px 6px; text-align:right; border:1px solid #ddd;">'.number_format($monto, 2).'</td>';
+        $html .= '<td style="padding:3px 6px; text-align:right; border:1px solid #ddd;">'.(($pct > 0) ? number_format($pct, 2) : "").'</td>';
+        $html .= '<td style="padding:3px 6px; text-align:right; border:1px solid #ddd;">'.(($base > 0) ? number_format($base, 2) : "").'</td>';
+        $html .= '<td style="padding:3px 6px; text-align:center; border:1px solid #ddd;"><a onclick="eliminar_cobro_fc('.$codigo_c.');" style="cursor:pointer; color:#88010e;" title="Eliminar cobro"><i class="icon-cancel"></i></a></td>';
+        $html .= '</tr>';
+        }
+
+    $html .= '<tr style="background:#f0f0f0; font-weight:bold;">';
+    $html .= '<td colspan="2" style="padding:3px 6px; text-align:right; border:1px solid #ccc;">TOTAL COBROS</td>';
+    $html .= '<td style="padding:3px 6px; text-align:right; border:1px solid #ccc;">'.number_format($suma, 2).'</td>';
+    $html .= '<td colspan="3" style="border:1px solid #ccc;"></td>';
+    $html .= '</tr>';
+    $html .= '</table>';
+    $html .= '</div>';
+    return $html;
+    }
+
+// Bloque de totales generales del invoice (steems por producto, comision,
+// extras, total invoice). Se refresca junto con el detalle.
+function render_totales_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "";
+
+    // Cabecera + datos bancarios del cliente (via marcacion.CODIGOCLIENTE).
+    $sql_cab = "SELECT fc.TOTALFULLES AS TOTALFULLES, fc.TOTALTALLOS AS TOTALTALLOS,
+        fc.TOTALPESO AS TOTALPESO, fc.TOTALFLORES AS TOTALFLORES,
+        fc.TOTALCOBROS AS TOTALCOBROS, fc.TOTALINVOICE AS TOTALINVOICE,
+        c.DATOSBANCARIOS AS DATOSBANCARIOS
+        FROM factura_cliente fc
+        LEFT JOIN marcacion m ON fc.CODIGOMARCACION = m.CODIGO
+        LEFT JOIN cliente c ON m.CODIGOCLIENTE = c.CODIGO
+        WHERE fc.CODIGO = ".$codigo_factura_cliente;
+    $res_cab = mysqli_query($link, $sql_cab);
+    if(!$res_cab || mysqli_num_rows($res_cab) == 0)
+        return "";
+    $cab             = mysqli_fetch_assoc($res_cab);
+    $datos_bancarios = (string)$cab["DATOSBANCARIOS"];
+
+    // Steems y flores por grupo de producto.
+    $sql_grp = "SELECT
+        COALESCE((
+            SELECT MIN(tp.CAMPOE1)
+            FROM tipo_producto tp
+            WHERE UPPER(TRIM(tp.NOMBRE)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBREINGLES)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBRE)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+               OR UPPER(TRIM(tp.NOMBREINGLES)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+        ), 99) AS ORDENGRUPO,
+        UPPER(TRIM(d.PRODUCTO)) AS PRODUCTO,
+        SUM(d.TALLOSTOTAL) AS STEEMS,
+        SUM(d.PRECIOTOTAL) AS FLORES
+        FROM detalle_factura_cliente d
+        WHERE d.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND d.ESTADO >= 0
+        GROUP BY UPPER(TRIM(d.PRODUCTO))
+        ORDER BY ORDENGRUPO, PRODUCTO";
+    $res_grp   = mysqli_query($link, $sql_grp);
+    $total_grp = ($res_grp) ? mysqli_num_rows($res_grp) : 0;
+
+    $titulos_producto = array(
+        'ROSA' => 'ROSES', 'CLAVEL' => 'CARNATIONS',
+        'GYPSOPHILA' => 'GYPSOPHILA', 'GYPSO' => 'GYPSOPHILA',
+        'HIDRANGEA' => 'HYDRANGEAS', 'ALSTROEMERIA' => 'ALSTROEMERIA',
+        'CARNATION' => 'CARNATIONS', 'SPRAY' => 'SPRAY ROSES',
+        'ROSA SPRAY' => 'SPRAY ROSES', 'CLAVEL SPRAY' => 'SPRAY CARNATIONS'
+        );
+
+    $filas_izq = "";
+    $filas_der = "";
+    for($i=1; $i<=$total_grp; $i++)
+        {
+        $g       = mysqli_fetch_assoc($res_grp);
+        $prod    = strtoupper(trim((string)$g["PRODUCTO"]));
+        $titulo  = isset($titulos_producto[$prod]) ? $titulos_producto[$prod] : $prod;
+        $steems  = (int)$g["STEEMS"];
+        $flores  = (float)$g["FLORES"];
+        $filas_izq .= '<tr><td style="padding:2px 8px;">- TOTAL '.htmlspecialchars($titulo, ENT_QUOTES, "UTF-8").' STEEMS:</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($steems).'</td></tr>';
+        $filas_der .= '<tr><td style="padding:2px 8px;">'.htmlspecialchars($titulo, ENT_QUOTES, "UTF-8").':</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($flores, 2).'</td></tr>';
+        }
+
+    // Cobros: COMISION (tipo 1) vs extras (resto).
+    $sql_com = "SELECT
+        SUM(CASE WHEN CODIGOTIPOCOBRO = 1 THEN MONTO ELSE 0 END) AS COMISION,
+        SUM(CASE WHEN CODIGOTIPOCOBRO <> 1 THEN MONTO ELSE 0 END) AS EXTRAS
+        FROM cobro_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0";
+    $res_com  = mysqli_query($link, $sql_com);
+    $comision = 0;
+    $extras   = 0;
+    if($res_com && mysqli_num_rows($res_com) > 0)
+        {
+        $fcm      = mysqli_fetch_assoc($res_com);
+        $comision = (float)$fcm["COMISION"];
+        $extras   = (float)$fcm["EXTRAS"];
+        }
+
+    $total_fulles  = (float)$cab["TOTALFULLES"];
+    $total_tallos  = (int)$cab["TOTALTALLOS"];
+    $total_peso    = (float)$cab["TOTALPESO"];
+    $total_flores  = (float)$cab["TOTALFLORES"];
+    $total_invoice = (float)$cab["TOTALINVOICE"];
+
+    $html  = '<div style="margin-top:20px; display:flex; gap:30px; flex-wrap:wrap;">';
+    // Columna izquierda: steems y pesos.
+    $html .= '<div style="flex:1; min-width:280px;">';
+    $html .= '<table style="width:100%; font-size:12px;">';
+    $html .= '<tr><td style="padding:2px 8px; font-weight:bold; color:#88010e;">TOTAL FULL:</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($total_fulles, 2).'</td></tr>';
+    $html .= $filas_izq;
+    $html .= '<tr style="border-top:2px solid #88010e;"><td style="padding:4px 8px; font-weight:bold;">TOTAL STEEMS:</td><td style="padding:4px 8px; text-align:right; font-weight:bold;">'.number_format($total_tallos).'</td></tr>';
+    $html .= '<tr><td style="padding:2px 8px; font-weight:bold;">TOTAL WEIGHT:</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($total_peso, 2).'</td></tr>';
+    $html .= '</table>';
+    $html .= '</div>';
+    // Columna derecha: montos.
+    $html .= '<div style="flex:1; min-width:280px;">';
+    $html .= '<table style="width:100%; font-size:12px;">';
+    $html .= $filas_der;
+    $html .= '<tr><td style="padding:2px 8px;">COMMISSION:</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($comision, 2).'</td></tr>';
+    $html .= '<tr><td style="padding:2px 8px;">AWB + EXTRAS:</td><td style="padding:2px 8px; text-align:right; font-weight:bold;">'.number_format($extras, 2).'</td></tr>';
+    $html .= '<tr style="border-top:2px solid #88010e;"><td style="padding:4px 8px; font-weight:bold; color:#88010e; font-size:14px;">TOTAL INVOICE:</td><td style="padding:4px 8px; text-align:right; font-weight:bold; color:#88010e; font-size:14px;">'.number_format($total_invoice, 2).'</td></tr>';
+    $html .= '</table>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    // Datos bancarios del cliente (cliente.DATOSBANCARIOS). Si esta vacio o
+    // NULL, no se muestra la seccion.
+    if(!empty($datos_bancarios))
+        {
+        $html .= '<div style="margin-top:22px; padding:12px; background:#f7f7f7; border:1px solid #ddd; border-radius:4px; font-size:12px; line-height:1.7;">';
+        $html .= '<div style="color:#88010e; font-weight:bold; margin-bottom:8px;">BANK INFORMATION</div>';
+        $html .= '<pre style="font-size:12px; font-family:monospace; white-space:pre-wrap; margin:0;">'.htmlspecialchars($datos_bancarios).'</pre>';
+        $html .= '</div>';
+        }
+
+    return $html;
+    }
+
+// HTML completo del detalle del invoice: secciones de grid por producto +
+// cobros + totales + datos bancarios. Se recarga completo tras cada edicion.
+function detalle_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return "Invoice invalido";
+
+    $cms       = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $total_cms = count($cms);
+
+    // Detalle con grupo de producto (ORDENGRUPO desde tipo_producto.CAMPOE1).
+    $sql = "SELECT d.CODIGO AS CODIGO, d.PRODUCTO AS PRODUCTO, d.FINCA AS FINCA,
+        d.VARIEDAD AS VARIEDAD, d.LARGO AS LARGO, d.TALLOSTOTAL AS TALLOSTOTAL,
+        d.PRECIOUNITARIO AS PRECIOUNITARIO, d.PRECIOTOTAL AS PRECIOTOTAL,
+        d.FB AS FB, d.NUMEROCAJA AS NUMEROCAJA, d.TIPOCAJA AS TIPOCAJA,
+        COALESCE((
+            SELECT MIN(tp.CAMPOE1)
+            FROM tipo_producto tp
+            WHERE UPPER(TRIM(tp.NOMBRE)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBREINGLES)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBRE)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+               OR UPPER(TRIM(tp.NOMBREINGLES)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+        ), 99) AS ORDENGRUPO
+        FROM detalle_factura_cliente d
+        WHERE d.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND d.ESTADO >= 0
+        ORDER BY ORDENGRUPO, d.PRODUCTO, d.INDICELINEA, d.FINCA, d.NUMEROCAJA";
+    $res   = mysqli_query($link, $sql);
+    $total = ($res) ? mysqli_num_rows($res) : 0;
+
+    // Agrupar por PRODUCTO manteniendo el orden.
+    $grupos       = array();
+    $orden_grupos = array();
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila = mysqli_fetch_assoc($res);
+        $prod = strtoupper(trim((string)$fila["PRODUCTO"]));
+        if($prod == "")
+            $prod = "OTRO";
+        if(!isset($grupos[$prod]))
+            {
+            $grupos[$prod]  = array();
+            $orden_grupos[] = $prod;
+            }
+        $grupos[$prod][] = $fila;
+        }
+
+    $titulos_producto = array(
+        'ROSA' => 'ROSES', 'CLAVEL' => 'CARNATIONS',
+        'GYPSOPHILA' => 'GYPSOPHILA', 'GYPSO' => 'GYPSOPHILA',
+        'HIDRANGEA' => 'HYDRANGEAS', 'ALSTROEMERIA' => 'ALSTROEMERIA',
+        'CARNATION' => 'CARNATIONS', 'SPRAY' => 'SPRAY ROSES',
+        'ROSA SPRAY' => 'SPRAY ROSES', 'CLAVEL SPRAY' => 'SPRAY CARNATIONS'
+        );
+
+    $html = "";
+    if($total == 0)
+        $html .= '<p style="color:#888; text-align:center; padding:20px;">No hay lineas de detalle en este invoice.</p>';
+
+    $total_grupos = count($orden_grupos);
+    for($g=1; $g<=$total_grupos; $g++)
+        {
+        $nombre_grupo = $orden_grupos[$g-1];
+        $lineas       = $grupos[$nombre_grupo];
+        $total_lineas = count($lineas);
+        $titulo       = isset($titulos_producto[$nombre_grupo]) ? $titulos_producto[$nombre_grupo] : $nombre_grupo;
+
+        $html .= '<div style="margin-top:14px;">';
+        $html .= '<div style="background:#88010e; color:#fff; font-weight:bold; font-size:13px; padding:5px 10px; border-radius:4px 4px 0 0;">'.htmlspecialchars($titulo, ENT_QUOTES, "UTF-8").'</div>';
+        $html .= '<table class="grid_invoice_detalle" style="width:100%; border-collapse:collapse; font-size:11px;">';
+        $html .= '<tr style="background:#970202; color:#fff;">';
+        $html .= '<th style="padding:3px 4px;">FB</th>';
+        $html .= '<th style="padding:3px 4px;">FARM</th>';
+        $html .= '<th style="padding:3px 4px;">VARIETY</th>';
+        for($c=0; $c<$total_cms; $c++)
+            $html .= '<th style="padding:3px 3px; width:32px; text-align:center;">'.$cms[$c].'</th>';
+        $html .= '<th style="padding:3px 4px; text-align:right;">ST PRICE</th>';
+        $html .= '<th style="padding:3px 4px; text-align:right;">TOTAL</th>';
+        $html .= '</tr>';
+
+        // Acumuladores de la seccion.
+        $tot_fb     = 0;
+        $tot_cm     = array();
+        for($tc=0; $tc<$total_cms; $tc++)
+            $tot_cm[$tc] = 0;
+        $tot_costo  = 0;
+
+        for($l=1; $l<=$total_lineas; $l++)
+            {
+            $d            = $lineas[$l-1];
+            $codigo_linea = (int)$d["CODIGO"];
+            $fb           = (float)$d["FB"];
+            $fb_disp      = _fmt_fb_fc($fb);
+            $largo        = ($d["LARGO"] !== null) ? (int)$d["LARGO"] : null;
+            $tallos       = ($d["TALLOSTOTAL"] !== null) ? (int)$d["TALLOSTOTAL"] : null;
+            $finca_disp   = htmlspecialchars(strtoupper((string)$d["FINCA"]), ENT_QUOTES, "UTF-8");
+            $var_disp     = htmlspecialchars(strtoupper((string)$d["VARIEDAD"]), ENT_QUOTES, "UTF-8");
+
+            $bg = ($l % 2 == 0) ? "#f9f9f9" : "#fff";
+            $html .= '<tr data-codigo="'.$codigo_linea.'" style="background:'.$bg.';">';
+            $html .= '<td style="padding:2px 4px; text-align:center; border:1px solid #ddd;">'.$fb_disp.'</td>';
+            $html .= '<td style="padding:2px 4px; border:1px solid #ddd;">'.$finca_disp.'</td>';
+            $html .= '<td class="celda_editable_fc" data-codigo="'.$codigo_linea.'" data-campo="VARIEDAD" style="padding:2px 4px; border:1px solid #ddd; cursor:pointer;">'.$var_disp.'</td>';
+
+            for($c=0; $c<$total_cms; $c++)
+                {
+                $val = "";
+                if($largo !== null && $largo == $cms[$c] && $tallos !== null)
+                    {
+                    $val = (string)$tallos;
+                    $tot_cm[$c] += $tallos;
+                    }
+                $html .= '<td class="celda_editable_fc celda_cm_fc" data-codigo="'.$codigo_linea.'" data-campo="CM_'.$cms[$c].'" style="padding:2px 3px; text-align:center; border:1px solid #ddd; cursor:pointer;">'.$val.'</td>';
+                }
+
+            $precio_u = ($d["PRECIOUNITARIO"] !== null) ? number_format((float)$d["PRECIOUNITARIO"], 2) : "";
+            $precio_t = ($d["PRECIOTOTAL"] !== null) ? number_format((float)$d["PRECIOTOTAL"], 2) : "";
+            $html .= '<td class="celda_editable_fc" data-codigo="'.$codigo_linea.'" data-campo="PRECIOUNITARIO" style="padding:2px 4px; text-align:right; border:1px solid #ddd; cursor:pointer;">'.$precio_u.'</td>';
+            $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd;">'.$precio_t.'</td>';
+            $html .= '</tr>';
+
+            $tot_fb += $fb;
+            if($d["PRECIOTOTAL"] !== null)
+                $tot_costo += (float)$d["PRECIOTOTAL"];
+            }
+
+        // Fila TOTAL de la seccion.
+        $html .= '<tr style="background:#f0f0f0; font-weight:bold;">';
+        $html .= '<td style="padding:2px 4px; text-align:center; border:1px solid #ccc;">'.number_format($tot_fb, 2).'</td>';
+        $html .= '<td style="padding:2px 4px; border:1px solid #ccc;">TOTAL</td>';
+        $html .= '<td style="padding:2px 4px; border:1px solid #ccc;"></td>';
+        for($c=0; $c<$total_cms; $c++)
+            $html .= '<td style="padding:2px 3px; text-align:center; border:1px solid #ccc;">'.(($tot_cm[$c] > 0) ? $tot_cm[$c] : "").'</td>';
+        $html .= '<td style="padding:2px 4px; border:1px solid #ccc;"></td>';
+        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ccc;">'.number_format($tot_costo, 2).'</td>';
+        $html .= '</tr>';
+        $html .= '</table>';
+        $html .= '</div>';
+        }
+
+    // Seccion de cobros.
+    $html .= lista_cobros_factura_cliente_dsft($codigo_factura_cliente);
+
+    // Totales generales + datos bancarios.
+    $html .= render_totales_factura_cliente_dsft($codigo_factura_cliente);
+
+    return $html;
+    }
+
+// EXCEL DEL INVOICE (PhpSpreadsheet). Endpoint de DESCARGA: manda headers de
+// xlsx y escribe a php://output. Mismo patron que generar_consolidado_dsft pero
+// leyendo de factura_cliente / detalle_factura_cliente, SIN columnas internas
+// (FARM PR / F TOTAL / PROFIT), CON seccion de cobros y datos bancarios.
+function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = "xlsx")
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    $formato                = strtolower(trim((string)$formato));
+
+    require_once __DIR__ . '/vendor/autoload.php';
+
+    // 1) Cabecera del invoice + datos bancarios del cliente (via marcacion).
+    $sql_cab = "SELECT fc.NUMEROINVOICE AS NUMEROINVOICE, fc.FECHAINVOICE AS FECHAINVOICE,
+        fc.FECHAVUELO AS FECHAVUELO, fc.NOMBREMARCACION AS NOMBREMARCACION,
+        fc.PAIS AS PAIS, fc.LABEL AS LABEL, fc.AWB AS AWB,
+        fc.TOTALFLORES AS TOTALFLORES, fc.TOTALCOBROS AS TOTALCOBROS,
+        fc.TOTALINVOICE AS TOTALINVOICE, fc.TOTALFULLES AS TOTALFULLES,
+        fc.TOTALTALLOS AS TOTALTALLOS, fc.TOTALPESO AS TOTALPESO,
+        c.DATOSBANCARIOS AS DATOSBANCARIOS
+        FROM factura_cliente fc
+        LEFT JOIN marcacion m ON fc.CODIGOMARCACION = m.CODIGO
+        LEFT JOIN cliente c ON m.CODIGOCLIENTE = c.CODIGO
+        WHERE fc.CODIGO = ".$codigo_factura_cliente;
+    $res_cab = mysqli_query($link, $sql_cab);
+    if(!$res_cab || mysqli_num_rows($res_cab) == 0)
+        {
+        echo "Invoice no encontrado";
+        return;
+        }
+    $cab             = mysqli_fetch_assoc($res_cab);
+    $datos_bancarios = (string)$cab["DATOSBANCARIOS"];
+
+    $num_invoice = (trim((string)$cab["NUMEROINVOICE"]) != "") ? (string)$cab["NUMEROINVOICE"] : (string)$codigo_factura_cliente;
+
+    // 2) Detalle agrupado por producto.
+    $sql_det = "SELECT d.NUMEROCAJA AS NUMEROCAJA, d.TIPOCAJA AS TIPOCAJA,
+        d.PRODUCTO AS PRODUCTO, d.FINCA AS FINCA, d.VARIEDAD AS VARIEDAD,
+        d.LARGO AS LARGO, d.TALLOSTOTAL AS TALLOSTOTAL, d.FB AS FB,
+        d.PRECIOUNITARIO AS PRECIOUNITARIO, d.PRECIOTOTAL AS PRECIOTOTAL,
+        COALESCE((
+            SELECT MIN(tp.CAMPOE1)
+            FROM tipo_producto tp
+            WHERE UPPER(TRIM(tp.NOMBRE)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBREINGLES)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBRE)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+               OR UPPER(TRIM(tp.NOMBREINGLES)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+        ), 99) AS ORDENGRUPO
+        FROM detalle_factura_cliente d
+        WHERE d.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND d.ESTADO >= 0
+        ORDER BY ORDENGRUPO, d.PRODUCTO, d.INDICELINEA, d.FINCA, d.NUMEROCAJA";
+    $res_det   = mysqli_query($link, $sql_det);
+    $total_det = ($res_det) ? mysqli_num_rows($res_det) : 0;
+
+    $grupos = array();
+    for($di=1; $di<=$total_det; $di++)
+        {
+        $fila = mysqli_fetch_assoc($res_det);
+        $prod = strtoupper(trim((string)$fila["PRODUCTO"]));
+        if($prod == "")
+            $prod = "OTRO";
+        if(!isset($grupos[$prod]))
+            $grupos[$prod] = array();
+        $grupos[$prod][] = $fila;
+        }
+
+    // 3) Construir el Excel.
+    $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+    $sheet       = $spreadsheet->getActiveSheet();
+    // NOTA: el fondo blanco NO se aplica como estilo por defecto de toda la hoja
+    // (marcaria todas las celdas como usadas y Google Drive generaria paginas en
+    // blanco al exportar a PDF). Se aplica al final solo al rango con datos.
+    $sheet->setTitle('Invoice');
+
+    // Logo de la empresa embebido en A1 (queda dentro del .xlsx).
+    $ruta_logo = __DIR__ . '/images/logo_diva_esp.png';
+    if(file_exists($ruta_logo))
+        {
+        $logo = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
+        $logo->setName('Logo');
+        $logo->setDescription('Logo DIVA');
+        $logo->setPath($ruta_logo);
+        $logo->setCoordinates('A1');
+        // PNG nativo 420x156 (proporcion 2.69). Con proporcion ACTIVADA y fijando
+        // solo el ancho, el alto se ajusta automatico sin deformar. 396px = ~10,5 cm
+        // de ancho (330 +20%). No llamar setHeight/setWidthAndHeight: con proporcion
+        // en false varias versiones de PhpSpreadsheet ignoran el tamano y usan el nativo.
+        $logo->setResizeProportional(true);
+        $logo->setWidth(396);
+        $logo->setWorksheet($sheet);
+        }
+
+    $cms       = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $total_cms = count($cms);
+
+    $sheet->getColumnDimension('A')->setWidth(5);
+    $sheet->getColumnDimension('B')->setWidth(22);
+    $sheet->getColumnDimension('C')->setWidth(22);
+    $col_letra = 'D';
+    for($c=0; $c<$total_cms; $c++)
+        {
+        $sheet->getColumnDimension($col_letra)->setWidth(7);
+        $col_letra++;
+        }
+    $sheet->getColumnDimension('P')->setWidth(9);
+    $sheet->getColumnDimension('Q')->setWidth(10);
+
+    // --- HEADER ---
+    // Datos superiores a la derecha: titulos en negrita en F, valores en H (filas 1-6).
+    $sheet->setCellValue('F1', 'INVOICE NUM:');
+    $sheet->setCellValue('H1', $num_invoice);
+    $sheet->setCellValue('F2', 'SHIP DATE:');
+    $sheet->setCellValue('H2', $cab["FECHAVUELO"]);
+    $sheet->setCellValue('F3', 'CUSTOMER NAME:');
+    $sheet->setCellValue('H3', strtoupper((string)$cab["NOMBREMARCACION"]));
+    $sheet->setCellValue('F4', 'ADRESS:');
+    $sheet->setCellValue('H4', strtoupper((string)$cab["PAIS"]));
+    $sheet->setCellValue('F5', 'LABEL:');
+    $sheet->setCellValue('H5', strtoupper((string)$cab["LABEL"]));
+    $sheet->setCellValue('F6', 'AWB NUMBER:');
+    // AWB como TEXTO explicito: si no, Excel lo interpreta como numero y lo
+    // muestra en notacion cientifica (1E+12).
+    $sheet->setCellValueExplicit('H6', (string)$cab["AWB"], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+    $sheet->getStyle('F1:F6')->getFont()->setBold(true);
+
+    // Info de la empresa, debajo del logo (columna A, filas 9-11).
+    $sheet->setCellValue('A9', 'DIVA FLOREX S.A.S.  RUC 1793189840001');
+    $sheet->setCellValue('A10', 'Av. 6 de Diciembre N34-155 Dpt 84, Quito, Ecuador');
+    $sheet->setCellValue('A11', 'Phone number: +593999135857, +59326010256');
+
+    $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
+
+    // El detalle (ROSES, ...) arranca en la fila 14.
+    $fila_actual = 14;
+
+    $titulos_producto = array(
+        'ROSA' => 'ROSES', 'CLAVEL' => 'CARNATIONS',
+        'GYPSOPHILA' => 'GYPSOPHILA', 'GYPSO' => 'GYPSOPHILA',
+        'HIDRANGEA' => 'HYDRANGEAS', 'ALSTROEMERIA' => 'ALSTROEMERIA',
+        'CARNATION' => 'CARNATIONS', 'SPRAY' => 'SPRAY ROSES',
+        'ROSA SPRAY' => 'SPRAY ROSES', 'CLAVEL SPRAY' => 'SPRAY CARNATIONS'
+        );
+
+    // --- SECCIONES POR PRODUCTO ---
+    $keys_grupos  = array_keys($grupos);
+    $total_grupos = count($keys_grupos);
+    // Filas con relleno de color: el fondo blanco del rango con datos las pisa,
+    // asi que se guardan aqui y se re-aplica el relleno al final. Encabezados =
+    // crimson; totales de seccion y gran total = gris claro.
+    $filas_encabezado    = array();
+    $filas_total_seccion = array();
+    $fila_total_invoice  = 0;
+    for($g=0; $g<$total_grupos; $g++)
+        {
+        $nombre_grupo = $keys_grupos[$g];
+        $lineas       = $grupos[$nombre_grupo];
+        $total_lineas = count($lineas);
+        $titulo       = isset($titulos_producto[$nombre_grupo]) ? $titulos_producto[$nombre_grupo] : strtoupper($nombre_grupo);
+
+        // Titulo de la seccion centrado sobre toda la tabla (merge A:Q).
+        $sheet->mergeCells('A'.$fila_actual.':Q'.$fila_actual);
+        $sheet->setCellValue('A'.$fila_actual, $titulo);
+        $sheet->getStyle('A'.$fila_actual)->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
+        $fila_actual++;
+
+        $headers = array('FB', 'FARM', 'VARIETY');
+        for($c=0; $c<$total_cms; $c++)
+            $headers[] = $cms[$c].'cm';
+        $headers[] = 'ST PRICE';
+        $headers[] = 'TOTAL';
+
+        $col           = 'A';
+        $total_headers = count($headers);
+        for($h=0; $h<$total_headers; $h++)
+            {
+            $sheet->setCellValue($col.$fila_actual, $headers[$h]);
+            $col++;
+            }
+        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+            array(
+            'font'      => array('bold' => true, 'color' => array('rgb' => 'FFFFFF'), 'size' => 9),
+            'fill'      => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E')),
+            'alignment' => array('horizontal' => 'center')
+            ));
+        $filas_encabezado[] = $fila_actual;
+        $fila_actual++;
+
+        $total_fb        = 0;
+        $total_cms_grupo = array();
+        for($tc=0; $tc<$total_cms; $tc++)
+            $total_cms_grupo[$tc] = 0;
+        $total_costo_grupo = 0;
+
+        for($l=0; $l<$total_lineas; $l++)
+            {
+            $lin    = $lineas[$l];
+            $largo  = ($lin["LARGO"] !== null) ? (int)$lin["LARGO"] : null;
+            $tallos = ($lin["TALLOSTOTAL"] !== null) ? (int)$lin["TALLOSTOTAL"] : null;
+            $fb     = (float)$lin["FB"];
+
+            $sheet->setCellValue('A'.$fila_actual, ($fb > 0) ? $fb : "");
+            $sheet->setCellValue('B'.$fila_actual, strtoupper((string)$lin["FINCA"]));
+            $sheet->setCellValue('C'.$fila_actual, strtoupper((string)$lin["VARIEDAD"]));
+
+            if($largo !== null && $tallos !== null)
+                {
+                $idx_cm = array_search($largo, $cms);
+                if($idx_cm !== false)
+                    {
+                    $col_cm = chr(ord('D') + $idx_cm);
+                    $sheet->setCellValue($col_cm.$fila_actual, $tallos);
+                    $total_cms_grupo[$idx_cm] += $tallos;
+                    }
+                }
+
+            if($lin["PRECIOUNITARIO"] !== null)
+                $sheet->setCellValue('P'.$fila_actual, (float)$lin["PRECIOUNITARIO"]);
+            if($lin["PRECIOTOTAL"] !== null)
+                $sheet->setCellValue('Q'.$fila_actual, (float)$lin["PRECIOTOTAL"]);
+            $sheet->getStyle('P'.$fila_actual.':Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+
+            $total_fb += $fb;
+            if($lin["PRECIOTOTAL"] !== null)
+                $total_costo_grupo += (float)$lin["PRECIOTOTAL"];
+
+            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+                array('borders' => array('allBorders' => array(
+                    'borderStyle' => 'thin', 'color' => array('rgb' => 'CCCCCC')
+                    ))));
+            $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
+            $sheet->getStyle('D'.$fila_actual.':Q'.$fila_actual)->getAlignment()->setHorizontal('right');
+            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->getFont()->setSize(9);
+            $fila_actual++;
+            }
+
+        // Fila TOTAL de la seccion: la SUMA de FB va en la columna A (FB), sin la
+        // palabra "TOTAL". Las demas columnas mantienen sus sumas.
+        $sheet->setCellValue('A'.$fila_actual, ($total_fb > 0) ? $total_fb : "");
+        for($tc=0; $tc<$total_cms; $tc++)
+            {
+            $col_cm = chr(ord('D') + $tc);
+            if($total_cms_grupo[$tc] > 0)
+                $sheet->setCellValue($col_cm.$fila_actual, $total_cms_grupo[$tc]);
+            }
+        $sheet->setCellValue('Q'.$fila_actual, $total_costo_grupo);
+        $sheet->getStyle('Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+        // Celdas de total claramente delimitadas: negrita, bordes finos en todas +
+        // borde superior mas marcado, fondo gris claro. Numeros a la derecha, FB centrado.
+        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+            array(
+            'font'      => array('bold' => true, 'size' => 9),
+            'borders'   => array(
+                'allBorders' => array('borderStyle' => 'thin', 'color' => array('rgb' => 'BBBBBB')),
+                'top'        => array('borderStyle' => 'medium', 'color' => array('rgb' => '333333'))
+                ),
+            'fill'      => array('fillType' => 'solid', 'startColor' => array('rgb' => 'F0F0F0')),
+            'alignment' => array('horizontal' => 'right')
+            ));
+        $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
+        $filas_total_seccion[] = $fila_actual;
+        $fila_actual += 3;
+        }
+
+    // --- SECCION DE COBROS ---
+    $sql_cob = "SELECT cf.NOMBRECOBRO AS NOMBRECOBRO, cf.MONTO AS MONTO,
+        cf.PORCENTAJE AS PORCENTAJE, cf.BASEPORCENTAJE AS BASEPORCENTAJE,
+        tc.NOMBRE AS NOMBRETIPO
+        FROM cobro_factura_cliente cf
+        LEFT JOIN tipo_cobro tc ON cf.CODIGOTIPOCOBRO = tc.CODIGO
+        WHERE cf.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND cf.ESTADO >= 0
+        ORDER BY cf.CODIGO";
+    $res_cob   = mysqli_query($link, $sql_cob);
+    $total_cob = ($res_cob) ? mysqli_num_rows($res_cob) : 0;
+
+    $sheet->setCellValue('A'.$fila_actual, 'ADDITIONAL CHARGES');
+    $sheet->getStyle('A'.$fila_actual)->getFont()->setBold(true)->setSize(11);
+    $fila_actual++;
+
+    $sheet->setCellValue('C'.$fila_actual, 'NAME');
+    $sheet->setCellValue('P'.$fila_actual, 'AMOUNT');
+    $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        array(
+        'font' => array('bold' => true, 'color' => array('rgb' => 'FFFFFF'), 'size' => 9),
+        'fill' => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E'))
+        ));
+    $filas_encabezado[] = $fila_actual;
+    $fila_actual++;
+
+    $suma_cobros = 0;
+    for($ci=1; $ci<=$total_cob; $ci++)
+        {
+        $co    = mysqli_fetch_assoc($res_cob);
+        $monto = (float)$co["MONTO"];
+        $suma_cobros += $monto;
+        $sheet->setCellValue('C'.$fila_actual, strtoupper((string)$co["NOMBRECOBRO"]));
+        $sheet->setCellValue('P'.$fila_actual, $monto);
+        $sheet->getStyle('P'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('P'.$fila_actual)->getAlignment()->setHorizontal('right');
+        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->getFont()->setSize(9);
+        $fila_actual++;
+        }
+
+    // Fila TOTAL de la tabla de cobros (suma de todos los cobros).
+    $sheet->setCellValue('C'.$fila_actual, 'TOTAL CHARGES');
+    $sheet->setCellValue('P'.$fila_actual, $suma_cobros);
+    $sheet->getStyle('P'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+    $sheet->getStyle('C'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        array(
+        'font'    => array('bold' => true, 'size' => 9),
+        'borders' => array('top' => array('borderStyle' => 'medium', 'color' => array('rgb' => '333333')))
+        ));
+    $sheet->getStyle('P'.$fila_actual)->getAlignment()->setHorizontal('right');
+    $fila_actual++;
+
+    // Separacion entre la tabla ADDITIONAL CHARGES y el bloque de totales.
+    $fila_actual += 3;
+
+    // --- BLOQUE DE TOTALES (dos columnas, mismos valores que la pantalla
+    // render_totales_factura_cliente_dsft). IZQ = steems/pesos, DER = precios. ---
+
+    // Steems y flores por producto (mismo query que render_totales).
+    $sql_grp = "SELECT
+        COALESCE((
+            SELECT MIN(tp.CAMPOE1)
+            FROM tipo_producto tp
+            WHERE UPPER(TRIM(tp.NOMBRE)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBREINGLES)) = UPPER(TRIM(d.PRODUCTO))
+               OR UPPER(TRIM(tp.NOMBRE)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+               OR UPPER(TRIM(tp.NOMBREINGLES)) LIKE CONCAT(UPPER(TRIM(d.PRODUCTO)), '%')
+        ), 99) AS ORDENGRUPO,
+        UPPER(TRIM(d.PRODUCTO)) AS PRODUCTO,
+        SUM(d.TALLOSTOTAL) AS STEEMS,
+        SUM(d.PRECIOTOTAL) AS FLORES
+        FROM detalle_factura_cliente d
+        WHERE d.CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND d.ESTADO >= 0
+        GROUP BY UPPER(TRIM(d.PRODUCTO))
+        ORDER BY ORDENGRUPO, PRODUCTO";
+    $res_grp    = mysqli_query($link, $sql_grp);
+    $total_grp  = ($res_grp) ? mysqli_num_rows($res_grp) : 0;
+    $grupos_tot = array();
+    for($i=1; $i<=$total_grp; $i++)
+        {
+        $g      = mysqli_fetch_assoc($res_grp);
+        $prod   = strtoupper(trim((string)$g["PRODUCTO"]));
+        $titulo = isset($titulos_producto[$prod]) ? $titulos_producto[$prod] : $prod;
+        $grupos_tot[$i] = array(
+            'TITULO' => $titulo,
+            'STEEMS' => (int)$g["STEEMS"],
+            'FLORES' => (float)$g["FLORES"]
+            );
+        }
+
+    // Comision (tipo 1) vs extras (resto).
+    $sql_com = "SELECT
+        SUM(CASE WHEN CODIGOTIPOCOBRO = 1 THEN MONTO ELSE 0 END) AS COMISION,
+        SUM(CASE WHEN CODIGOTIPOCOBRO <> 1 THEN MONTO ELSE 0 END) AS EXTRAS
+        FROM cobro_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0";
+    $res_com  = mysqli_query($link, $sql_com);
+    $comision = 0;
+    $extras   = 0;
+    if($res_com && mysqli_num_rows($res_com) > 0)
+        {
+        $fcm      = mysqli_fetch_assoc($res_com);
+        $comision = (float)$fcm["COMISION"];
+        $extras   = (float)$fcm["EXTRAS"];
+        }
+
+    $total_fulles  = (float)$cab["TOTALFULLES"];
+    $total_tallos  = (int)$cab["TOTALTALLOS"];
+    $total_peso    = (float)$cab["TOTALPESO"];
+    $total_invoice = (float)$cab["TOTALINVOICE"];
+
+    $fila_base = $fila_actual;
+
+    // COLUMNA IZQUIERDA (C = etiqueta, D = valor).
+    $row = $fila_base;
+    $sheet->setCellValue('C'.$row, 'TOTAL FULL:');
+    $sheet->setCellValue('D'.$row, number_format($total_fulles, 2));
+    $sheet->getStyle('C'.$row.':D'.$row)->getFont()->setBold(true);
+    $sheet->getStyle('D'.$row)->getAlignment()->setHorizontal('right');
+    $row++;
+    for($i=1; $i<=$total_grp; $i++)
+        {
+        $sheet->setCellValue('C'.$row, '- TOTAL '.$grupos_tot[$i]['TITULO'].' STEEMS:');
+        $sheet->setCellValue('D'.$row, number_format($grupos_tot[$i]['STEEMS']));
+        $sheet->getStyle('D'.$row)->getFont()->setBold(true);
+        $sheet->getStyle('D'.$row)->getAlignment()->setHorizontal('right');
+        $row++;
+        }
+    $sheet->setCellValue('C'.$row, 'TOTAL STEEMS:');
+    $sheet->setCellValue('D'.$row, number_format($total_tallos));
+    $sheet->getStyle('C'.$row.':D'.$row)->applyFromArray(
+        array(
+        'font'    => array('bold' => true),
+        'borders' => array('top' => array('borderStyle' => 'medium', 'color' => array('rgb' => '333333')))
+        ));
+    $sheet->getStyle('D'.$row)->getAlignment()->setHorizontal('right');
+    $row++;
+    $sheet->setCellValue('C'.$row, 'TOTAL WEIGHT:');
+    $sheet->setCellValue('D'.$row, number_format($total_peso, 2));
+    $sheet->getStyle('C'.$row.':D'.$row)->getFont()->setBold(true);
+    $sheet->getStyle('D'.$row)->getAlignment()->setHorizontal('right');
+    $row++;
+    $fila_fin_izq = $row;
+
+    // COLUMNA DERECHA (F = etiqueta, I = valor).
+    $row = $fila_base;
+    for($i=1; $i<=$total_grp; $i++)
+        {
+        $sheet->setCellValue('F'.$row, $grupos_tot[$i]['TITULO'].':');
+        $sheet->setCellValue('I'.$row, number_format($grupos_tot[$i]['FLORES'], 2));
+        $sheet->getStyle('I'.$row)->getFont()->setBold(true);
+        $sheet->getStyle('I'.$row)->getAlignment()->setHorizontal('right');
+        $row++;
+        }
+    $sheet->setCellValue('F'.$row, 'COMMISSION:');
+    $sheet->setCellValue('I'.$row, number_format($comision, 2));
+    $sheet->getStyle('I'.$row)->getFont()->setBold(true);
+    $sheet->getStyle('I'.$row)->getAlignment()->setHorizontal('right');
+    $row++;
+    $sheet->setCellValue('F'.$row, 'AWB + EXTRAS:');
+    $sheet->setCellValue('I'.$row, number_format($extras, 2));
+    $sheet->getStyle('I'.$row)->getFont()->setBold(true);
+    $sheet->getStyle('I'.$row)->getAlignment()->setHorizontal('right');
+    $row++;
+    // TOTAL INVOICE resaltado: negrita, borde superior, fondo verde claro.
+    $sheet->setCellValue('F'.$row, 'TOTAL INVOICE:');
+    $sheet->setCellValue('I'.$row, number_format($total_invoice, 2));
+    $sheet->getStyle('F'.$row.':I'.$row)->applyFromArray(
+        array(
+        'font'    => array('bold' => true, 'size' => 12),
+        'borders' => array('top' => array('borderStyle' => 'medium', 'color' => array('rgb' => '333333'))),
+        'fill'    => array('fillType' => 'solid', 'startColor' => array('rgb' => 'E6F4EA'))
+        ));
+    $sheet->getStyle('I'.$row)->getAlignment()->setHorizontal('right');
+    $fila_total_invoice = $row;
+    $row++;
+    $fila_fin_der = $row;
+
+    // Continuar debajo del bloque mas largo, con un renglon de aire.
+    $fila_actual = (($fila_fin_izq > $fila_fin_der) ? $fila_fin_izq : $fila_fin_der) + 2;
+
+    // --- DATOS BANCARIOS (cliente.DATOSBANCARIOS, una linea por renglon) ---
+    if(trim($datos_bancarios) != "")
+        {
+        $sheet->setCellValue('A'.$fila_actual, 'BANK INFORMATION');
+        $sheet->getStyle('A'.$fila_actual)->getFont()->setBold(true)->setSize(10);
+        $fila_actual++;
+
+        $bancos       = preg_split('/\r\n|\r|\n/', $datos_bancarios);
+        $total_bancos = count($bancos);
+        for($b=0; $b<$total_bancos; $b++)
+            {
+            $sheet->setCellValue('A'.$fila_actual, $bancos[$b]);
+            $sheet->getStyle('A'.$fila_actual)->getFont()->setSize(9);
+            $fila_actual++;
+            }
+        }
+
+    // Eliminar filas vacias despues del contenido para que Google Drive no
+    // genere paginas en blanco al exportar a PDF (las celdas con estilo pero
+    // sin datos se interpretan como contenido).
+    $ultima_fila_con_datos = $fila_actual - 1;
+    $max_fila_hoja = $sheet->getHighestRow();
+    if($max_fila_hoja > $ultima_fila_con_datos)
+        {
+        $sheet->removeRow($ultima_fila_con_datos + 1, $max_fila_hoja - $ultima_fila_con_datos);
+        }
+
+    // Fondo blanco SOLO en el rango con datos (no en toda la hoja).
+    $sheet->getStyle('A1:Q'.$ultima_fila_con_datos)->getFill()
+        ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+        ->getStartColor()->setRGB('FFFFFF');
+
+    // Re-aplicar SOLO el relleno de las filas con color: el fondo blanco de arriba
+    // pisa el relleno (el texto y los bordes sobreviven porque el fill blanco solo
+    // toca el relleno). Encabezados = crimson; totales de seccion = gris; el
+    // TOTAL INVOICE del bloque final = verde claro.
+    $total_encabezados = count($filas_encabezado);
+    for($e=0; $e<$total_encabezados; $e++)
+        {
+        $fh = $filas_encabezado[$e];
+        $sheet->getStyle('A'.$fh.':Q'.$fh)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('88010E');
+        }
+    $total_tot_secc = count($filas_total_seccion);
+    for($t=0; $t<$total_tot_secc; $t++)
+        {
+        $ft = $filas_total_seccion[$t];
+        $sheet->getStyle('A'.$ft.':Q'.$ft)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('F0F0F0');
+        }
+    if($fila_total_invoice > 0)
+        {
+        $sheet->getStyle('F'.$fila_total_invoice.':I'.$fila_total_invoice)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('E6F4EA');
+        }
+
+    // Forzar dimensiones de impresion.
+    $sheet->getPageSetup()->setPrintArea('A1:Q'.$ultima_fila_con_datos);
+    $sheet->getPageSetup()->setFitToWidth(1);
+    $sheet->getPageSetup()->setFitToHeight(0);
+
+    // Eliminar cualquier hoja extra que PhpSpreadsheet haya creado.
+    $cuenta_hojas = $spreadsheet->getSheetCount();
+    for($i=$cuenta_hojas; $i>=2; $i--)
+        {
+        $spreadsheet->removeSheetByIndex($i - 1);
+        }
+
+    // 4) Salida segun formato. Limpiar TODO buffer previo para no corromper el
+    // binario (xlsx/pdf) con whitespace/warnings de los includes.
+    $nombre_archivo = 'INVOICE_'.$codigo_factura_cliente.'_'
+        .strtoupper((string)$cab["NOMBREMARCACION"]).'_'.date('Ymd_His').'.xlsx';
+
+    while(ob_get_level() > 0)
+        ob_end_clean();
+
+    if($formato == "pdf")
+        {
+        try
+            {
+            // 1) Guardar xlsx temporal.
+            $tmp_xlsx = '/tmp/invoice_'.$codigo_factura_cliente.'_'.time().'.xlsx';
+            $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmp_xlsx);
+
+            // 2) Cliente Google con el token existente.
+            $client = new \Google\Client();
+            $client->setAuthConfig('/home/u154-6g3keph3vtcn/credenciales_correos/client_secret.json');
+            $token_json = file_get_contents('/home/u154-6g3keph3vtcn/credenciales_correos/token.json');
+            $token_data = json_decode($token_json, true);
+            $client->setAccessToken($token_data);
+
+            // Refrescar el token si expiro (preservando el refresh_token).
+            if($client->isAccessTokenExpired())
+                {
+                $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+                $new_token = $client->getAccessToken();
+                $new_token['refresh_token'] = $token_data['refresh_token'];
+                file_put_contents('/home/u154-6g3keph3vtcn/credenciales_correos/token.json',
+                    json_encode($new_token));
+                }
+
+            $drive = new \Google\Service\Drive($client);
+
+            // 3) Subir el xlsx a Drive convirtiendolo a Google Sheet.
+            $file_metadata = new \Google\Service\Drive\DriveFile();
+            $file_metadata->setName('invoice_temp_'.$codigo_factura_cliente.'.xlsx');
+            $file_metadata->setMimeType('application/vnd.google-apps.spreadsheet');
+
+            $contenido_xlsx = file_get_contents($tmp_xlsx);
+            $uploaded = $drive->files->create($file_metadata, array(
+                'data'       => $contenido_xlsx,
+                'mimeType'   => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'uploadType' => 'multipart',
+                'fields'     => 'id'
+                ));
+
+            $file_id = $uploaded->id;
+
+            // 4) Exportar como PDF.
+            $pdf_content = $drive->files->export($file_id, 'application/pdf', array(
+                'alt' => 'media'
+                ));
+            $pdf_body = $pdf_content->getBody()->getContents();
+
+            // 5) Borrar el archivo temporal de Drive.
+            $drive->files->delete($file_id);
+
+            // 6) Borrar el xlsx temporal local.
+            unlink($tmp_xlsx);
+
+            // 7) Servir el PDF.
+            while(ob_get_level() > 0)
+                ob_end_clean();
+
+            $nombre_pdf = str_replace('.xlsx', '.pdf', $nombre_archivo);
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="'.$nombre_pdf.'"');
+            header('Content-Length: '.strlen($pdf_body));
+            header('Cache-Control: max-age=0');
+            echo $pdf_body;
+            exit;
+            }
+        catch(\Exception $e)
+            {
+            while(ob_get_level() > 0)
+                ob_end_clean();
+            echo "Error generando PDF: ".$e->getMessage();
+            if(isset($tmp_xlsx) && file_exists($tmp_xlsx))
+                unlink($tmp_xlsx);
+            // Intentar borrar de Drive si alcanzo a subirse.
+            if(isset($drive) && isset($file_id))
+                {
+                try
+                    {
+                    $drive->files->delete($file_id);
+                    }
+                catch(\Exception $e2)
+                    {
+                    }
+                }
+            exit;
+            }
+        }
+    else
+        {
+        // Excel directo a la salida.
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="'.$nombre_archivo.'"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        }
+
+    exit;
+    }
+
+// PDF DEL INVOICE: reutiliza el generador de Excel con formato "pdf", que sube
+// el xlsx a Google Drive, lo exporta a PDF y lo sirve (mismo patron que
+// generar_consolidado_dsft).
+function generar_pdf_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    generar_excel_factura_cliente_dsft($codigo_factura_cliente, "pdf");
     exit;
     }

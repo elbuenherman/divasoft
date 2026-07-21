@@ -1,4 +1,4 @@
-<?php 
+<?php          
 include("variables_globales.php");
 include("funciones.php");
 include("funciones_v2.php");
@@ -11,7 +11,7 @@ if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft"
     echo subir_archivo_factura_dsft();
     exit;
     }
-
+ 
 $funcion = $_REQUEST['funcion'];
 if (isset($_REQUEST['parametro1'])) $parametro1 = urldecode($_REQUEST['parametro1']);
 if (isset($_REQUEST['parametro2'])) $parametro2 = $_REQUEST['parametro2'];
@@ -381,7 +381,7 @@ if($funcion == 'lista_clientes_dsft')
 if($funcion == 'devuelve_cliente_dsft')
     echo devuelve_cliente_dsft($parametro1);
 if($funcion == 'graba_cliente_dsft')
-    echo graba_cliente_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10, $parametro11, $parametro12);
+    echo graba_cliente_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10, $parametro11, $parametro12, $parametro13);
 if($funcion == 'elimina_cliente_dsft')
     echo elimina_cliente_dsft($parametro1, $parametro2);
 if($funcion == 'trazabilidad_cliente_dsft')
@@ -405,7 +405,7 @@ if($funcion == 'lista_marcaciones_dsft')
 if($funcion == 'devuelve_marcacion_dsft')
     echo devuelve_marcacion_dsft($parametro1);
 if($funcion == 'graba_marcacion_dsft')
-    echo graba_marcacion_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
+    echo graba_marcacion_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7, $parametro8, $parametro9, $parametro10);
 if($funcion == 'elimina_marcacion_dsft')
     echo elimina_marcacion_dsft($parametro1, $parametro2);
 if($funcion == 'trazabilidad_marcacion_dsft')
@@ -492,6 +492,41 @@ if($funcion == 'grabar_tipo_cobro_dsft')
     echo grabar_tipo_cobro_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6, $parametro7);
 if($funcion == 'elimina_tipo_cobro_dsft')
     echo elimina_tipo_cobro_dsft($parametro1, $parametro2);
+
+// INVOICE CLIENTE (factura_cliente)
+if($funcion == 'verifica_factura_cliente_dsft')
+    echo verifica_factura_cliente_dsft($parametro1);
+if($funcion == 'crear_o_abrir_factura_cliente_dsft')
+    echo crear_o_abrir_factura_cliente_dsft($parametro1);
+if($funcion == 'crear_factura_cliente_nueva_dsft')
+    echo crear_factura_cliente_nueva_dsft($parametro1, $parametro2);
+if($funcion == 'eliminar_factura_cliente_fisico_dsft')
+    echo eliminar_factura_cliente_fisico_dsft($parametro1);
+if($funcion == 'detalle_factura_cliente_dsft')
+    echo detalle_factura_cliente_dsft($parametro1);
+if($funcion == 'actualizar_celda_detalle_factura_cliente_dsft')
+    echo actualizar_celda_detalle_factura_cliente_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'actualizar_cabecera_factura_cliente_dsft')
+    echo actualizar_cabecera_factura_cliente_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'lista_cobros_factura_cliente_dsft')
+    echo lista_cobros_factura_cliente_dsft($parametro1);
+if($funcion == 'agregar_cobro_factura_cliente_dsft')
+    echo agregar_cobro_factura_cliente_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'eliminar_cobro_factura_cliente_dsft')
+    echo eliminar_cobro_factura_cliente_dsft($parametro1);
+if($funcion == 'recalcular_totales_factura_cliente_dsft')
+    echo recalcular_totales_factura_cliente_dsft($parametro1);
+// Descarga del invoice (xlsx o pdf): NO hacen echo, mandan headers y exit.
+if($funcion == 'generar_excel_factura_cliente_dsft')
+    {
+    generar_excel_factura_cliente_dsft($parametro1);
+    exit;
+    }
+if($funcion == 'generar_pdf_factura_cliente_dsft')
+    {
+    generar_pdf_factura_cliente_dsft($parametro1);
+    exit;
+    }
 
 
 mysqli_close($link);

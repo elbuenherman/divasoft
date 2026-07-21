@@ -1,12 +1,12 @@
-<?php   
+<?php                
 include("variables_globales.php");  
 include("funciones.php");
 include("valida_sesion.php");      
 // CHEQUEO PERMISOS        
-$permiso[] = NULL;       
+$permiso[] = NULL;        
 consulta_permisos($_SESSION['s_codigo'], $permiso);  
 $usuario_web = $_SESSION['s_codigo'];
-  
+   
 $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
 
@@ -763,6 +763,182 @@ function descargar_consolidado(codigo_consolidado, formato)
     window.open("funciones_ajax.php?funcion=generar_consolidado_dsft"
         + "&parametro1=" + codigo_consolidado
         + "&parametro2=" + formato, "_blank");
+    }
+
+// ===== FACTURA CLIENTE (INVOICE) =====
+// Si NO existe invoice: crea directamente y abre. Si YA existen: dialog jQuery UI
+// crimson con la mini-lista de todos los invoices + boton CREAR NUEVO.
+function abrir_factura_cliente(codigo_consolidado)
+    {
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=verifica_factura_cliente_dsft&parametro1=" + codigo_consolidado;
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        $("#id_espera").hide();
+        var datos = JSON.parse(data);
+        if(datos.EXISTE == "SI")
+            {
+            // Construir mini-lista de invoices.
+            var html = '<table style="width:100%; font-size:12px; border-collapse:collapse; margin-bottom:12px;">';
+            html += '<tr style="background:#970202; color:#fff;">';
+            html += '<th style="padding:4px 8px; text-align:center;">INVOICE</th>';
+            html += '<th style="padding:4px 8px; text-align:center;">FECHA</th>';
+            html += '<th style="padding:4px 8px; text-align:center;">OPC</th>';
+            html += '</tr>';
+            var invoices = datos.INVOICES;
+            for(var key in invoices)
+                {
+                var inv = invoices[key];
+                var num_display = (inv.NUMEROINVOICE != "") ? inv.NUMEROINVOICE : inv.CODIGO;
+                // Usuario creador junto al codigo/numero (ej: "9 - HDIENER"). Vacio si no hay.
+                var usuario_display = (inv.USERNAME && inv.USERNAME != "") ? (" - " + inv.USERNAME) : "";
+                // Fecha (solo la parte de fecha) + hora HH:MM:SS tomada de FECHAREGISTRO (datetime).
+                var fecha_raw = (inv.FECHAINVOICE != "" && inv.FECHAINVOICE != null) ? inv.FECHAINVOICE : inv.FECHAREGISTRO;
+                var solo_fecha = (fecha_raw && fecha_raw.indexOf(" ") > -1) ? fecha_raw.split(" ")[0] : fecha_raw;
+                var hora = "";
+                if(inv.FECHAREGISTRO && inv.FECHAREGISTRO.indexOf(" ") > -1)
+                    {
+                    var hms = inv.FECHAREGISTRO.split(" ")[1].split(":");
+                    if(hms.length >= 3)
+                        hora = hms[0] + ":" + hms[1] + ":" + hms[2];
+                    else if(hms.length == 2)
+                        hora = hms[0] + ":" + hms[1];
+                    }
+                var fecha_display = solo_fecha + (hora != "" ? " " + hora : "");
+                var bg = (parseInt(key) % 2 == 0) ? "#f9f9f9" : "#fff";
+                html += '<tr style="background:' + bg + ';">';
+                html += '<td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:center;"><strong>' + num_display + usuario_display + '</strong></td>';
+                html += '<td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:center;">' + fecha_display + '</td>';
+                html += '<td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:center;">';
+                html += '<a onclick="$(\'#id_dialog_invoice_cliente\').dialog(\'close\'); window.open(\'consola_factura_cliente.php?codigo=' + inv.CODIGO + '\', \'_blank\');" style="cursor:pointer; color:#2196F3; font-size:14px;" title="Abrir"><i class="icon-arrow-right-3"></i></a>';
+                html += '<a onclick="confirmar_borrar_invoice(' + inv.CODIGO + ', ' + codigo_consolidado + ');" style="cursor:pointer; color:#c62828; font-size:14px; margin-left:8px;" title="Borrar"><i class="icon-remove"></i></a>';
+                html += '</td>'; 
+                html += '</tr>';
+                }
+            html += '</table>';
+
+            $("#id_dialog_invoice_cliente").html(html);
+            $("#id_dialog_invoice_cliente").dialog(
+                {
+                modal: true,
+                width: 450,
+                title: "Invoices del Consolidado",
+                dialogClass: 'myTitleClass',
+                buttons:
+                    [
+                    {
+                    text: "CREAR NUEVO",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        crear_invoice_nuevo(codigo_consolidado);
+                        }
+                    },
+                    {
+                    text: "CANCELAR",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        }
+                    }
+                    ]
+                });
+            }
+        else
+            {
+            // No existe — crear directamente sin preguntar.
+            crear_invoice_nuevo(codigo_consolidado);
+            }
+        });
+    }
+
+function crear_invoice_nuevo(codigo_consolidado)
+    {
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=crear_factura_cliente_nueva_dsft&parametro1=" + codigo_consolidado
+        + "&parametro2=" + global_codigo_usuario;
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        $("#id_espera").hide();
+        var resp = data.trim();
+        if(resp.indexOf("ERROR:") === 0)
+            {
+            messageBox(resp);
+            return;
+            }
+        var codigo_nuevo = parseInt(resp);
+        if(isNaN(codigo_nuevo) || codigo_nuevo <= 0)
+            {
+            messageBox("Error al crear el invoice. Respuesta del servidor: [" + resp + "]");
+            return;
+            }
+        window.open("consola_factura_cliente.php?codigo=" + codigo_nuevo, "_blank");
+        });
+    }
+
+// Confirmacion (dialog jQuery UI del sistema) para borrado FISICO de un invoice.
+function confirmar_borrar_invoice(codigo, codigo_consolidado)
+    {
+    $("#id_dialog_confirma_factura").html("<p>&iquest;Desea borrar esta factura?</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 350,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "SI",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    borrar_invoice_fisico(codigo, codigo_consolidado);
+                    }
+                },
+                {
+                text: "NO",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    }
+                }
+            ]
+        });
+    }
+
+// Borrado FISICO del invoice + recarga de la mini-lista. Si tras borrar no
+// quedan invoices, NO reabrir el dialog (abrir_factura_cliente auto-crearia uno).
+function borrar_invoice_fisico(codigo, codigo_consolidado)
+    {
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=eliminar_factura_cliente_fisico_dsft&parametro1=" + codigo;
+    var obj_ajax = $.get(url, function(data, status){;});
+    obj_ajax.success(function(data, status)
+        {
+        $("#id_espera").hide();
+        if(data.trim() != "OK")
+            {
+            messageBox("Error al borrar: " + data);
+            return;
+            }
+        $("#id_dialog_invoice_cliente").dialog("close");
+        // Verificar si quedan invoices para decidir si reabrir la mini-lista.
+        var url_v = "funciones_ajax.php?funcion=verifica_factura_cliente_dsft&parametro1=" + codigo_consolidado;
+        $.get(url_v, function(data_v)
+            {
+            var datos_v = JSON.parse(data_v);
+            if(datos_v.EXISTE == "SI")
+                abrir_factura_cliente(codigo_consolidado);
+            else
+                messageBox("No quedan facturas para este consolidado.");
+            });
+        });
     }
 
 // ===== AÑADIR FACTURA A UN CONSOLIDADO =====
@@ -2023,6 +2199,7 @@ $(document).ready(function()
     <!-- DIALOGOS -->
     <div id="dialog" title="Alerta"></div>
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
+    <div id="id_dialog_invoice_cliente" title="Invoice Cliente"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
     <!-- Mini-menu flotante de formato (Excel / PDF) del icono puzzle. -->

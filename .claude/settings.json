@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l funciones_v2.php funciones_ajax.php consola_consolidado.php funciones.php)",
+      "Bash(ls -la consola_factura_cliente.php)",
+      "Read(//Applications/AMPPS/**)",
+      "Bash(php -v)",
+      "Bash(php -l consola_consolidado.php)",
+      "Bash(awk 'NR>=406 && NR<=700 && /return/' funciones_v2.php)",
+      "Bash(grep -niE 'timezone|DateTimeZone|America/|\\\\$tz')",
+      "Bash(php -l cron_extraer_correos.php)"
+    ]
+  }
+}

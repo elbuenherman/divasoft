@@ -1,5 +1,5 @@
 <?php
-include("variables_globales.php");
+include("variables_globales.php"); 
 include("funciones.php");
 include("valida_sesion.php");  
 // CHEQUEO PERMISOS    
@@ -301,6 +301,7 @@ function devuelve_cliente(codigo)
         var pais_val = (datos.CODIGOPAIS && parseInt(datos.CODIGOPAIS) > 0) ? datos.CODIGOPAIS.toString() : "0";
         $("#id_codigopais").val(pais_val).trigger('change');
         $("#id_observaciones").val(datos.OBSERVACIONES || "");
+        $("#id_datos_bancarios").val(datos.DATOSBANCARIOS || "");
         if(parseInt(datos.ESTADO) == 0)
             {
             $("#id_estado_activo").prop('checked', false);
@@ -396,7 +397,8 @@ function grabar_cliente()
         + "&parametro9=" + encodeURIComponent($("#id_observaciones").val())
         + "&parametro10=" + estado_val
         + "&parametro11=" + global_codigo_usuario
-        + "&parametro12=" + $("#id_codigopais").val();
+        + "&parametro12=" + $("#id_codigopais").val()
+        + "&parametro13=" + encodeURIComponent($("#id_datos_bancarios").val());
     var obj_ajax = $.get(url, function(data, status){;});
     obj_ajax.success(function(data, status)
         {
@@ -458,6 +460,7 @@ function boton_nuevo()
     $("#id_ciudad").val("");
     $("#id_codigopais").val("0").trigger('change');
     $("#id_observaciones").val("");
+    $("#id_datos_bancarios").val("");
     $("#id_estado_activo").prop('checked', true);
     $("#id_estado_inactivo").prop('checked', false);
     $("#id_tbody_marcaciones_cliente").html('<tr><td colspan="4" class="td_vacio">Seleccione un cliente para ver sus marcaciones</td></tr>');
@@ -602,6 +605,15 @@ $(document).ready(function()
                         <td style="padding-bottom: 8px;">
                             <textarea id="id_observaciones" maxlength="500" rows="4"
                                 style="width: 100%; text-transform: uppercase; font-size: 12px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
+                        </td>
+                    </tr>
+                    <!-- DATOS BANCARIOS -->
+                    <tr>
+                        <td style="text-align: right; padding-right: 8px; padding-bottom: 8px; vertical-align: top; white-space: nowrap;">DATOS BANCO:</td>
+                        <td style="padding-bottom: 8px;">
+                            <textarea id="id_datos_bancarios" maxlength="2000" rows="6"
+                                style="width: 100%; font-size: 11px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: vertical; font-family: monospace; text-transform: uppercase;"
+                                placeholder="BANK: ...&#10;SWIFT CODE: ...&#10;BENEFICIARY: ...&#10;ACCOUNT: ..."></textarea>
                         </td>
                     </tr>
                     <!-- ESTADO -->
