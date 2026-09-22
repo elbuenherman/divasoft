@@ -1,5 +1,5 @@
 <?php
- 
+  
 // ============================================================================
 //  cron_procesar_facturas.php  (CLI - cron cada 3 minutos en SiteGround)
 //  Procesa con IA UN adjunto pendiente por corrida (el mas reciente).
@@ -48,8 +48,9 @@ mysqli_query($link, "SET CHARACTER SET utf8");
 $php_bin  = "/usr/local/bin/php";
 $ruta_cli = __DIR__ . "/procesa_factura_final_cli_haiku.php";
 
-$ruta_lock = "/tmp/lock_cron_procesar.txt";
-$ruta_log  = "/tmp/cron_procesar_".date("Ymd").".log";
+$ruta_lock  = "/tmp/lock_cron_procesar.txt";
+$ruta_log   = "/tmp/cron_procesar_".date("Ymd").".log";
+$ruta_pausa = "/tmp/pausa_cron_ia.txt"; // pausa automatica por error de saldo/key
 
 // ----------------------------------------------------------------------------
 // Log del dia (append) + stdout.
@@ -59,6 +60,23 @@ function log_cron($ruta_log, $mensaje)
     $linea = "[".date("Y-m-d H:i:s")."] ".$mensaje."\n";
     file_put_contents($ruta_log, $linea, FILE_APPEND);
     echo $linea;
+    }
+
+// ----------------------------------------------------------------------------
+// PAUSA por error de API (saldo/key): si se activo hace menos de 1 hora, no
+// intentar nada (todos los adjuntos fallarian igual y solo llenarian el log).
+// Se reanuda solo al cumplir la hora. La activa el post-proceso de mas abajo.
+// ----------------------------------------------------------------------------
+if(file_exists($ruta_pausa))
+    {
+    $edad_pausa = time() - filemtime($ruta_pausa);
+    if($edad_pausa < 3600)
+        {
+        log_cron($ruta_log, "EN PAUSA por error de API (saldo/key) hace ".$edad_pausa."s. No se intenta (se reanuda al cumplir 1h).");
+        exit(0);
+        }
+    unlink($ruta_pausa);
+    log_cron($ruta_log, "Pausa de API vencida (".$edad_pausa."s). Se reanuda el procesamiento.");
     }
 
 // ----------------------------------------------------------------------------
@@ -144,6 +162,26 @@ try
             {
             mysqli_query($link, "UPDATE archivo_correo SET CAMPOE1 = GREATEST(COALESCE(CAMPOE1, 0) - 1, 0) WHERE CODIGO = ".$codigo);
             log_cron($ruta_log, "SALTADO codigo ".$codigo." (".$nombre."): ya en proceso por otro flujo. Intento NO contado.");
+            }
+        else if(strpos($texto_salida, "ERROR_API:") !== false)
+            {
+            // Fallo EXTERNO de la API (sin saldo, rate limit, API caida/timeout,
+            // key vencida): NO es culpa del archivo. Revertir el incremento para
+            // que el adjunto quede pendiente y se reintente al resolverse.
+            mysqli_query($link, "UPDATE archivo_correo SET CAMPOE1 = GREATEST(COALESCE(CAMPOE1, 0) - 1, 0) WHERE CODIGO = ".$codigo);
+            $detalle_api = "";
+            if(preg_match('/ERROR_API:([^\r\n]*)/', $texto_salida, $m_api))
+                $detalle_api = trim($m_api[1]);
+            log_cron($ruta_log, "Intento NO contado - error de API: ".$detalle_api." (codigo ".$codigo.", ".$nombre.").");
+
+            // Si es saldo o key, todos los adjuntos fallarian igual cada 3 min:
+            // pausar el cron 1 hora (se reanuda solo). Los transitorios (rate,
+            // caida, conexion) NO pausan: se reintenta en la proxima corrida.
+            if(strpos($texto_salida, "ERROR_API:SALDO") !== false || strpos($texto_salida, "ERROR_API:AUTH") !== false)
+                {
+                file_put_contents($ruta_pausa, date("Y-m-d H:i:s")." ".$detalle_api);
+                log_cron($ruta_log, "PAUSA: error de saldo/key. Cron en pausa 1h (".$ruta_pausa.").");
+                }
             }
         else
             {

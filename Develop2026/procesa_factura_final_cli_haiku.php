@@ -10,7 +10,7 @@
 //  Uso: php procesa_factura_final_cli_haiku.php <codigo>
 //  Ejemplo: php procesa_factura_final_cli_haiku.php 79
 // ============================================================================
- 
+    
 // Solo por CLI: estos scripts viven en public_html (alcanzables por URL) y
 // llaman a APIs de pago. Si se abren por web -> 403 y salir.
 if(php_sapi_name() != "cli")
@@ -599,6 +599,44 @@ function _haiku_pdf($api_key, $pdf_base64, $prompt, $temperature)
 // ----------------------------------------------------------------------------
 // ejecuta_haiku_doble - dos llamadas Haiku PDF directo, temperatura 0 y 0.3.
 // ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// clasifica_error_api - dado el retorno de una llamada _haiku_* fallida, decide
+// si el fallo es de INFRAESTRUCTURA de la API (externo y temporal, NO culpa del
+// archivo) y de que tipo. Devuelve "" si el fallo es atribuible al archivo o a
+// la extraccion (ese SI debe contar como intento). Tipos: SALDO / AUTH / RATE /
+// CAIDA / CONEXION.
+// ----------------------------------------------------------------------------
+function clasifica_error_api($r)
+    {
+    $http   = isset($r["http_code"]) ? (int)$r["http_code"] : 0;
+    $cuerpo = strtolower((string)(isset($r["respuesta_cruda"]) ? $r["respuesta_cruda"] : ""));
+
+    // cURL fallo (no se llego a la API): curl_getinfo deja http_code en 0.
+    if($http === 0)
+        return "CONEXION";
+    // Key invalida o vencida.
+    if($http == 401 || $http == 403)
+        return "AUTH";
+    // Rate limit.
+    if($http == 429)
+        return "RATE";
+    // API caida.
+    if($http >= 500 && $http <= 599)
+        return "CAIDA";
+    // Saldo insuficiente: 402 siempre; 400 solo si el cuerpo lo indica (un 400
+    // generico puede ser un PDF malformado -> eso SI es culpa del archivo).
+    if($http == 402)
+        return "SALDO";
+    if($http == 400 && (strpos($cuerpo, "credit balance") !== false
+        || strpos($cuerpo, "insufficient") !== false
+        || strpos($cuerpo, "billing") !== false
+        || strpos($cuerpo, "too low") !== false))
+        return "SALDO";
+    // Cualquier otro no-200 (404, 413 muy grande, 400 malformado...) es
+    // atribuible al archivo/extraccion: cuenta como intento.
+    return "";
+    }
+
 function ejecuta_haiku_doble($pdf_binario, $api_anthropic)
     {
     global $PROMPT_GRANDE, $UMBRAL_PORCENTAJE_NULL;
@@ -1368,6 +1406,30 @@ if(isset($resultado_haiku["respuesta2_cruda"]) && $resultado_haiku["respuesta2_c
 // ya devolvio ok=true usando la exitosa como base (con estado=4 REVISAR).
 if(!$resultado_haiku["ok"])
     {
+    // Distinguir fallo de INFRAESTRUCTURA de la API (sin saldo, rate limit, API
+    // caida/timeout, key vencida) de un fallo real de extraccion. El primero NO
+    // es culpa del archivo: se marca "ERROR_API:<TIPO>" para que el cron NO lo
+    // cuente como intento (y no descarte la factura por un problema externo).
+    $tipo_api_1    = clasifica_error_api(isset($resultado_haiku["r1"]) ? $resultado_haiku["r1"] : array());
+    $tipo_api_2    = clasifica_error_api(isset($resultado_haiku["r2"]) ? $resultado_haiku["r2"] : array());
+    $prioridad_api = array(1 => "SALDO", 2 => "AUTH", 3 => "RATE", 4 => "CAIDA", 5 => "CONEXION");
+    $tipo_api      = "";
+    for($i = 1; $i <= 5; $i++)
+        {
+        if($tipo_api_1 == $prioridad_api[$i] || $tipo_api_2 == $prioridad_api[$i])
+            {
+            $tipo_api = $prioridad_api[$i];
+            break;
+            }
+        }
+    if($tipo_api != "")
+        {
+        log_dual("\nERROR_API:".$tipo_api.": ".(string)$resultado_haiku["error"]."\n");
+        log_dual("\n=== FIN ===\n");
+        if($fh_log) fclose($fh_log);
+        echo "\nLog guardado en: ".$archivo_log."\n";
+        exit(1);
+        }
     log_dual("\nERROR FATAL: ambas llamadas Haiku fallaron. ".(string)$resultado_haiku["error"]."\n");
     if(isset($resultado_haiku["r1"]["respuesta_cruda"]) && $resultado_haiku["r1"]["respuesta_cruda"] != "")
         log_dual("Respuesta cruda llamada 1 (primeros 2000 chars):\n".substr((string)$resultado_haiku["r1"]["respuesta_cruda"], 0, 2000)."\n");
@@ -1627,21 +1689,12 @@ $ruta_tmp_def      = "/tmp/".$nombre_definitivo;
 $ruta_def          = $ruta_tmp_def;
 file_put_contents($ruta_tmp_def, json_encode($json_definitivo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-// Copiar el JSON al directorio publico de web para descarga directa.
-$dir_publico  = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026";
-$ruta_pub_def = $dir_publico."/".$nombre_definitivo;
-$copia_ok     = @copy($ruta_tmp_def, $ruta_pub_def);
-
-if($copia_ok)
-    {
-    $url_descarga   = "https://www.dienersoft.com/carpeta/divasoft1/Develop2026/".$nombre_definitivo;
-    $comando_borrar = "rm ".$ruta_pub_def;
-    }
-else
-    {
-    $url_descarga   = "(fallo copia a web: ".$ruta_pub_def.")";
-    $comando_borrar = "";
-    }
+// El JSON definitivo NO se copia a public_html. Ahi quedaria accesible por URL sin
+// autenticacion (datos de fincas, variedades, cantidades y precios) y, con el cron
+// corriendo solo, se acumularia un archivo por factura sin que nadie los borre. El
+// dato ya persiste en factura_finca.RESPUESTACLAUDE2 y queda una copia de
+// diagnostico en /tmp (no expuesta). El flujo manual tampoco usa esta ruta: el
+// endpoint progreso_factura detecta el fin por "=== FIN ===" en el output.
 
 log_dual("\n--- METADATOS ---\n");
 log_dual("TIPO_EXTRACCION:                ".$tipo_extraccion."\n");
@@ -1669,7 +1722,7 @@ log_dual("TOTAL:         ~$".number_format($costo_total, 6)." USD\n");
 
 log_dual("\nModelo formateador: ".$modelo_formateador."\n");
 
-log_dual("\nJSON guardado en disco (ver URL de descarga al final).\n");
+log_dual("\nJSON definitivo en /tmp (diagnostico) y en factura_finca.RESPUESTACLAUDE2.\n");
 
 // ----------------------------------------------------------------------------
 // RESUMEN
@@ -1758,10 +1811,9 @@ if($codigo_factura > 0)
 log_dual("\n=== FIN ===\n");
 log_dual("Tiempo total: ".number_format($tiempo_total, 2)." s\n");
 log_dual("\nLog guardado en: ".$archivo_log."\n");
-log_dual("\n--- JSON DEFINITIVO DESCARGABLE ---\n");
-log_dual("URL: ".$url_descarga."\n");
-if($comando_borrar !== "")
-    log_dual("\nIMPORTANTE: borrar el archivo despues de revisarlo:\n".$comando_borrar."\n");
+log_dual("\n--- JSON DEFINITIVO ---\n");
+log_dual("En base de datos: factura_finca.RESPUESTACLAUDE2\n");
+log_dual("Copia de diagnostico en /tmp/: ".$nombre_definitivo."\n");
 log_dual("\nArchivos crudos en /tmp/: final_".$codigo."_".$fecha_corrida."_*\n");
 
 if($fh_log) fclose($fh_log);

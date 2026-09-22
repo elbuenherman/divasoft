@@ -1182,21 +1182,12 @@ $ruta_tmp_def      = "/tmp/".$nombre_definitivo;
 $ruta_def          = $ruta_tmp_def;
 file_put_contents($ruta_tmp_def, json_encode($json_definitivo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-// Copiar el JSON al directorio publico de web para descarga directa.
-$dir_publico  = "/home/u154-6g3keph3vtcn/www/dienersoft.com/public_html/carpeta/divasoft1/Develop2026";
-$ruta_pub_def = $dir_publico."/".$nombre_definitivo;
-$copia_ok     = @copy($ruta_tmp_def, $ruta_pub_def);
-
-if($copia_ok)
-    {
-    $url_descarga   = "https://www.dienersoft.com/carpeta/divasoft1/Develop2026/".$nombre_definitivo;
-    $comando_borrar = "rm ".$ruta_pub_def;
-    }
-else
-    {
-    $url_descarga   = "(fallo copia a web: ".$ruta_pub_def.")";
-    $comando_borrar = "";
-    }
+// El JSON definitivo NO se copia a public_html. Ahi quedaria accesible por URL sin
+// autenticacion (datos de fincas, variedades, cantidades y precios) y, con el cron
+// corriendo solo, se acumularia un archivo por factura sin que nadie los borre. El
+// dato ya persiste en factura_finca.RESPUESTACLAUDE2 y queda una copia de
+// diagnostico en /tmp (no expuesta). El flujo manual tampoco usa esta ruta: el
+// endpoint progreso_factura detecta el fin por "=== FIN ===" en el output.
 
 log_dual("\n--- METADATOS ---\n");
 log_dual("TIPO_EXTRACCION:                ".$tipo_extraccion."\n");
@@ -1224,7 +1215,7 @@ log_dual("TOTAL:         ~$".number_format($costo_total, 6)." USD\n");
 
 log_dual("\nModelo formateador: ".$modelo_formateador."\n");
 
-log_dual("\nJSON guardado en disco (ver URL de descarga al final).\n");
+log_dual("\nJSON definitivo en /tmp (diagnostico) y en factura_finca.RESPUESTACLAUDE2.\n");
 
 // ----------------------------------------------------------------------------
 // RESUMEN
@@ -1257,10 +1248,9 @@ log_dual("Suma PRECIO_TOTAL lineas: $".number_format($suma_total_lineas, 2)."\n"
 log_dual("\n=== FIN ===\n");
 log_dual("Tiempo total: ".number_format($tiempo_total, 2)." s\n");
 log_dual("\nLog guardado en: ".$archivo_log."\n");
-log_dual("\n--- JSON DEFINITIVO DESCARGABLE ---\n");
-log_dual("URL: ".$url_descarga."\n");
-if($comando_borrar !== "")
-    log_dual("\nIMPORTANTE: borrar el archivo despues de revisarlo:\n".$comando_borrar."\n");
+log_dual("\n--- JSON DEFINITIVO ---\n");
+log_dual("En base de datos: factura_finca.RESPUESTACLAUDE2\n");
+log_dual("Copia de diagnostico en /tmp/: ".$nombre_definitivo."\n");
 log_dual("\nArchivos crudos en /tmp/: final_".$codigo."_".$fecha_corrida."_*\n");
 
 if($fh_log) fclose($fh_log);
