@@ -1,5 +1,5 @@
 <?php
-
+   
 // ============================================================================
 //  ver_factura_finca.php
 //  Vista web de una factura ya procesada (cabecera + detalle), con formato
@@ -101,7 +101,8 @@ for($i=0; $i<$total_det; $i++)
     $grupos[$producto][] = $detalle[$i];
     }
 
-$largos = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+// Mantener sincronizado con lista_cms_dsft() de funciones_v2.php.
+$largos = array(30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160);
 $num_largos = count($largos);
 
 // Suma SUBTOTAL del detalle.

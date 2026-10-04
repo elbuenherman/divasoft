@@ -1,7 +1,7 @@
-<?php          
+<?php           
 include("variables_globales.php");
 include("funciones.php");
-include("funciones_v2.php");
+include("funciones_v2.php");    
 // ini_set('display_errors', 1);
 // error_reporting(E_ALL);
 // Dispatch POST con archivo: detectado antes del flujo normal porque
@@ -467,6 +467,40 @@ if($funcion == 'quitar_guia_consolidado_dsft')
     echo quitar_guia_consolidado_dsft($parametro1, $parametro2);
 if($funcion == 'lista_guias_consolidado_dsft')
     echo lista_guias_consolidado_dsft($parametro1);
+
+// Guia (AWB) por caja: dialogo, asignacion en los tres niveles y textos.
+if($funcion == 'render_guias_asignar_dsft')
+    echo render_guias_asignar_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'render_confirma_guia_dsft')
+    echo render_confirma_guia_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'render_icono_guia_factura_dsft')
+    echo render_icono_guia_factura_dsft($parametro1);
+if($funcion == 'render_aviso_regenerar_dsft')
+    echo render_aviso_regenerar_dsft($parametro1);
+if($funcion == 'asignar_guia_caja_dsft')
+    echo asignar_guia_caja_dsft($parametro1, $parametro2, $parametro3, $parametro4);
+if($funcion == 'asignar_guia_factura_dsft')
+    echo asignar_guia_factura_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'asignar_guia_consolidado_cajas_dsft')
+    echo asignar_guia_consolidado_cajas_dsft($parametro1, $parametro2, $parametro3);
+
+// Confirmacion de entrega por caja (a la carguera).
+if($funcion == 'alternar_entrega_caja_dsft')
+    echo alternar_entrega_caja_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'confirmar_entrega_factura_dsft')
+    echo confirmar_entrega_factura_dsft($parametro1, $parametro2);
+if($funcion == 'desconfirmar_entrega_factura_dsft')
+    echo desconfirmar_entrega_factura_dsft($parametro1, $parametro2);
+if($funcion == 'render_contador_entregas_dsft')
+    echo render_contador_entregas_dsft($parametro1);
+
+// Medidas (columnas cm) del consolidado.
+if($funcion == 'render_medidas_consolidado_dsft')
+    echo render_medidas_consolidado_dsft($parametro1);
+if($funcion == 'agregar_medida_consolidado_dsft')
+    echo agregar_medida_consolidado_dsft($parametro1, $parametro2, $parametro3);
+if($funcion == 'quitar_medida_consolidado_dsft')
+    echo quitar_medida_consolidado_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'opciones_guias_recientes_dsft')
     echo opciones_guias_recientes_dsft();
 // Tablita read-only en consola_clientes_dsft.php

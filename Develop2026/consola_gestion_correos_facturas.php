@@ -16,12 +16,16 @@ $fecha_hora_hoy = date("Y-m-d H:i:s");
 // Mostramos "FECHAVUELO - GUIAS_CONCAT" en cada option.
 $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
 mysqli_query($link, "SET CHARACTER SET utf8");
+// LEFT JOIN a marcacion: hay consolidados sin marcacion y con INNER se caerian
+// del selector.
 $sql_consolidados = "SELECT c.CODIGO, c.FECHAVUELO,
+    m.NOMBREMARCACION AS MARCACION,
     (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
         FROM guia_consolidado gc
         INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
         WHERE gc.CODIGOCONSOLIDADO = c.CODIGO) AS GUIAS
     FROM consolidado c
+    LEFT JOIN marcacion m ON c.CODIGOMARCACION = m.CODIGO
     WHERE c.ESTADO >= 0
     ORDER BY c.FECHAVUELO DESC";
 $resultado_consolidados = mysqli_query($link, $sql_consolidados);
@@ -33,6 +37,7 @@ for($i=0; $i<$numero_consolidados; $i++)
     $arreglo_consolidados[$i]['CODIGO']     = $fila['CODIGO'];
     $arreglo_consolidados[$i]['FECHAVUELO'] = $fila['FECHAVUELO'];
     $arreglo_consolidados[$i]['GUIAS']      = $fila['GUIAS'];
+    $arreglo_consolidados[$i]['MARCACION']  = $fila['MARCACION'];
     }
 ?>
 <!DOCTYPE html>
@@ -294,16 +299,47 @@ function messageBox(texto)
     }
 
 // ===== Filtro local por texto (maqueta: recorre los grupos de correo del grid) =====
+// Filtra el listado en el cliente, componiendo los dos filtros: el texto del
+// buscador (sobre todo el grupo del correo) y el check "Solo sin consolidado"
+// (por ADJUNTO, usando los data- que puso lista_correos_facturas). Como el check
+// vive fuera del div del listado, su estado sobrevive a actualiza_listado(), que
+// vuelve a llamar a esta funcion despues de recargar.
 function filtrar_listado_local() 
     {
-    var texto = $("#id_busqueda_listado").val().toUpperCase();
+    var texto    = $("#id_busqueda_listado").val().toUpperCase();
+    var solo_sin = $("#id_solo_sin_consolidado").is(":checked");
+
     $("#id_listado_correos .grupo_correo").each(function()
         {
-        var fila = $(this).text().toUpperCase();
-        if(fila.indexOf(texto) > -1)
-            $(this).show();
+        var grupo = $(this);
+
+        // Filas de adjunto: se ocultan las ya asignadas y los packing/statement.
+        var visibles = 0;
+        grupo.find("tr.fila_adjunto").each(function()
+            {
+            var fila_adj = $(this);
+            var ocultar  = solo_sin
+                        && (fila_adj.attr("data-asignado") == "1"
+                         || fila_adj.attr("data-excluido") == "1");
+            if(ocultar)
+                {
+                fila_adj.hide();
+                }
+            else
+                {
+                fila_adj.show();
+                visibles++;
+                }
+            });
+
+        // Grupo completo: texto del buscador, y con el check activo tiene que
+        // quedarle al menos un adjunto visible (si no, se oculta tambien la fila
+        // del correo, que vive en el mismo tbody).
+        var coincide = (texto == "" || grupo.text().toUpperCase().indexOf(texto) > -1);
+        if(coincide && (!solo_sin || visibles > 0))
+            grupo.show();
         else
-            $(this).hide();
+            grupo.hide();
         });
     }
 
@@ -392,7 +428,7 @@ function extraer_correos()
         $.get("funciones_ajax.php?funcion=progreso_extraccion", function(data)
             {
             try
-                {
+                { 
                 var p = JSON.parse(data);
                 if(p.estado == "en_curso")
                     {
@@ -846,7 +882,15 @@ $(document).ready(function()
                             $cc = (int)$arreglo_consolidados[$i]['CODIGO'];
                             $cf = htmlspecialchars((string)$arreglo_consolidados[$i]['FECHAVUELO'], ENT_QUOTES, 'UTF-8');
                             $gc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['GUIAS']) ? $arreglo_consolidados[$i]['GUIAS'] : ''), ENT_QUOTES, 'UTF-8');
-                            $texto_opt = $cc." - ".$cf.($gc !== '' ? ' - '.$gc : '');
+                            $mc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['MARCACION']) ? $arreglo_consolidados[$i]['MARCACION'] : ''), ENT_QUOTES, 'UTF-8');
+                            // "COD - FECHA - MARCACION - GUIAS". Los tramos vacios se
+                            // omiten para no dejar " - - ". Al estar en el texto de la
+                            // option, el buscador del Select2 encuentra por marcacion.
+                            $texto_opt = $cc." - ".$cf;
+                            if(trim($mc) !== '')
+                                $texto_opt .= ' - '.$mc;
+                            if($gc !== '')
+                                $texto_opt .= ' - '.$gc;
                             echo '<option value="'.$cc.'">'.$texto_opt.'</option>';
                             }
                         ?>
@@ -854,6 +898,10 @@ $(document).ready(function()
                     <i class="icon-search" style="color:#88010e; font-size:14px; margin-left:6px;"></i>
                     <input type="text" id="id_busqueda_listado" autocomplete="off" class="input_pequeno"
                         style="width:200px; flex: 0 0 200px;" placeholder="Buscar..." onkeyup="filtrar_listado_local();" />
+                    <label style="font-size:12px; white-space:nowrap; cursor:pointer; margin-left:6px;"
+                        title="Oculta los adjuntos ya asignados a un consolidado y los packing/statement">
+                        <input type="checkbox" id="id_solo_sin_consolidado" onchange="filtrar_listado_local();"
+                            style="vertical-align:middle; margin-right:4px;" />Solo sin consolidado</label>
                 </div>
             </div>
 

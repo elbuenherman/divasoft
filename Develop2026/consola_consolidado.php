@@ -1,9 +1,9 @@
 <?php                
-include("variables_globales.php");  
+include("variables_globales.php");   
 include("funciones.php");
-include("valida_sesion.php");      
-// CHEQUEO PERMISOS        
-$permiso[] = NULL;        
+include("valida_sesion.php");        
+// CHEQUEO PERMISOS         
+$permiso[] = NULL;          
 consulta_permisos($_SESSION['s_codigo'], $permiso);  
 $usuario_web = $_SESSION['s_codigo'];
    
@@ -139,7 +139,7 @@ if($res_tipos_js)
 body.metro {
     background-color: #edededff !important;
     background-image: none !important;
-    }
+    }   
 textarea, input[type="text"] {
     text-transform: uppercase;
     }
@@ -626,6 +626,582 @@ function cargar_guias_consolidado(codigo_consolidado)
         });
     }
 
+// ===== AVISO BREVE =====
+// Cartel chico arriba al centro, justo debajo de la barra fija (45px de alto,
+// z-index 90 en css_v4.php), que aparece y se disuelve solo. No hay que
+// cerrarlo, no bloquea nada (pointer-events:none) y no es modal. Si llegan
+// varios clics seguidos, el nuevo reemplaza al anterior en vez de apilarse.
+// tipo: "verde" para confirmaciones; cualquier otro valor = gris oscuro.
+// Aviso chico que sale JUNTO al elemento clicado y se disuelve solo. Imita el
+// aspecto del messageBox del sistema (barra crimson + cuerpo blanco) pero NO es
+// un dialog jQuery UI: uno real seria modal y robaria el foco. Las medidas
+// salen de .ui-dialog / .myTitleClass en css/dienersoft_comun.css.
+// No hay que cerrarlo, no bloquea (pointer-events:none) y no es modal. Si
+// llegan varios clics seguidos, el nuevo reemplaza al anterior.
+//   elemento: el <a> donde se hizo clic. Sin el, cae al respaldo arriba al centro.
+function aviso_breve(texto, elemento)
+    {
+    // Nunca dos a la vez, ni dos elementos con el mismo id.
+    $("#id_aviso_breve").stop(true, true).remove();
+
+    // Nace transparente y fuera de pantalla: asi se puede medir (un display:none
+    // no se deja medir) sin que llegue a verse en la esquina.
+    // El padding derecho de la barra es 12px y no 36px como en el dialog real,
+    // porque aca no hay boton X que dejar libre.
+    var caja = '<div id="id_aviso_breve" style="'
+        + 'position:absolute; top:0; left:-9999px; opacity:0;'
+        + ' z-index:95; pointer-events:none;'
+        + ' background:#fff; border:1px solid #aaa; border-radius:4px;'
+        + ' box-shadow:0 4px 12px rgba(0,0,0,0.3); overflow:hidden;'
+        + ' min-width:220px; font-family:inherit;">'
+        + '<div style="background:#88010e; color:#fff; font-weight:bold;'
+        + ' font-size:13px; padding:8px 12px; box-sizing:border-box;">Alerta</div>'
+        + '<div style="background:#fff; color:#000; font-size:14px;'
+        + ' padding:16px 12px; text-align:left; white-space:nowrap;'
+        + ' box-sizing:border-box;">' + texto + '</div>'
+        + '</div>';
+
+    $("body").append(caja);
+    var aviso = $("#id_aviso_breve");
+
+    // Respaldo: sin elemento de referencia, arriba al centro y fijo a la ventana.
+    if(!elemento || $(elemento).length == 0)
+        {
+        aviso.css({ "position": "fixed", "top": "53px", "left": "50%", "margin-left": -(aviso.outerWidth() / 2) + "px" });
+        aviso.animate({ "opacity": 1 }, 150, function()
+            {
+            $(this).delay(800).fadeOut(1000, function() { $(this).remove(); });
+            });
+        return;
+        }
+
+    var posicion = $(elemento).offset();
+    var ancho_el = $(elemento).outerWidth();
+    var alto_el  = $(elemento).outerHeight();
+    var ancho_av = aviso.outerWidth();
+    var alto_av  = aviso.outerHeight();
+    var centro_x = posicion.left + (ancho_el / 2);
+
+    // Por defecto encima del icono. Si ahi lo taparia la barra fija (45px de
+    // alto, anclada a la ventana), se pasa abajo.
+    var piso  = $(window).scrollTop() + 45 + 4;
+    var pos_y = posicion.top - alto_av - 8;
+    if(pos_y < piso)
+        pos_y = posicion.top + alto_el + 8;
+    // Ni arriba ni abajo alcanza: pasa si el icono quedo bajo la barra por un
+    // scroll con el dialogo abierto. Se deja apenas debajo de la barra.
+    if(pos_y < piso)
+        pos_y = piso;
+
+    // Centrado sobre el icono, pero sin salirse por los costados de la ventana.
+    var pos_x  = centro_x - (ancho_av / 2);
+    var minimo = $(window).scrollLeft() + 8;
+    var maximo = $(window).scrollLeft() + $(window).width() - ancho_av - 8;
+    if(pos_x > maximo)
+        pos_x = maximo;
+    if(pos_x < minimo)
+        pos_x = minimo;
+
+    // Entra con un leve empujon hacia arriba (5px), se deja leer 0,8 s y se
+    // disuelve en 1 s antes de salir del DOM.
+    aviso.css({ "left": pos_x + "px", "top": (pos_y + 5) + "px" });
+    aviso.animate({ "top": pos_y + "px", "opacity": 1 }, 150, function()
+        {
+        $(this).delay(800).fadeOut(1000, function() { $(this).remove(); });
+        });
+    }
+
+// ===== ENTREGA A LA CARGUERA (por caja) =====
+// La marca es por CAJA y es solo informativa: no bloquea la edicion de las
+// lineas. El contador "Entregadas X/Y" vive en la cabecera de la tarjeta, o
+// sea FUERA del grid, asi que se refresca aparte.
+
+// Lee "Entregadas X/Y" del contador de la tarjeta. El servidor es el que
+// manda: si este numero quedara viejo, solo afecta el texto del dialogo.
+function numeros_entregas(codigo_ff)
+    {
+    var texto  = $("#id_entregadas_" + codigo_ff).text();
+    var partes = texto.replace(/[^0-9\/]/g, "").split("/");
+    var x = parseInt(partes[0]);
+    var y = parseInt(partes[1]);
+    return {
+        entregadas: isNaN(x) ? 0 : x,
+        total:      isNaN(y) ? 0 : y
+        };
+    }
+
+function actualizar_contador_entregas(codigo_ff)
+    {
+    var url = "funciones_ajax.php?funcion=render_contador_entregas_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(data)
+        {
+        $("#id_entregadas_" + codigo_ff).html(data);
+        });
+    }
+
+// Clic en el icono de una caja: alterna sin dialogo (es una sola caja y se
+// deshace con otro clic).
+function alternar_entrega_caja(codigo_ff, numero_caja, elemento)
+    {
+    // Estado dibujado ahora, solo para elegir el texto del aviso. El que decide
+    // el estado real es el servidor.
+    var entregada_antes = $("#id_ship_" + codigo_ff + "_" + numero_caja).attr("data-entregada");
+    var queda_entregada = (entregada_antes != "1");
+
+    var url = "funciones_ajax.php?funcion=alternar_entrega_caja_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + numero_caja
+        + "&parametro3=" + global_codigo_usuario;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            if(queda_entregada)
+                aviso_breve("Caja " + numero_caja + " entregada a la carguera", elemento);
+            else
+                aviso_breve("Caja " + numero_caja + " marcada como no entregada", elemento);
+            recargar_grid_factura_por_codigo(codigo_ff);
+            }
+        else
+            {
+            messageBox(data);
+            }
+        });
+    }
+
+function confirmar_entrega_factura(codigo_ff, elemento)
+    {
+    // Guardar el boton ANTES de abrir el dialogo: cuando llega el OK el foco ya
+    // no esta en el, pero el globo tiene que salir igual junto a el.
+    var boton_origen = elemento;
+    var conteo       = numeros_entregas(codigo_ff);
+    if(conteo.total <= 0)
+        {
+        messageBox("Esta factura no tiene cajas para confirmar");
+        return;
+        }
+    $("#id_dialog_confirma_factura").html(
+        "<p>&iquest;Confirmar la entrega de las <strong>" + conteo.total
+        + "</strong> cajas de esta factura?</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 400,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "SI",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=confirmar_entrega_factura_dsft"
+                        + "&parametro1=" + codigo_ff
+                        + "&parametro2=" + global_codigo_usuario;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            {
+                            aviso_breve("Factura confirmada: " + conteo.total + " cajas entregadas", boton_origen);
+                            recargar_grid_factura_por_codigo(codigo_ff);
+                            }
+                        else
+                            {
+                            messageBox(data);
+                            }
+                        });
+                    }
+                },
+                {
+                text: "NO",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+function desconfirmar_entrega_factura(codigo_ff, elemento)
+    {
+    var boton_origen = elemento;
+    var conteo       = numeros_entregas(codigo_ff);
+    if(conteo.entregadas <= 0)
+        {
+        messageBox("Esta factura no tiene cajas confirmadas");
+        return;
+        }
+    $("#id_dialog_confirma_factura").html(
+        "<p>&iquest;Desconfirmar las <strong>" + conteo.entregadas
+        + "</strong> cajas ya marcadas como entregadas?</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 400,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "SI",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=desconfirmar_entrega_factura_dsft"
+                        + "&parametro1=" + codigo_ff
+                        + "&parametro2=" + global_codigo_usuario;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            {
+                            aviso_breve("Factura desconfirmada", boton_origen);
+                            recargar_grid_factura_por_codigo(codigo_ff);
+                            }
+                        else
+                            {
+                            messageBox(data);
+                            }
+                        });
+                    }
+                },
+                {
+                text: "NO",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// ===== GUIA (AWB) POR CAJA =====
+// Cada caja queda asignada a UNA guia, elegida entre las que ya tiene su
+// consolidado. El mismo dialogo sirve en los tres niveles (caja, factura y
+// consolidado); el destino se guarda en estas globales ANTES de abrirlo, porque
+// las filas del dialogo las dibuja el servidor y no lo conocen.
+var global_guia_contexto    = "caja";
+var global_guia_codigo_ff   = 0;
+var global_guia_numero_caja = 0;
+var global_guia_consolidado = 0;
+var global_guia_origen      = null;
+
+function dialog_guias_caja(codigo_ff, numero_caja, codigo_consolidado, codigo_guia_actual, elemento)
+    {
+    global_guia_contexto    = "caja";
+    global_guia_codigo_ff   = codigo_ff;
+    global_guia_numero_caja = numero_caja;
+    global_guia_consolidado = codigo_consolidado;
+    global_guia_origen      = elemento;
+    abrir_dialog_guias(codigo_consolidado, "caja", codigo_guia_actual, "Guia de la caja " + numero_caja);
+    }
+
+function dialog_guias_factura(codigo_ff, codigo_consolidado, elemento)
+    {
+    global_guia_contexto    = "factura";
+    global_guia_codigo_ff   = codigo_ff;
+    global_guia_numero_caja = 0;
+    global_guia_consolidado = codigo_consolidado;
+    global_guia_origen      = elemento;
+    abrir_dialog_guias(codigo_consolidado, "factura", 0, "Guia de la factura " + codigo_ff);
+    }
+
+function dialog_guias_consolidado(codigo_consolidado, elemento)
+    {
+    global_guia_contexto    = "consolidado";
+    global_guia_codigo_ff   = 0;
+    global_guia_numero_caja = 0;
+    global_guia_consolidado = codigo_consolidado;
+    global_guia_origen      = elemento;
+    abrir_dialog_guias(codigo_consolidado, "consolidado", 0, "Guia del consolidado " + codigo_consolidado);
+    }
+
+function abrir_dialog_guias(codigo_consolidado, contexto, codigo_guia_actual, titulo)
+    {
+    var url = "funciones_ajax.php?funcion=render_guias_asignar_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=" + contexto
+        + "&parametro3=" + codigo_guia_actual;
+    $.get(url, function(data)
+        {
+        $("#id_dialog_guias").html(data);
+        $("#id_dialog_guias").dialog(
+            {
+            modal: true,
+            width: 360,
+            title: titulo,
+            dialogClass: 'myTitleClass',
+            buttons:
+                [
+                    {
+                    text: "CERRAR",
+                    class: 'cancelButton',
+                    click: function() { $(this).dialog("close"); }
+                    }
+                ]
+            });
+        });
+    }
+
+// Una fila del dialogo. codigo_guia 0 = quitar la guia.
+function elegir_guia_asignar(codigo_guia, numero_guia)
+    {
+    $("#id_dialog_guias").dialog("close");
+
+    // El destino se CONGELA aca. Si se leyeran las globales al confirmar, un
+    // clic en otro icono mientras viaja el AJAX del texto de confirmacion las
+    // cambiaria y la asignacion caeria en el destino equivocado.
+    var destino = {
+        contexto:    global_guia_contexto,
+        codigo_ff:   global_guia_codigo_ff,
+        numero_caja: global_guia_numero_caja,
+        consolidado: global_guia_consolidado,
+        origen:      global_guia_origen
+        };
+
+    // Una sola caja: se aplica directo, es reversible con otro clic.
+    if(destino.contexto == "caja")
+        {
+        guardar_guia_caja(destino, codigo_guia, numero_guia);
+        return;
+        }
+
+    // Factura o consolidado completo: confirmar SI / NO. El texto con los
+    // numeros lo arma el servidor, que es el que sabe cuantas cajas cambian.
+    var codigo = (destino.contexto == "factura") ? destino.codigo_ff : destino.consolidado;
+    var url = "funciones_ajax.php?funcion=render_confirma_guia_dsft"
+        + "&parametro1=" + destino.contexto
+        + "&parametro2=" + codigo
+        + "&parametro3=" + codigo_guia;
+    $.get(url, function(texto)
+        {
+        $("#id_dialog_confirma_factura").html(texto);
+        $("#id_dialog_confirma_factura").dialog(
+            {
+            modal: true,
+            width: 430,
+            dialogClass: 'myTitleClass',
+            buttons:
+                [
+                    {
+                    text: "SI",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        guardar_guia_masivo(destino, codigo_guia, numero_guia);
+                        }
+                    },
+                    {
+                    text: "NO",
+                    click: function() { $(this).dialog("close"); }
+                    }
+                ]
+            });
+        });
+    }
+
+function guardar_guia_caja(destino, codigo_guia, numero_guia)
+    {
+    var codigo_ff   = destino.codigo_ff;
+    var numero_caja = destino.numero_caja;
+    var origen      = destino.origen;
+    var url = "funciones_ajax.php?funcion=asignar_guia_caja_dsft"
+        + "&parametro1=" + codigo_ff
+        + "&parametro2=" + numero_caja
+        + "&parametro3=" + codigo_guia
+        + "&parametro4=" + global_codigo_usuario;
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            {
+            if(codigo_guia > 0)
+                aviso_breve("Caja " + numero_caja + " asignada a la guia " + numero_guia, origen);
+            else
+                aviso_breve("Caja " + numero_caja + " sin guia", origen);
+            recargar_grid_factura_por_codigo(codigo_ff);
+            // El color de la fila del listado depende de TODAS las cajas del
+            // consolidado, asi que tambien cambia al tocar una sola.
+            actualiza_listado();
+            }
+        else
+            {
+            messageBox(data);
+            }
+        });
+    }
+
+function guardar_guia_masivo(destino, codigo_guia, numero_guia)
+    {
+    var contexto  = destino.contexto;
+    var codigo_ff = destino.codigo_ff;
+    var codigo_co = destino.consolidado;
+    var origen    = destino.origen;
+
+    // Solo estos dos contextos son masivos. Cualquier otro valor se ignora en
+    // lugar de caer por descarte en la rama del consolidado completo.
+    if(contexto != "factura" && contexto != "consolidado")
+        return;
+
+    var url = "";
+    if(contexto == "factura")
+        {
+        url = "funciones_ajax.php?funcion=asignar_guia_factura_dsft"
+            + "&parametro1=" + codigo_ff
+            + "&parametro2=" + codigo_guia
+            + "&parametro3=" + global_codigo_usuario;
+        }
+    else
+        {
+        url = "funciones_ajax.php?funcion=asignar_guia_consolidado_cajas_dsft"
+            + "&parametro1=" + codigo_co
+            + "&parametro2=" + codigo_guia
+            + "&parametro3=" + global_codigo_usuario;
+        }
+
+    $("#id_espera").show();
+    $.get(url, function(data)
+        {
+        $("#id_espera").hide();
+        if(data != "OK")
+            {
+            messageBox(data);
+            return;
+            }
+
+        if(contexto == "factura")
+            {
+            if(codigo_guia > 0)
+                aviso_breve("Factura asignada a la guia " + numero_guia, origen);
+            else
+                aviso_breve("Guia quitada de la factura", origen);
+            recargar_grid_factura_por_codigo(codigo_ff);
+            actualiza_listado();
+            return;
+            }
+
+        // Consolidado: cambio en todas las facturas, asi que se redibuja el
+        // detalle completo, y el listado para que se actualice el color de la fila.
+        if(codigo_guia > 0)
+            aviso_breve("Consolidado asignado a la guia " + numero_guia, origen);
+        else
+            aviso_breve("Guia quitada de todas las cajas", origen);
+        if(global_codigo_seleccionado == codigo_co)
+            cargar_detalle_consolidado(codigo_co);
+        actualiza_listado();
+        });
+    }
+
+// El icono de guia de la cabecera vive fuera del grid, igual que el contador de
+// entregas, asi que se refresca aparte.
+function actualizar_icono_guia_factura(codigo_ff)
+    {
+    var url = "funciones_ajax.php?funcion=render_icono_guia_factura_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(data)
+        {
+        $("#id_guia_factura_" + codigo_ff).html(data);
+        });
+    }
+
+// ===== MEDIDAS (columnas cm) del consolidado =====
+// Las columnas de cm del grid y de los Excel salen de consolidado.MEDIDASCM.
+// Este dialog las edita; despues de cada cambio hay que redibujar TODAS las
+// tarjetas de facturas porque comparten las mismas columnas.
+function dialog_medidas_consolidado()
+    {
+    if(global_codigo_seleccionado <= 0)
+        {
+        messageBox("Por favor seleccione un consolidado");
+        return;
+        }
+    cargar_medidas_consolidado();
+    $("#id_dialog_medidas").dialog(
+        {
+        modal: true,
+        width: 340,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "CERRAR",
+                class: 'cancelButton',
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// Trae el contenido del dialog (lista de medidas + campo para agregar).
+function cargar_medidas_consolidado()
+    {
+    var url = "funciones_ajax.php?funcion=render_medidas_consolidado_dsft"
+        + "&parametro1=" + global_codigo_seleccionado;
+    $.get(url, function(data)
+        {
+        $("#id_dialog_medidas").html(data);
+        });
+    }
+
+// Validacion identica a la del servidor.
+function valida_medida(medida)
+    {
+    if(medida == "" || isNaN(medida))
+        return "Por favor ingrese una medida mayor a cero";
+    var valor = parseInt(medida);
+    if(isNaN(valor) || valor <= 0)
+        return "Por favor ingrese una medida mayor a cero";
+    if(valor > 500)
+        return "La medida no puede ser mayor a 500 cm";
+    return "OK";
+    }
+
+function agregar_medida_consolidado()
+    {
+    var medida  = $("#id_medida_nueva").val();
+    var mensaje = valida_medida(medida);
+    if(mensaje != "OK")
+        {
+        messageBox(mensaje);
+        return;
+        }
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=agregar_medida_consolidado_dsft"
+        + "&parametro1=" + global_codigo_seleccionado
+        + "&parametro2=" + parseInt(medida)
+        + "&parametro3=" + global_codigo_usuario;
+    $.get(url, function(data)
+        {
+        $("#id_espera").hide();
+        if(data == "OK")
+            refrescar_por_cambio_de_medidas();
+        else
+            messageBox(data);
+        });
+    }
+
+function quitar_medida_consolidado(medida)
+    {
+    $("#id_espera").show();
+    var url = "funciones_ajax.php?funcion=quitar_medida_consolidado_dsft"
+        + "&parametro1=" + global_codigo_seleccionado
+        + "&parametro2=" + medida
+        + "&parametro3=" + global_codigo_usuario;
+    $.get(url, function(data)
+        {
+        $("#id_espera").hide();
+        if(data == "OK")
+            refrescar_por_cambio_de_medidas();
+        else
+            messageBox(data);
+        });
+    }
+
+// Tras agregar o quitar: recargar la lista del dialog Y el detalle completo,
+// porque todas las tarjetas comparten las mismas columnas de cm.
+function refrescar_por_cambio_de_medidas()
+    {
+    cargar_medidas_consolidado();
+    cargar_detalle_consolidado(global_codigo_seleccionado);
+    }
+
 // ===== Detalle del consolidado (facturas asignadas) =====
 // Carga el HTML del detalle (grids de cada factura + areas PDF) en el div
 // inferior id_detalle_consolidado. Se invoca al seleccionar un consolidado.
@@ -715,7 +1291,7 @@ function confirmar_tipo_producto(codigo_ff)
                 {
                 $("#id_grid_factura_" + codigo_ff).html(data2);
                 });
-            }
+            } 
         else
             {
             messageBox("Error: " + data);
@@ -1403,6 +1979,8 @@ function recargar_grid_factura_por_codigo(codigo_ff)
             {
             $("#id_totales_factura_" + codigo_ff).html(data_tot);
             });
+        actualizar_contador_entregas(codigo_ff);
+        actualizar_icono_guia_factura(codigo_ff);
         });
     }
 
@@ -1429,12 +2007,10 @@ function eliminar_linea_detalle(codigo_detalle, codigo_ff)
                         {
                         if(data == "OK")
                             {
-                            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
-                                + "&parametro1=" + codigo_ff;
-                            $.get(url2, function(data2)
-                                {
-                                $("#id_grid_factura_" + codigo_ff).html(data2);
-                                });
+                            // Si era la ultima linea de la caja, se borro tambien
+                            // su registro (y con el su entrega y su guia), asi que
+                            // hay que refrescar el contador y el icono de guia.
+                            recargar_grid_factura_por_codigo(codigo_ff);
                             }
                         else
                             messageBox(data);
@@ -1531,7 +2107,48 @@ function agregar_caja_detalle(codigo_ff)
 // Reusa el JSON guardado en factura_finca.RESPUESTACLAUDE (no llama de
 // nuevo a Claude): elimina el detalle actual y lo recrea desde el JSON.
 // Es instantaneo, no requiere polling.
+// Antes de regenerar: si la factura tiene cajas confirmadas, avisar, porque
+// al rehacer las lineas se pueden perder esas confirmaciones.
 function regenerar_factura(codigo_ff, codigo_adj, nombre_adj)
+    {
+    // El texto lo arma el servidor: cuenta las cajas entregadas Y las que tienen
+    // guia asignada. Respuesta vacia = no hay nada que advertir.
+    var url = "funciones_ajax.php?funcion=render_aviso_regenerar_dsft"
+        + "&parametro1=" + codigo_ff;
+    $.get(url, function(aviso)
+        {
+        if($.trim(aviso) == "")
+            {
+            dialog_restaurar_factura(codigo_ff, codigo_adj, nombre_adj);
+            return;
+            }
+        $("#id_dialog_confirma_factura").html(aviso);
+        $("#id_dialog_confirma_factura").dialog(
+            {
+            modal: true,
+            width: 420,
+            dialogClass: 'myTitleClass',
+            buttons:
+                [
+                    {
+                    text: "SI",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        dialog_restaurar_factura(codigo_ff, codigo_adj, nombre_adj);
+                        }
+                    },
+                    {
+                    text: "NO",
+                    click: function() { $(this).dialog("close"); }
+                    }
+                ]
+            });
+        });
+    }
+
+function dialog_restaurar_factura(codigo_ff, codigo_adj, nombre_adj)
     {
     $("#id_dialog_confirma_factura").html(
         "<p>Restaurar factura <strong>" + nombre_adj + "</strong> al original de la IA?</p>"
@@ -1574,18 +2191,15 @@ function ejecutar_regeneracion(codigo_ff, codigo_adj, nombre_adj)
             {
             messageBox("Factura restaurada al original de la IA ("
                 + partes[1] + " lineas).");
-            // Recargar solo el grid de esta factura.
-            var url2 = "funciones_ajax.php?funcion=render_grid_factura_dsft"
-                + "&parametro1=" + codigo_ff;
-            $.get(url2, function(data2)
+            // Recargar el grid de esta factura. Por recargar_grid_factura_por_codigo
+            // y no a mano, para que se refresquen tambien el contador de entregas
+            // y el icono de guia, que viven FUERA del grid y acaban de cambiar.
+            recargar_grid_factura_por_codigo(codigo_ff);
+            // Scroll al grid restaurado.
+            $("html, body").animate(
                 {
-                $("#id_grid_factura_" + codigo_ff).html(data2);
-                // Scroll al grid restaurado.
-                $("html, body").animate(
-                    {
-                    scrollTop: $("#id_grid_factura_" + codigo_ff).offset().top - 50
-                    }, 300);
-                });
+                scrollTop: $("#id_grid_factura_" + codigo_ff).offset().top - 50
+                }, 300);
             }
         else
             {
@@ -2182,9 +2796,10 @@ $(document).ready(function()
                     </tr>
                 </table>
 
-                <!-- Botones GRABAR / NUEVO -->
+                <!-- Botones MEDIDAS / GRABAR / NUEVO -->
                 <div style="text-align: right; margin-top: 10px;">
-                    <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="grabar_consolidado();">GRABAR</button>
+                    <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="dialog_medidas_consolidado();">MEDIDAS</button>
+                    <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="grabar_consolidado();" style="margin-left: 5px;">GRABAR</button>
                     <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="boton_nuevo();" style="margin-left: 5px;">NUEVO</button>
                 </div>
             </div>
@@ -2200,6 +2815,8 @@ $(document).ready(function()
     <div id="dialog" title="Alerta"></div>
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_dialog_invoice_cliente" title="Invoice Cliente"></div>
+    <div id="id_dialog_medidas" title="Medidas (cm) del consolidado"></div>
+    <div id="id_dialog_guias" title="Guias"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
     <!-- Mini-menu flotante de formato (Excel / PDF) del icono puzzle. -->

@@ -1,5 +1,5 @@
 <?php  
-                                               
+                                                         
 // ============================================================================
 //  funciones_v2.php  -  Logica nueva (estilo v3).
 //  Consola de Correos / Facturas: extraccion desde Gmail.
@@ -643,9 +643,9 @@ function procesar_factura_web($codigo_adjunto)
     exec($comando);
 
     return "Procesamiento iniciado para ".$fila["NOMBREARCHIVO"].". El proceso corre en segundo plano.";
-    }
+    } 
 
-
+  
 // Extrae solo el/los email(s) de un campo De/Para (quita nombres, comillas y < >).
 function limpia_email($texto)
     {
@@ -691,6 +691,10 @@ function asignar_factura_consolidado_dsft($codigo_factura, $codigo_consolidado)
     $r = mysqli_query($link, $sql);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+
+    // La factura cambia de consolidado: las guias que tenian sus cajas eran del
+    // consolidado anterior y ya no le pertenecen.
+    limpiar_guias_factura_dsft($codigo_factura);
     return "OK";
     }
 
@@ -1045,7 +1049,17 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                     }
                 $adj_visor = str_replace('VISOR_TITLE', $visor_title, $adj_visor_template);
 
-                $html .= '<tr class="fila_adjunto">';
+                // Marcas para el filtro "Solo sin consolidado" del cliente.
+                // asignado: la factura de este adjunto ya tiene consolidado, que es
+                // el mismo campo que graban las flechitas (CODIGOCONSOLIDADO).
+                // excluido: packing lists y statements, que nunca se asignan y si no
+                // apareceran siempre como pendientes.
+                $nombre_lower = strtolower((string)$adj_nombre);
+                $es_excluido  = (strpos($nombre_lower, 'packing') !== false
+                              || strpos($nombre_lower, 'statement') !== false);
+                $adj_asignado = ($proc !== null && isset($proc["CODIGOCONSOLIDADO"]) && (int)$proc["CODIGOCONSOLIDADO"] > 0) ? 1 : 0;
+
+                $html .= '<tr class="fila_adjunto" data-asignado="'.$adj_asignado.'" data-excluido="'.($es_excluido ? 1 : 0).'">';
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
                 // Celda CONSOLIDADO: "COD - FECHAVUELO" si la factura tiene consolidado asignado, vacia si no.
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_consolidado.'</td>';
@@ -1057,11 +1071,6 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_tam.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_estado_adj.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.' text-align:right;">';
-                // Excluir packing lists y statements: no son facturas a procesar.
-                $nombre_lower = strtolower((string)$adj_nombre);
-                $es_excluido = (strpos($nombre_lower, 'packing') !== false
-                             || strpos($nombre_lower, 'statement') !== false);
-  
                 if($proc !== null)
                     {
                     $codigo_ff = (int)$proc["CODIGO"];
@@ -2231,7 +2240,11 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     $html .= '<th style="width: 28%;">OPC</th>';
     $html .= '</tr></thead>';
     $html .= '<tbody>';
- 
+
+    // Cajas con guia de TODOS los consolidados en una sola consulta: el color
+    // del icon-hash de cada fila se resuelve despues en memoria.
+    $resumen_guias = resumen_guias_consolidados_dsft();
+
     for($i=0; $i<$numero; $i++)
         {
         $codigo  = (int)$arreglo[$i]['CODIGO'];
@@ -2257,6 +2270,11 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $html .= '<a onclick="dialog_subir_archivo('.$codigo.');" style="cursor:pointer; color:#88010e; margin-right:4px;" title="Subir archivo y procesar con IA"><i class="icon-upload"></i></a>';
         $html .= '<a onclick="toggle_menu_formato(this, '.$codigo.');" style="cursor:pointer; color:#2e7d32; margin-right:4px; position:relative;" title="Generar consolidado"><i class="icon-puzzle"></i></a>';
         $html .= '<a onclick="abrir_factura_cliente('.$codigo.');" style="cursor:pointer; color:#2196F3; margin-right:4px;" title="Factura cliente"><i class="icon-dollar"></i></a>';
+        // Guia (AWB) de todas las cajas del consolidado. El conteo sale del
+        // resumen que se trajo ANTES del bucle, no de una consulta por fila.
+        $guia_total   = isset($resumen_guias[$codigo]) ? (int)$resumen_guias[$codigo]["TOTAL"]   : 0;
+        $guia_conguia = isset($resumen_guias[$codigo]) ? (int)$resumen_guias[$codigo]["CONGUIA"] : 0;
+        $html .= '<a onclick="dialog_guias_consolidado('.$codigo.', this);" style="cursor:pointer; color:'.color_icono_guia_dsft($guia_total, $guia_conguia).'; margin-right:4px;" title="Guia asignada en '.$guia_conguia.' de '.$guia_total.' cajas"><i class="icon-hash"></i></a>';
         $html .= '<a onclick="messageBox(\'Packing - proximamente\');" style="cursor:pointer; color:#d4890e; margin-right:4px;" title="Packing"><i class="icon-bus"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
@@ -2340,13 +2358,16 @@ function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigoc
     if($codigo == 0)
         {
         // GUIA y DESTINO quedan en la BD pero la consola no los escribe.
+        // MEDIDASCM se prellena con las medidas por defecto; despues se edita
+        // desde el boton MEDIDAS de la consola.
+        $medidas_defecto = medidas_cm_a_texto_dsft(medidas_cm_defecto_dsft());
         $sql = "INSERT INTO consolidado (
             CODIGO, FECHAVUELO, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
-            CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES,
+            CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES, MEDIDASCM,
             ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
         ) VALUES (
             0, '".$fechavuelo."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
-            ".$valor_codigoagencia.", ".$valor_codigopais.", '".$observaciones."',
+            ".$valor_codigoagencia.", ".$valor_codigopais.", '".$observaciones."', '".$medidas_defecto."',
             ".$estado.", ".$codigo_usuario.", NOW()
         )";
         }
@@ -2643,11 +2664,21 @@ function detalle_consolidado_dsft($codigo_consolidado)
         // Icono toggle al inicio: minimiza/expande el contenido de la tarjeta.
         $html .= '<a onclick="toggle_tarjeta_factura('.$codigo_ff.');" style="cursor:pointer; color:#88010e; margin-right:6px;" title="Minimizar/Expandir"><i id="id_toggle_icon_'.$codigo_ff.'" class="icon-arrow-up"></i></a>';
         $html .= '<span style="color:#333;">'.$codigo_ff.'</span> - FACTURA <strong>'.$nfac.' - '.$finca.'</strong>';
+        // Contador de cajas entregadas. Vive FUERA del grid, asi que el JS lo
+        // refresca aparte cada vez que recarga el grid de esta factura.
+        $html .= ' <span id="id_entregadas_'.$codigo_ff.'" style="font-weight:normal; font-size:11px; margin-left:8px;">'.render_contador_entregas_dsft($codigo_ff).'</span>';
         if($es_pdf && $codigo_adj > 0)
             $html .= ' <a onclick="ver_pdf_consolidado('.$codigo_adj.', \''.$nombre_adj.'\', '.$codigo_ff.');" style="cursor:pointer; margin-left:10px;" title="Ver PDF original"><i class="icon-file-pdf" style="color:#88010e;"></i></a>';
         // Icono regenerar: solo si hay adjunto asociado.
         if($codigo_adj > 0)
             $html .= ' <a onclick="regenerar_factura('.$codigo_ff.', '.$codigo_adj.', \''.$nombre_adj.'\');" style="cursor:pointer; color:#d4890e; margin-left:8px;" title="Regenerar factura (volver a procesar con IA)"><i class="icon-loop"></i></a>';
+        // Entrega de la factura COMPLETA: confirmar / desconfirmar todas las
+        // cajas de una vez. Las dos piden confirmacion SI / NO en el JS.
+        $html .= ' <a onclick="confirmar_entrega_factura('.$codigo_ff.', this);" style="cursor:pointer; color:#2e7d32; margin-left:8px;" title="Confirmar entrega de todas las cajas"><i class="icon-shipping"></i></a>';
+        $html .= ' <a onclick="desconfirmar_entrega_factura('.$codigo_ff.', this);" style="cursor:pointer; color:#c62828; margin-left:6px;" title="Desconfirmar todas las cajas"><i class="icon-shipping"></i></a>';
+        // Guia (AWB) de toda la factura. Va en su propio span porque el JS lo
+        // refresca aparte: vive fuera del grid, igual que el contador.
+        $html .= ' <span id="id_guia_factura_'.$codigo_ff.'">'.render_icono_guia_factura_dsft($codigo_ff, $codigo_consolidado).'</span>';
         // Icono quitar: desasocia la factura del consolidado (no la borra).
         $html .= ' <a onclick="quitar_factura_consolidado('.$codigo_ff.', \''.$descripcion_factura.'\');" style="cursor:pointer; color:#88010e; margin-left:8px;" title="Quitar factura de este consolidado"><i class="icon-remove"></i></a>';
         $html .= '</div>';
@@ -2703,15 +2734,19 @@ function render_grid_factura_dsft($codigo_ff)
     if($codigo_ff <= 0)
         return "Factura invalida";
 
-    // FINCA de la cabecera (para la columna FARM del grid).
-    $sql_cab = "SELECT FINCA FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    // FINCA de la cabecera (para la columna FARM del grid) y consolidado al
+    // que pertenece (define que columnas de cm se dibujan).
+    $sql_cab = "SELECT FINCA AS FINCA, CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO
+        FROM factura_finca
+        WHERE CODIGO = ".$codigo_ff;
     $res_cab = mysqli_query($link, $sql_cab);
     if(!$res_cab || mysqli_num_rows($res_cab) == 0)
         return "Factura no encontrada";
-    $fila_cab = mysqli_fetch_assoc($res_cab);
-    $finca    = (string)$fila_cab["FINCA"];
+    $fila_cab           = mysqli_fetch_assoc($res_cab);
+    $finca              = (string)$fila_cab["FINCA"];
+    $codigo_consolidado = (int)$fila_cab["CODIGOCONSOLIDADO"];
 
-    return _render_grid_factura($link, $codigo_ff, $finca);
+    return _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado);
     }
 
 // Renderiza SOLO el contenido (innerHTML) del bloque de totales de una
@@ -2753,10 +2788,1119 @@ function render_totales_factura_dsft($codigo_ff)
     return $html;
     }
 
-// Helper interno de detalle_consolidado_dsft. Renderiza el grid posicional
-// de detalle_factura_finca con columnas cm (40 a 150) y FB equivalente
-// (FB=1, HB=0.5, QB=0.25, OB/EB=0.125) en la primera linea de cada caja.
-function _render_grid_factura($link, $codigo_ff, $finca)
+// ----------------------------------------------------------------------------
+// MEDIDAS (cm) DE UN CONSOLIDADO
+//
+// Las columnas de cm NO existen en la base: cada linea de detalle (factura
+// finca y factura cliente) guarda un solo LARGO, y la grilla se arma al
+// mostrar cruzando ese LARGO con la lista de medidas activas.
+//
+// Cada consolidado define su propia lista en consolidado.MEDIDASCM, un texto
+// con las medidas separadas por coma y ordenadas ascendente ("30,40,50,60").
+// Si viene NULL o vacio (consolidados viejos) se usan las medidas por defecto.
+// ----------------------------------------------------------------------------
+
+// Medidas por defecto: las que se prellenan al crear un consolidado y las que
+// se usan cuando todavia no hay un consolidado al cual preguntarle.
+function medidas_cm_defecto_dsft()
+    {
+    return array(30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160);
+    }
+
+// Quita duplicados y lo que no sea entero positivo, y ordena ascendente.
+function medidas_cm_normaliza_dsft($medidas)
+    {
+    $limpias = array();
+    $total   = count($medidas);
+    for($i=0; $i<$total; $i++)
+        {
+        $n = (int)$medidas[$i];
+        if($n > 0 && !in_array($n, $limpias, true))
+            $limpias[] = $n;
+        }
+    sort($limpias, SORT_NUMERIC);
+    return $limpias;
+    }
+
+// Texto de consolidado.MEDIDASCM ("30,40,50") -> arreglo de enteros normalizado.
+// Devuelve arreglo vacio si el texto viene vacio o sin numeros validos.
+function medidas_cm_desde_texto_dsft($texto)
+    {
+    $texto = trim((string)$texto);
+    if($texto == "")
+        return array();
+    return medidas_cm_normaliza_dsft(explode(",", $texto));
+    }
+
+// Arreglo de enteros -> texto para guardar en consolidado.MEDIDASCM.
+function medidas_cm_a_texto_dsft($medidas)
+    {
+    return implode(",", medidas_cm_normaliza_dsft($medidas));
+    }
+
+// Medidas configuradas del consolidado (solo MEDIDASCM, SIN unir las que estan
+// en uso). Es la lista que se edita desde el dialog MEDIDAS. Si el consolidado
+// no tiene nada guardado, devuelve las medidas por defecto.
+function medidas_cm_configuradas_dsft($codigo_consolidado)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return medidas_cm_defecto_dsft();
+
+    $sql = "SELECT MEDIDASCM AS MEDIDASCM
+        FROM consolidado
+        WHERE CODIGO = ".$codigo_consolidado;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return medidas_cm_defecto_dsft();
+
+    $fila    = mysqli_fetch_assoc($res);
+    $medidas = medidas_cm_desde_texto_dsft($fila["MEDIDASCM"]);
+    if(count($medidas) == 0)
+        return medidas_cm_defecto_dsft();
+    return $medidas;
+    }
+
+// Cuenta las lineas de detalle_factura_finca del consolidado agrupadas por
+// LARGO. Devuelve un arreglo indexado por medida: array(60 => 45, 70 => 12).
+// Se usa para el contador del dialog y para bloquear el borrado de una medida
+// que esta en uso.
+function medidas_cm_uso_dsft($codigo_consolidado)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $usos = array();
+    if($codigo_consolidado <= 0)
+        return $usos;
+
+    $sql = "SELECT d.LARGO AS LARGO, COUNT(*) AS LINEAS
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND d.ESTADO >= 0
+          AND d.LARGO > 0
+        GROUP BY d.LARGO";
+    $res   = mysqli_query($link, $sql);
+    $total = ($res) ? mysqli_num_rows($res) : 0;
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila = mysqli_fetch_assoc($res);
+        $usos[(int)$fila["LARGO"]] = (int)$fila["LINEAS"];
+        }
+    return $usos;
+    }
+
+// Lista EFECTIVA de medidas de un consolidado: las configuradas UNIDAS a las
+// que ya tienen tallos cargados. La union no es opcional: si la usuaria quito
+// una medida pero quedaron lineas con ese largo, la columna tiene que seguir
+// apareciendo o esos tallos desaparecen del grid y de los Excel.
+// Con $codigo_consolidado <= 0 devuelve las medidas por defecto.
+function lista_cms_dsft($codigo_consolidado = 0)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return medidas_cm_defecto_dsft();
+
+    $medidas   = medidas_cm_configuradas_dsft($codigo_consolidado);
+    $usos      = medidas_cm_uso_dsft($codigo_consolidado);
+    $en_uso    = array_keys($usos);
+    $total_uso = count($en_uso);
+    for($i=0; $i<$total_uso; $i++)
+        $medidas[] = (int)$en_uso[$i];
+
+    return medidas_cm_normaliza_dsft($medidas);
+    }
+
+// Lista de medidas para el invoice: la del consolidado al que pertenece MAS
+// las medidas presentes en sus propias lineas, porque el detalle del invoice
+// se edita aparte y puede tener largos que ya no estan en el consolidado.
+function lista_cms_factura_cliente_dsft($codigo_factura_cliente)
+    {
+    global $link;
+    $codigo_factura_cliente = (int)$codigo_factura_cliente;
+    if($codigo_factura_cliente <= 0)
+        return medidas_cm_defecto_dsft();
+
+    // Consolidado de esta factura_cliente.
+    $codigo_consolidado = 0;
+    $sql_fc = "SELECT CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO
+        FROM factura_cliente
+        WHERE CODIGO = ".$codigo_factura_cliente;
+    $res_fc = mysqli_query($link, $sql_fc);
+    if($res_fc && mysqli_num_rows($res_fc) > 0)
+        {
+        $fila_fc            = mysqli_fetch_assoc($res_fc);
+        $codigo_consolidado = (int)$fila_fc["CODIGOCONSOLIDADO"];
+        }
+
+    $medidas = ($codigo_consolidado > 0)
+             ? lista_cms_dsft($codigo_consolidado)
+             : medidas_cm_defecto_dsft();
+
+    // Medidas presentes en las lineas del propio invoice.
+    $sql_uso = "SELECT DISTINCT LARGO AS LARGO
+        FROM detalle_factura_cliente
+        WHERE CODIGOFACTURACLIENTE = ".$codigo_factura_cliente."
+          AND ESTADO >= 0
+          AND LARGO > 0";
+    $res_uso   = mysqli_query($link, $sql_uso);
+    $total_uso = ($res_uso) ? mysqli_num_rows($res_uso) : 0;
+    for($i=1; $i<=$total_uso; $i++)
+        {
+        $fila_uso  = mysqli_fetch_assoc($res_uso);
+        $medidas[] = (int)$fila_uso["LARGO"];
+        }
+
+    return medidas_cm_normaliza_dsft($medidas);
+    }
+
+// Guarda la lista de medidas del consolidado (normalizada) y sella quien
+// modifico. Retorna "OK" o el mensaje de error SQL.
+function medidas_cm_guarda_dsft($codigo_consolidado, $medidas, $codigo_usuario)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_usuario     = (int)$codigo_usuario;
+
+    // Freno en el unico punto que escribe MEDIDASCM: dejar la columna vacia
+    // haria que medidas_cm_configuradas_dsft cayera en el fallback y el
+    // consolidado apareciera de golpe con las 14 por defecto. Ningun camino
+    // puede vaciarla, aunque se llame a esta funcion desde otro lado.
+    $medidas = medidas_cm_normaliza_dsft($medidas);
+    if(count($medidas) == 0)
+        return "El consolidado debe quedar con al menos una medida";
+
+    $texto = mysqli_real_escape_string($link, medidas_cm_a_texto_dsft($medidas));
+
+    $sql = "UPDATE consolidado SET
+        MEDIDASCM             = '".$texto."',
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo_consolidado;
+    if(!mysqli_query($link, $sql))
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Agrega una medida a la lista del consolidado. Validaciones identicas al JS.
+function agregar_medida_consolidado_dsft($codigo_consolidado, $medida, $codigo_usuario)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "Consolidado inválido";
+
+    $medida = (int)$medida;
+    if($medida <= 0)
+        return "Por favor ingrese una medida mayor a cero";
+    if($medida > 500)
+        return "La medida no puede ser mayor a 500 cm";
+
+    $medidas = medidas_cm_configuradas_dsft($codigo_consolidado);
+    if(in_array($medida, $medidas, true))
+        return "La medida ".$medida." cm ya está en la lista";
+
+    $medidas[] = $medida;
+    return medidas_cm_guarda_dsft($codigo_consolidado, $medidas, $codigo_usuario);
+    }
+
+// Quita una medida de la lista del consolidado. Si hay lineas cargadas con ese
+// largo NO la quita: sacarla esconderia esos tallos del grid y de los Excel.
+function quitar_medida_consolidado_dsft($codigo_consolidado, $medida, $codigo_usuario)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "Consolidado inválido";
+
+    $medida = (int)$medida;
+    if($medida <= 0)
+        return "Medida inválida";
+
+    $usos   = medidas_cm_uso_dsft($codigo_consolidado);
+    $lineas = isset($usos[$medida]) ? (int)$usos[$medida] : 0;
+    if($lineas > 0)
+        return "No se puede quitar la medida ".$medida.": ".$lineas." línea".(($lineas == 1) ? "" : "s")." la ".(($lineas == 1) ? "usa" : "usan");
+
+    $medidas   = medidas_cm_configuradas_dsft($codigo_consolidado);
+    $restantes = array();
+    $total     = count($medidas);
+    for($i=0; $i<$total; $i++)
+        {
+        if((int)$medidas[$i] != $medida)
+            $restantes[] = (int)$medidas[$i];
+        }
+    if(count($restantes) == 0)
+        return "El consolidado debe quedar con al menos una medida";
+
+    return medidas_cm_guarda_dsft($codigo_consolidado, $restantes, $codigo_usuario);
+    }
+
+// Contenido del dialog MEDIDAS: una fila por medida activa con su contador de
+// lineas y el icono de quitar (apagado si la medida esta en uso), mas el campo
+// para agregar una medida nueva.
+function render_medidas_consolidado_dsft($codigo_consolidado)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return '<div style="color:#88010e; font-size:12px;">Consolidado inválido</div>';
+
+    // $medidas es la lista EFECTIVA (lo que se dibuja como columnas) y
+    // $configuradas es lo que realmente se guarda en MEDIDASCM. Una medida
+    // puede estar en la efectiva sin estar configurada: aparece forzada
+    // porque tiene lineas cargadas.
+    $medidas      = lista_cms_dsft($codigo_consolidado);
+    $configuradas = medidas_cm_configuradas_dsft($codigo_consolidado);
+    $usos         = medidas_cm_uso_dsft($codigo_consolidado);
+    $total_med    = count($medidas);
+    $total_conf   = count($configuradas);
+
+    $html  = '<div style="font-size:11px; color:#666; padding:0 0 6px 0;">';
+    $html .= 'Columnas de cm de este consolidado. Las medidas con líneas cargadas no se pueden quitar.';
+    $html .= '</div>';
+    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    for($m=0; $m<$total_med; $m++)
+        {
+        $medida    = (int)$medidas[$m];
+        $lineas    = isset($usos[$medida]) ? (int)$usos[$medida] : 0;
+        $plural    = ($lineas == 1) ? "" : "s";
+        $bg        = ($m % 2 == 0) ? "#fff" : "#f9f9f9";
+        $es_config = in_array($medida, $configuradas, true);
+
+        // El basurero se apaga por dos motivos distintos, con su propio aviso:
+        // la medida tiene lineas, o es la unica que queda configurada.
+        $motivo_bloqueo = "";
+        if($lineas > 0)
+            $motivo_bloqueo = "No se puede quitar: ".$lineas." línea".$plural." ".(($lineas == 1) ? "usa" : "usan")." esta medida";
+        else if($es_config && $total_conf <= 1)
+            $motivo_bloqueo = "No se puede quitar: el consolidado debe quedar con al menos una medida";
+
+        // Texto del estado. Una medida con lineas que NO esta configurada se
+        // dibuja igual para no esconder tallos; se aclara por que aparece.
+        if($lineas > 0 && !$es_config)
+            $estado = $lineas.' línea'.$plural.' (fuera de la lista)';
+        else if($lineas > 0)
+            $estado = $lineas.' línea'.$plural;
+        else
+            $estado = 'Sin líneas';
+
+        $html .= '<tr style="background:'.$bg.';">';
+        $html .= '<td style="padding:3px 6px; border:1px solid #ddd; font-weight:bold; width:60px;">'.$medida.' cm</td>';
+        $html .= '<td style="padding:3px 6px; border:1px solid #ddd; color:'.(($lineas > 0) ? '#666' : '#999').';">'.$estado.'</td>';
+        $html .= '<td style="padding:3px 6px; border:1px solid #ddd; text-align:center; width:28px;">';
+        if($motivo_bloqueo != "")
+            $html .= '<i class="icon-remove" style="color:#ccc;" title="'.htmlspecialchars($motivo_bloqueo, ENT_QUOTES, "UTF-8").'"></i>';
+        else
+            $html .= '<a onclick="quitar_medida_consolidado('.$medida.');" style="cursor:pointer; color:#c62828;" title="Quitar la medida '.$medida.' cm"><i class="icon-remove"></i></a>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+    $html .= '</table>';
+
+    $html .= '<div style="margin-top:10px; padding-top:8px; border-top:1px solid #ddd; text-align:right;">';
+    $html .= '<input type="text" id="id_medida_nueva" maxlength="3" placeholder="55"';
+    $html .= ' style="width:55px; font-size:12px; text-align:right;" onfocus="this.select()"';
+    $html .= ' onkeypress="return (event.charCode >= 48 && event.charCode <= 57)" />';
+    $html .= ' <button type="button" class="button bg-darkRed bg-hover-red fg-white"';
+    $html .= ' onclick="agregar_medida_consolidado();" style="margin-left:5px;">AGREGAR</button>';
+    $html .= '</div>';
+    return $html;
+    }
+
+// ----------------------------------------------------------------------------
+// CONFIRMACION DE ENTREGA POR CAJA (a la carguera)
+//
+// Es SOLO informativo: no bloquea la edicion de las lineas. La marca es por
+// CAJA, no por variedad, y la caja se identifica igual que en el grid, por el
+// par (CODIGOFACTURAFINCA, NUMEROCAJA). Los datos viven en caja_factura_finca,
+// "al costado" de detalle_factura_finca, que no se toca.
+//
+// Regla: una caja SIN registro en la tabla es una caja sin entregar. El
+// registro nace la primera vez que la usuaria marca algo.
+// ----------------------------------------------------------------------------
+
+// Estado de entrega de TODAS las cajas de una factura en UNA sola consulta
+// (el grid la llama una vez y despues resuelve cada fila en memoria).
+// Devuelve un arreglo indexado por NUMEROCAJA.
+function estado_cajas_factura_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    $estados   = array();
+    if($codigo_ff <= 0)
+        return $estados;
+
+    // Los dos LEFT JOIN evitan consultas por caja: usuario resuelve el nombre de
+    // quien REGISTRO la entrega y guia el numero de AWB, ambos solo para los
+    // title. Se usa CODIGOUSUARIOENTREGA y no CODIGOUSUARIOMODIFICA, porque esa
+    // otra la pisa cualquier cambio (por ejemplo asignar una guia).
+    $sql = "SELECT c.NUMEROCAJA AS NUMEROCAJA,
+        c.ENTREGADA AS ENTREGADA,
+        c.FECHAENTREGA AS FECHAENTREGA,
+        c.CODIGOGUIA AS CODIGOGUIA,
+        g.NUMEROGUIA AS NUMEROGUIA,
+        u.nombre_usuario AS NOMBREUSUARIO,
+        u.apellido_usuario AS APELLIDOUSUARIO
+        FROM caja_factura_finca c
+        LEFT JOIN usuario u ON c.CODIGOUSUARIOENTREGA = u.codigo_usuario
+        LEFT JOIN guia g ON c.CODIGOGUIA = g.CODIGO
+        WHERE c.CODIGOFACTURAFINCA = ".$codigo_ff;
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $estados;
+
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila  = mysqli_fetch_assoc($res);
+        $nombre = trim((string)$fila["NOMBREUSUARIO"]." ".(string)$fila["APELLIDOUSUARIO"]);
+        $estados[(int)$fila["NUMEROCAJA"]] = array(
+            "ENTREGADA"    => (int)$fila["ENTREGADA"],
+            "FECHAENTREGA" => (string)$fila["FECHAENTREGA"],
+            "USUARIO"      => $nombre,
+            "CODIGOGUIA"   => (int)$fila["CODIGOGUIA"],
+            "NUMEROGUIA"   => (string)$fila["NUMEROGUIA"]
+            );
+        }
+    return $estados;
+    }
+
+// Cajas entregadas (X) y cajas totales (Y) de una factura, en una consulta.
+// Y sale de las lineas (DISTINCT NUMEROCAJA con ESTADO >= 0), asi que X nunca
+// puede superar a Y aunque quedara una anotacion vieja de una caja borrada.
+function cuenta_cajas_entregadas_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    $conteo    = array("TOTAL" => 0, "ENTREGADAS" => 0);
+    if($codigo_ff <= 0)
+        return $conteo;
+
+    $sql = "SELECT COUNT(DISTINCT d.NUMEROCAJA) AS TOTAL,
+        COUNT(DISTINCT CASE WHEN c.ENTREGADA = 1 THEN d.NUMEROCAJA END) AS ENTREGADAS
+        FROM detalle_factura_finca d
+        LEFT JOIN caja_factura_finca c
+               ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+              AND c.NUMEROCAJA = d.NUMEROCAJA
+        WHERE d.CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND d.ESTADO >= 0";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return $conteo;
+
+    $fila                 = mysqli_fetch_assoc($res);
+    $conteo["TOTAL"]      = (int)$fila["TOTAL"];
+    $conteo["ENTREGADAS"] = (int)$fila["ENTREGADAS"];
+    return $conteo;
+    }
+
+// Texto "Entregadas X/Y" de la cabecera de la tarjeta. Se pide por AJAX cada
+// vez que se recarga el grid, porque el contador vive fuera del grid.
+function render_contador_entregas_dsft($codigo_ff)
+    {
+    $conteo = cuenta_cajas_entregadas_dsft($codigo_ff);
+    $total  = (int)$conteo["TOTAL"];
+    $x      = (int)$conteo["ENTREGADAS"];
+
+    // Sin cajas no hay nada que contar: la etiqueta no se dibuja.
+    if($total == 0)
+        return "";
+
+    // Verde cuando estan todas, rojo mientras falte alguna.
+    $color  = ($x == $total) ? "#2e7d32" : "#c62828";
+    $titulo = "Entregadas ".$x." de ".$total." cajas";
+    return '<span style="background:'.$color.'; color:#fff; font-weight:bold;'
+        .' padding:2px 8px; border-radius:4px;" title="'.htmlspecialchars($titulo, ENT_QUOTES, "UTF-8").'">'
+        .$x.'/'.$total.'</span>';
+    }
+
+// Alterna entregada / no entregada de UNA caja. Sin dialogo: es una sola caja
+// y la accion es reversible con otro clic.
+function alternar_entrega_caja_dsft($codigo_ff, $numero_caja, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $numero_caja    = (int)$numero_caja;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura invalida";
+    if($numero_caja <= 0)
+        return "ERROR: Caja invalida";
+
+    // Estado actual. Sin registro = sin entregar.
+    $entregada = 0;
+    $sql_act   = "SELECT ENTREGADA AS ENTREGADA
+        FROM caja_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND NUMEROCAJA = ".$numero_caja;
+    $res_act = mysqli_query($link, $sql_act);
+    if(!$res_act)
+        return "ERROR: ".mysqli_error($link);
+    if(mysqli_num_rows($res_act) > 0)
+        {
+        $fila_act  = mysqli_fetch_assoc($res_act);
+        $entregada = (int)$fila_act["ENTREGADA"];
+        }
+
+    $nuevo = ($entregada == 1) ? 0 : 1;
+    $fecha = ($nuevo == 1) ? "NOW()" : "NULL";
+
+    // ON DUPLICATE KEY UPDATE contra el UNIQUE (CODIGOFACTURAFINCA, NUMEROCAJA):
+    // un doble clic no crea dos registros de la misma caja.
+    // CODIGOUSUARIOENTREGA solo lo escriben las acciones de entrega, asi que
+    // guarda quien registro el cambio de estado sin que lo pise una guia.
+    $sql = "INSERT INTO caja_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, ENTREGADA, FECHAENTREGA, CODIGOUSUARIOENTREGA,
+         CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+        VALUES
+        (".$codigo_ff.", ".$numero_caja.", ".$nuevo.", ".$fecha.", ".$codigo_usuario.",
+         ".$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())
+        ON DUPLICATE KEY UPDATE
+        ENTREGADA             = ".$nuevo.",
+        FECHAENTREGA          = ".$fecha.",
+        CODIGOUSUARIOENTREGA  = ".$codigo_usuario.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Marca como entregadas TODAS las cajas de la factura. Un solo INSERT con
+// varias filas en vez de una consulta por caja.
+function confirmar_entrega_factura_dsft($codigo_ff, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura invalida";
+
+    $sql_cajas = "SELECT DISTINCT NUMEROCAJA AS NUMEROCAJA
+        FROM detalle_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND ESTADO >= 0
+        ORDER BY NUMEROCAJA";
+    $res_cajas = mysqli_query($link, $sql_cajas);
+    if(!$res_cajas)
+        return "ERROR: ".mysqli_error($link);
+
+    $total = mysqli_num_rows($res_cajas);
+    if($total == 0)
+        return "ERROR: La factura no tiene cajas para confirmar";
+
+    $valores = array();
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila      = mysqli_fetch_assoc($res_cajas);
+        $valores[] = "(".$codigo_ff.", ".(int)$fila["NUMEROCAJA"].", 1, NOW(), ".$codigo_usuario.", "
+                   .$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())";
+        }
+
+    $sql = "INSERT INTO caja_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, ENTREGADA, FECHAENTREGA, CODIGOUSUARIOENTREGA,
+         CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+        VALUES ".implode(", ", $valores)."
+        ON DUPLICATE KEY UPDATE
+        ENTREGADA             = 1,
+        FECHAENTREGA          = NOW(),
+        CODIGOUSUARIOENTREGA  = ".$codigo_usuario.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Desmarca TODAS las cajas de la factura. No hace falta crear registros: una
+// caja sin registro ya cuenta como sin entregar, asi que alcanza con apagar
+// los que existan.
+function desconfirmar_entrega_factura_dsft($codigo_ff, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura invalida";
+
+    $sql = "UPDATE caja_factura_finca SET
+        ENTREGADA             = 0,
+        FECHAENTREGA          = NULL,
+        CODIGOUSUARIOENTREGA  = ".$codigo_usuario.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// ----------------------------------------------------------------------------
+// GUIA (AWB) POR CAJA
+//
+// Cada caja queda asignada a UNA sola guia a la vez, en la columna
+// caja_factura_finca.CODIGOGUIA (NULL = sin guia). Una sola columna = una sola
+// guia; si la caja se reetiqueta, se le cambia la guia.
+//
+// Las guias elegibles son SIEMPRE las que ya tiene el consolidado
+// (guia_consolidado union guia). Si falta una, la usuaria la agrega al
+// consolidado con el mecanismo que ya existe y despues la asigna.
+//
+// Colores del icono icon-hash, iguales en los tres niveles (caja, factura y
+// consolidado): GRIS #9e9e9e sin guia (o con alguna caja sin guia) y AMARILLO
+// #f9a825 cuando todas tienen. El numero de guia va solo en el title.
+// ----------------------------------------------------------------------------
+
+// Guias que tiene asociado un consolidado. Es la lista elegible del dialogo.
+function guias_del_consolidado_dsft($codigo_consolidado)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $guias              = array();
+    if($codigo_consolidado <= 0)
+        return $guias;
+
+    $sql = "SELECT g.CODIGO AS CODIGO, g.NUMEROGUIA AS NUMEROGUIA
+        FROM guia_consolidado gc
+        INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+        WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+        ORDER BY g.NUMEROGUIA";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $guias;
+
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila    = mysqli_fetch_assoc($res);
+        $guias[] = array(
+            "CODIGO"     => (int)$fila["CODIGO"],
+            "NUMEROGUIA" => (string)$fila["NUMEROGUIA"]
+            );
+        }
+    return $guias;
+    }
+
+// Consolidado al que pertenece una factura_finca (0 si no se encuentra).
+function consolidado_de_factura_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return 0;
+
+    $sql = "SELECT CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO
+        FROM factura_finca
+        WHERE CODIGO = ".$codigo_ff;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return 0;
+
+    $fila = mysqli_fetch_assoc($res);
+    return (int)$fila["CODIGOCONSOLIDADO"];
+    }
+
+// Valida en el SERVIDOR que la guia pertenezca al consolidado. El dialogo solo
+// ofrece las correctas, pero no se confia en eso: la peticion puede venir
+// armada a mano.
+function guia_pertenece_consolidado_dsft($codigo_consolidado, $codigo_guia)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia        = (int)$codigo_guia;
+    if($codigo_consolidado <= 0 || $codigo_guia <= 0)
+        return 0;
+
+    $sql = "SELECT CODIGOGUIA AS CODIGOGUIA
+        FROM guia_consolidado
+        WHERE CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND CODIGOGUIA = ".$codigo_guia;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return 0;
+    return 1;
+    }
+
+// Numero de una guia (cadena vacia si no existe). Para los textos y los title.
+function numero_guia_dsft($codigo_guia)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_guia = (int)$codigo_guia;
+    if($codigo_guia <= 0)
+        return "";
+
+    $sql = "SELECT NUMEROGUIA AS NUMEROGUIA FROM guia WHERE CODIGO = ".$codigo_guia;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return "";
+
+    $fila = mysqli_fetch_assoc($res);
+    return (string)$fila["NUMEROGUIA"];
+    }
+
+// Cajas con guia de UNA factura. TOTAL sale de las lineas (DISTINCT NUMEROCAJA
+// con ESTADO >= 0), asi que CONGUIA nunca puede superar a TOTAL. Si se pasa
+// $codigo_guia, CAMBIAN dice cuantas cajas ya tienen OTRA guia distinta: es el
+// numero que el dialogo avisa antes de reasignar.
+function cuenta_cajas_con_guia_dsft($codigo_ff, $codigo_guia = 0)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff   = (int)$codigo_ff;
+    $codigo_guia = (int)$codigo_guia;
+    $conteo      = array("TOTAL" => 0, "CONGUIA" => 0, "CAMBIAN" => 0);
+    if($codigo_ff <= 0)
+        return $conteo;
+
+    $sql = "SELECT COUNT(DISTINCT d.NUMEROCAJA) AS TOTAL,
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN d.NUMEROCAJA END) AS CONGUIA,
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 AND c.CODIGOGUIA <> ".$codigo_guia." THEN d.NUMEROCAJA END) AS CAMBIAN
+        FROM detalle_factura_finca d
+        LEFT JOIN caja_factura_finca c
+               ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+              AND c.NUMEROCAJA = d.NUMEROCAJA
+        WHERE d.CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND d.ESTADO >= 0";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return $conteo;
+
+    $fila               = mysqli_fetch_assoc($res);
+    $conteo["TOTAL"]    = (int)$fila["TOTAL"];
+    $conteo["CONGUIA"]  = (int)$fila["CONGUIA"];
+    $conteo["CAMBIAN"]  = (int)$fila["CAMBIAN"];
+    return $conteo;
+    }
+
+// Lo mismo pero de TODO el consolidado. Agrega FACTURAS, que el dialogo usa
+// para el texto "las N cajas de las F facturas". Las cajas se cuentan por el
+// par factura+caja, porque el NUMEROCAJA se repite entre facturas distintas.
+function cuenta_cajas_con_guia_consolidado_dsft($codigo_consolidado, $codigo_guia = 0)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia        = (int)$codigo_guia;
+    $conteo             = array("TOTAL" => 0, "CONGUIA" => 0, "CAMBIAN" => 0, "FACTURAS" => 0);
+    if($codigo_consolidado <= 0)
+        return $conteo;
+
+    $sql = "SELECT COUNT(DISTINCT CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA)) AS TOTAL,
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA) END) AS CONGUIA,
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 AND c.CODIGOGUIA <> ".$codigo_guia." THEN CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA) END) AS CAMBIAN,
+        COUNT(DISTINCT d.CODIGOFACTURAFINCA) AS FACTURAS
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        LEFT JOIN caja_factura_finca c
+               ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+              AND c.NUMEROCAJA = d.NUMEROCAJA
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND d.ESTADO >= 0";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return $conteo;
+
+    $fila                = mysqli_fetch_assoc($res);
+    $conteo["TOTAL"]     = (int)$fila["TOTAL"];
+    $conteo["CONGUIA"]   = (int)$fila["CONGUIA"];
+    $conteo["CAMBIAN"]   = (int)$fila["CAMBIAN"];
+    $conteo["FACTURAS"]  = (int)$fila["FACTURAS"];
+    return $conteo;
+    }
+
+// Resumen de cajas con guia de TODOS los consolidados, en UNA sola consulta.
+// El listado de consolidados lo pide una vez y despues resuelve el color de
+// cada fila en memoria, en lugar de consultar por fila.
+function resumen_guias_consolidados_dsft()
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $resumen = array();
+    $sql = "SELECT ff.CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
+        COUNT(DISTINCT CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA)) AS TOTAL,
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA) END) AS CONGUIA
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        LEFT JOIN caja_factura_finca c
+               ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+              AND c.NUMEROCAJA = d.NUMEROCAJA
+        WHERE d.ESTADO >= 0
+          AND ff.CODIGOCONSOLIDADO IS NOT NULL
+        GROUP BY ff.CODIGOCONSOLIDADO";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $resumen;
+
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila = mysqli_fetch_assoc($res);
+        $resumen[(int)$fila["CODIGOCONSOLIDADO"]] = array(
+            "TOTAL"   => (int)$fila["TOTAL"],
+            "CONGUIA" => (int)$fila["CONGUIA"]
+            );
+        }
+    return $resumen;
+    }
+
+// Color del icono icon-hash a partir de un conteo: amarillo solo si hay cajas y
+// TODAS tienen guia. Un unico lugar para que los tres niveles coincidan.
+function color_icono_guia_dsft($total, $con_guia)
+    {
+    $total    = (int)$total;
+    $con_guia = (int)$con_guia;
+    if($total > 0 && $con_guia >= $total)
+        return "#f9a825";
+    return "#9e9e9e";
+    }
+
+// Contenido del dialogo de guias. Las filas llaman siempre a la misma funcion
+// JS (elegir_guia_asignar); el destino concreto (caja, factura o consolidado)
+// lo guarda el JS antes de abrir el dialogo, porque aca no se conoce.
+//   $contexto:            "caja" | "factura" | "consolidado", solo para el texto.
+//   $codigo_guia_actual:  guia actual, para marcarla. 0 = no marcar ninguna.
+function render_guias_asignar_dsft($codigo_consolidado, $contexto = "caja", $codigo_guia_actual = 0)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia_actual = (int)$codigo_guia_actual;
+    $contexto           = strtolower(trim((string)$contexto));
+    if($codigo_consolidado <= 0)
+        return '<div style="color:#88010e; font-size:12px;">Consolidado inválido</div>';
+
+    $guias = guias_del_consolidado_dsft($codigo_consolidado);
+    $total = count($guias);
+
+    if($total == 0)
+        return '<div style="font-size:12px; color:#88010e; padding:4px 0;">'
+             .'Este consolidado no tiene guías. Agréguelas primero.</div>';
+
+    if($contexto == "factura")
+        $ayuda = 'Toque una guía para asignarla a TODAS las cajas de esta factura.';
+    else if($contexto == "consolidado")
+        $ayuda = 'Toque una guía para asignarla a TODAS las cajas de este consolidado.';
+    else
+        $ayuda = 'Toque una guía para asignarla a esta caja.';
+
+    $html  = '<div style="font-size:11px; color:#666; padding:0 0 6px 0;">'.$ayuda.'</div>';
+    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    for($i=0; $i<$total; $i++)
+        {
+        $codigo_guia = (int)$guias[$i]["CODIGO"];
+        $numero_guia = (string)$guias[$i]["NUMEROGUIA"];
+        $es_actual   = ($codigo_guia_actual > 0 && $codigo_guia == $codigo_guia_actual);
+        $bg          = ($i % 2 == 0) ? "#fff" : "#f9f9f9";
+        $numero_js   = htmlspecialchars(addslashes($numero_guia), ENT_QUOTES, "UTF-8");
+        $numero_html = htmlspecialchars($numero_guia, ENT_QUOTES, "UTF-8");
+
+        $html .= '<tr style="background:'.$bg.';">';
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd;">';
+        $html .= '<a onclick="elegir_guia_asignar('.$codigo_guia.', \''.$numero_js.'\');"';
+        $html .= ' style="cursor:pointer; color:#88010e; font-weight:bold;"';
+        $html .= ' title="Asignar la guía '.$numero_html.'">'.$numero_html.'</a>';
+        $html .= '</td>';
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:70px;">';
+        if($es_actual)
+            $html .= '<span style="color:#2e7d32; font-size:11px;"><i class="icon-checkmark"></i> actual</span>';
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+    $html .= '</table>';
+
+    // Quitar la guia: misma lista, accion opuesta. codigo_guia 0 = quitar.
+    if($contexto == "factura")
+        $texto_quitar = 'QUITAR GUÍA DE TODAS LAS CAJAS';
+    else if($contexto == "consolidado")
+        $texto_quitar = 'QUITAR GUÍA DE TODAS LAS CAJAS';
+    else
+        $texto_quitar = 'QUITAR GUÍA';
+
+    $html .= '<div style="margin-top:10px; padding-top:8px; border-top:1px solid #ddd;">';
+    $html .= '<a onclick="elegir_guia_asignar(0, \'\');" style="cursor:pointer; color:#c62828; font-size:12px; font-weight:bold;">';
+    $html .= '<i class="icon-remove" style="margin-right:4px;"></i>'.$texto_quitar.'</a>';
+    $html .= '</div>';
+    return $html;
+    }
+
+// Asigna (o quita, con $codigo_guia = 0) la guia de UNA caja.
+function asignar_guia_caja_dsft($codigo_ff, $numero_caja, $codigo_guia, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $numero_caja    = (int)$numero_caja;
+    $codigo_guia    = (int)$codigo_guia;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura inválida";
+    if($numero_caja <= 0)
+        return "ERROR: Caja inválida";
+
+    // La guia tiene que pertenecer al consolidado de esta factura.
+    if($codigo_guia > 0)
+        {
+        $codigo_consolidado = consolidado_de_factura_dsft($codigo_ff);
+        if($codigo_consolidado <= 0)
+            return "ERROR: La factura no pertenece a un consolidado";
+        if(guia_pertenece_consolidado_dsft($codigo_consolidado, $codigo_guia) == 0)
+            return "ERROR: Esa guía no pertenece al consolidado de la factura";
+        }
+
+    $valor_guia = ($codigo_guia > 0) ? (string)$codigo_guia : "NULL";
+
+    $sql = "INSERT INTO caja_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, CODIGOGUIA,
+         CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+        VALUES
+        (".$codigo_ff.", ".$numero_caja.", ".$valor_guia.",
+         ".$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())
+        ON DUPLICATE KEY UPDATE
+        CODIGOGUIA            = ".$valor_guia.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Asigna (o quita) la guia a TODAS las cajas de una factura, con un solo INSERT
+// multifila en lugar de una consulta por caja.
+function asignar_guia_factura_dsft($codigo_ff, $codigo_guia, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $codigo_guia    = (int)$codigo_guia;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura inválida";
+
+    if($codigo_guia > 0)
+        {
+        $codigo_consolidado = consolidado_de_factura_dsft($codigo_ff);
+        if($codigo_consolidado <= 0)
+            return "ERROR: La factura no pertenece a un consolidado";
+        if(guia_pertenece_consolidado_dsft($codigo_consolidado, $codigo_guia) == 0)
+            return "ERROR: Esa guía no pertenece al consolidado de la factura";
+        }
+
+    $sql_cajas = "SELECT DISTINCT NUMEROCAJA AS NUMEROCAJA
+        FROM detalle_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND ESTADO >= 0
+        ORDER BY NUMEROCAJA";
+    $res_cajas = mysqli_query($link, $sql_cajas);
+    if(!$res_cajas)
+        return "ERROR: ".mysqli_error($link);
+
+    $total = mysqli_num_rows($res_cajas);
+    if($total == 0)
+        return "ERROR: La factura no tiene cajas";
+
+    $valor_guia = ($codigo_guia > 0) ? (string)$codigo_guia : "NULL";
+    $valores    = array();
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila      = mysqli_fetch_assoc($res_cajas);
+        $valores[] = "(".$codigo_ff.", ".(int)$fila["NUMEROCAJA"].", ".$valor_guia.", "
+                   .$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())";
+        }
+
+    $sql = "INSERT INTO caja_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, CODIGOGUIA,
+         CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+        VALUES ".implode(", ", $valores)."
+        ON DUPLICATE KEY UPDATE
+        CODIGOGUIA            = ".$valor_guia.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Asigna (o quita) la guia a TODAS las cajas de TODAS las facturas del
+// consolidado, tambien con un solo INSERT multifila.
+function asignar_guia_consolidado_cajas_dsft($codigo_consolidado, $codigo_guia, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia        = (int)$codigo_guia;
+    $codigo_usuario     = (int)$codigo_usuario;
+    if($codigo_consolidado <= 0)
+        return "ERROR: Consolidado inválido";
+
+    if($codigo_guia > 0 && guia_pertenece_consolidado_dsft($codigo_consolidado, $codigo_guia) == 0)
+        return "ERROR: Esa guía no pertenece a este consolidado";
+
+    $sql_cajas = "SELECT DISTINCT d.CODIGOFACTURAFINCA AS CODIGOFACTURAFINCA,
+        d.NUMEROCAJA AS NUMEROCAJA
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND d.ESTADO >= 0
+        ORDER BY d.CODIGOFACTURAFINCA, d.NUMEROCAJA";
+    $res_cajas = mysqli_query($link, $sql_cajas);
+    if(!$res_cajas)
+        return "ERROR: ".mysqli_error($link);
+
+    $total = mysqli_num_rows($res_cajas);
+    if($total == 0)
+        return "ERROR: El consolidado no tiene cajas";
+
+    $valor_guia = ($codigo_guia > 0) ? (string)$codigo_guia : "NULL";
+    $valores    = array();
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila      = mysqli_fetch_assoc($res_cajas);
+        $valores[] = "(".(int)$fila["CODIGOFACTURAFINCA"].", ".(int)$fila["NUMEROCAJA"].", ".$valor_guia.", "
+                   .$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())";
+        }
+
+    $sql = "INSERT INTO caja_factura_finca
+        (CODIGOFACTURAFINCA, NUMEROCAJA, CODIGOGUIA,
+         CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+        VALUES ".implode(", ", $valores)."
+        ON DUPLICATE KEY UPDATE
+        CODIGOGUIA            = ".$valor_guia.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Icono icon-hash de la cabecera de una factura, con su color y su title.
+// Se pide por AJAX para refrescarlo sin redibujar toda la tarjeta.
+function render_icono_guia_factura_dsft($codigo_ff, $codigo_consolidado = 0)
+    {
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_consolidado <= 0)
+        $codigo_consolidado = consolidado_de_factura_dsft($codigo_ff);
+
+    $conteo = cuenta_cajas_con_guia_dsft($codigo_ff);
+    $color  = color_icono_guia_dsft($conteo["TOTAL"], $conteo["CONGUIA"]);
+    $titulo = "Guía asignada en ".$conteo["CONGUIA"]." de ".$conteo["TOTAL"]." cajas";
+    return '<a onclick="dialog_guias_factura('.$codigo_ff.', '.(int)$codigo_consolidado.', this);"'
+        .' style="cursor:pointer; color:'.$color.'; margin-left:8px;" title="'.$titulo.'">'
+        .'<i class="icon-hash"></i></a>';
+    }
+
+// Texto del dialogo SI / NO al asignar una guia a una factura o a un consolidado
+// completo. Lo arma el servidor y no el JS porque los numeros (cuantas cajas hay
+// y cuantas cambian de guia) dependen de la guia elegida.
+//   $contexto: "factura" (y $codigo es la factura) o "consolidado".
+function render_confirma_guia_dsft($contexto, $codigo, $codigo_guia)
+    {
+    $contexto    = strtolower(trim((string)$contexto));
+    $codigo      = (int)$codigo;
+    $codigo_guia = (int)$codigo_guia;
+
+    if($contexto == "consolidado")
+        $conteo = cuenta_cajas_con_guia_consolidado_dsft($codigo, $codigo_guia);
+    else
+        $conteo = cuenta_cajas_con_guia_dsft($codigo, $codigo_guia);
+
+    $cajas   = (int)$conteo["TOTAL"];
+    $cambian = (int)$conteo["CAMBIAN"];
+    $conguia = (int)$conteo["CONGUIA"];
+
+    if($cajas == 0)
+        return '<p style="color:#88010e;">No hay cajas para asignar.</p>';
+
+    // Quitar la guia: solo interesan las cajas que hoy tienen alguna.
+    if($codigo_guia <= 0)
+        {
+        if($conguia == 0)
+            return '<p style="color:#88010e;">Ninguna caja tiene guía asignada.</p>';
+        $donde = ($contexto == "consolidado") ? "este consolidado" : "esta factura";
+        if($conguia == 1)
+            return '<p>¿Quitar la guía de la <strong>1</strong> caja de '.$donde.' que la tiene asignada?</p>';
+        return '<p>¿Quitar la guía de las <strong>'.$conguia.'</strong> cajas de '.$donde.' que la tienen asignada?</p>';
+        }
+
+    $numero_guia = numero_guia_dsft($codigo_guia);
+    if($numero_guia == "")
+        $numero_guia = (string)$codigo_guia;
+    $numero_guia = htmlspecialchars($numero_guia, ENT_QUOTES, "UTF-8");
+
+    $las_cajas = ($cajas == 1) ? 'la <strong>1</strong> caja' : 'las <strong>'.$cajas.'</strong> cajas';
+    if($contexto == "consolidado")
+        {
+        $facturas    = (int)$conteo["FACTURAS"];
+        $las_facturas = ($facturas == 1) ? 'la <strong>1</strong> factura' : 'las <strong>'.$facturas.'</strong> facturas';
+        $html = '<p>¿Asignar la guía <strong>'.$numero_guia.'</strong> a '.$las_cajas
+              .' de '.$las_facturas.' de este consolidado?</p>';
+        }
+    else
+        {
+        $html = '<p>¿Asignar la guía <strong>'.$numero_guia.'</strong> a '.$las_cajas
+              .' de esta factura?</p>';
+        }
+
+    if($cambian > 0)
+        $html .= '<p style="color:#88010e;"><strong>'.$cambian.'</strong> caja'.(($cambian == 1) ? '' : 's')
+              .' ya tiene'.(($cambian == 1) ? '' : 'n').' otra guía y cambiará'.(($cambian == 1) ? '' : 'n').' de guía.</p>';
+    return $html;
+    }
+
+// Aviso previo a regenerar una factura. Cuenta las cajas confirmadas como
+// entregadas Y las que tienen guia asignada, porque al rehacer las lineas se
+// pueden perder las dos cosas. Devuelve cadena vacia si no hay nada que avisar,
+// y en ese caso el JS va directo al dialogo de restaurar.
+function render_aviso_regenerar_dsft($codigo_ff)
+    {
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "";
+
+    $entregas  = cuenta_cajas_entregadas_dsft($codigo_ff);
+    $guias     = cuenta_cajas_con_guia_dsft($codigo_ff);
+    $entregadas = (int)$entregas["ENTREGADAS"];
+    $con_guia   = (int)$guias["CONGUIA"];
+    if($entregadas == 0 && $con_guia == 0)
+        return "";
+
+    $partes = array();
+    if($entregadas > 0)
+        $partes[] = '<strong>'.$entregadas.'</strong> caja'.(($entregadas == 1) ? '' : 's').' confirmada'.(($entregadas == 1) ? '' : 's').' como entregada'.(($entregadas == 1) ? '' : 's');
+    if($con_guia > 0)
+        $partes[] = '<strong>'.$con_guia.'</strong> caja'.(($con_guia == 1) ? '' : 's').' con guía asignada';
+
+    $html  = '<p>Esta factura tiene '.implode(' y ', $partes).'.</p>';
+    $html .= '<p style="color:#88010e;">Al regenerar se rehacen las líneas y se pueden perder esas marcas.</p>';
+    $html .= '<p>¿Continuar?</p>';
+    return $html;
+    }
+
+// Helper interno de detalle_consolidado_dsft. Renderiza el grid posicional de
+// detalle_factura_finca con una columna por cada medida de lista_cms_dsft() y
+// FB equivalente (FB=1, HB=0.5, QB=0.25, OB/EB=0.125) en la primera linea de
+// cada caja.
+function _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado = 0)
     {
     $sql = "SELECT * FROM detalle_factura_finca
         WHERE CODIGOFACTURAFINCA = ".(int)$codigo_ff."
@@ -2775,9 +3919,13 @@ function _render_grid_factura($link, $codigo_ff, $finca)
         return $html;
         }
 
-    $total = mysqli_num_rows($res);
-    $cms   = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $total     = mysqli_num_rows($res);
+    $cms       = lista_cms_dsft($codigo_consolidado);
     $total_cms = count($cms);
+
+    // Estado de entrega de TODAS las cajas de la factura, de una sola vez.
+    // Cada fila lo resuelve en memoria: ninguna consulta por caja.
+    $entregas = estado_cajas_factura_dsft($codigo_ff);
 
     $html  = '<table class="grid_factura_detalle" style="width:100%; border-collapse:collapse; font-size:11px;">';
     $html .= '<tr style="background:#88010e; color:#fff;">';
@@ -2785,7 +3933,7 @@ function _render_grid_factura($link, $codigo_ff, $finca)
     $html .= '<th style="padding:2px 4px;">PROD</th>';
     $html .= '<th style="padding:2px 4px;">VARIETY</th>';
     for($c=0; $c<$total_cms; $c++)
-        $html .= '<th style="padding:2px 3px; width:35px; text-align:center;">'.$cms[$c].'</th>';
+        $html .= '<th style="padding:2px 3px; width:32px; text-align:center;">'.$cms[$c].'</th>';
     $html .= '<th style="padding:2px 4px; text-align:right;">ST PR</th>';
     $html .= '<th style="padding:2px 4px; text-align:right;">TOT</th>';
     $html .= '<th style="padding:2px 4px; width:25px;">A</th>';
@@ -2871,9 +4019,45 @@ function _render_grid_factura($link, $codigo_ff, $finca)
         // Columna de opciones: en la primera linea de cada caja, mostrar tambien
         // un boton "+" que agrega una linea adicional a la MISMA caja (mismo
         // NUMEROCAJA y TIPOCAJA). Siempre se muestra el "x" para eliminar.
-        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd;">';
+        $html .= '<td style="padding:2px 4px; text-align:right; border:1px solid #ddd; white-space:nowrap;">';
         if($es_primera_caja)
             {
+            // Icono de entrega a la carguera: SOLO en la primera linea de la
+            // caja (la misma fila donde va el FB). Verde = entregada.
+            $entregada  = (isset($entregas[$num_caja]) && $entregas[$num_caja]["ENTREGADA"] == 1);
+            $color_ship = $entregada ? "#2e7d32" : "#c62828";
+            if($entregada)
+                {
+                // "Entrega registrada por X": el sistema sabe quien la REGISTRO,
+                // no quien llevo fisicamente la caja. En cajas marcadas antes de
+                // existir CODIGOUSUARIOENTREGA el usuario viene NULL y se omite.
+                $titulo_ship = "Caja ".$num_caja.": entrega registrada";
+                if($entregas[$num_caja]["USUARIO"] != "")
+                    $titulo_ship .= " por ".$entregas[$num_caja]["USUARIO"];
+                if($entregas[$num_caja]["FECHAENTREGA"] != "")
+                    $titulo_ship .= " el ".$entregas[$num_caja]["FECHAENTREGA"];
+                $titulo_ship .= ". Click para desmarcar.";
+                }
+            else
+                {
+                $titulo_ship = "Caja ".$num_caja." sin entregar. Click para marcar como entregada.";
+                }
+            // data-entregada lo lee el JS para saber a que estado pasa el
+            // clic y elegir el texto del aviso breve. El estado real lo sigue
+            // decidiendo el servidor.
+            $html .= '<a id="id_ship_'.(int)$codigo_ff.'_'.$num_caja.'" data-entregada="'.($entregada ? 1 : 0).'" onclick="alternar_entrega_caja('.(int)$codigo_ff.', '.$num_caja.', this);" style="cursor:pointer; color:'.$color_ship.'; margin-right:4px;" title="'.htmlspecialchars($titulo_ship, ENT_QUOTES, "UTF-8").'"><i class="icon-shipping" style="font-size:11px;"></i></a>';
+
+            // Guia (AWB) de la caja: gris sin guia, amarillo con guia. El numero
+            // no se escribe en el grid, va solo en el title.
+            $codigo_guia_caja = isset($entregas[$num_caja]) ? (int)$entregas[$num_caja]["CODIGOGUIA"] : 0;
+            $numero_guia_caja = isset($entregas[$num_caja]) ? (string)$entregas[$num_caja]["NUMEROGUIA"] : "";
+            $color_guia       = color_icono_guia_dsft(1, ($codigo_guia_caja > 0) ? 1 : 0);
+            if($codigo_guia_caja > 0)
+                $titulo_guia = "Caja ".$num_caja." con la guia ".$numero_guia_caja.". Click para cambiarla.";
+            else
+                $titulo_guia = "Caja ".$num_caja." sin guia. Click para asignarle una.";
+            $html .= '<a id="id_guia_caja_'.(int)$codigo_ff.'_'.$num_caja.'" data-guia="'.$codigo_guia_caja.'" onclick="dialog_guias_caja('.(int)$codigo_ff.', '.$num_caja.', '.(int)$codigo_consolidado.', '.$codigo_guia_caja.', this);" style="cursor:pointer; color:'.$color_guia.'; margin-right:4px;" title="'.htmlspecialchars($titulo_guia, ENT_QUOTES, "UTF-8").'"><i class="icon-hash" style="font-size:11px;"></i></a>';
+
             $tipo_caja_js = htmlspecialchars(addslashes($tipo_caja), ENT_QUOTES, "UTF-8");
             $html .= '<a onclick="agregar_linea_a_caja('.(int)$codigo_ff.', '.$num_caja.', \''.$tipo_caja_js.'\');" style="cursor:pointer; color:#2e7d32; margin-right:4px;" title="Agregar linea a esta caja"><i class="icon-plus" style="font-size:10px;"></i></a>';
             }
@@ -2967,13 +4151,56 @@ function actualizar_celda_detalle_dsft($codigo, $campo, $valor)
 function eliminar_linea_detalle_dsft($codigo)
     {
     global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
     $codigo = (int)$codigo;
     if($codigo <= 0)
         return "Codigo invalido";
+
+    // Guardar a que caja pertenece ANTES de borrarla, para poder limpiar la
+    // confirmacion de entrega si esta era su ultima linea.
+    $codigo_ff   = 0;
+    $numero_caja = 0;
+    $sql_caja = "SELECT CODIGOFACTURAFINCA AS CODIGOFACTURAFINCA, NUMEROCAJA AS NUMEROCAJA
+        FROM detalle_factura_finca
+        WHERE CODIGO = ".$codigo;
+    $res_caja = mysqli_query($link, $sql_caja);
+    if($res_caja && mysqli_num_rows($res_caja) > 0)
+        {
+        $fila_caja   = mysqli_fetch_assoc($res_caja);
+        $codigo_ff   = (int)$fila_caja["CODIGOFACTURAFINCA"];
+        $numero_caja = (int)$fila_caja["NUMEROCAJA"];
+        }
+
     $sql = "DELETE FROM detalle_factura_finca WHERE CODIGO = ".$codigo;
     $r   = mysqli_query($link, $sql);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+
+    // Si la caja se quedo sin lineas, borrar su registro en caja_factura_finca.
+    // Sin esto la anotacion queda huerfana y, como agregar_caja_detalle_dsft
+    // numera con MAX(NUMEROCAJA)+1, el numero se reutiliza y la caja nueva
+    // naceria marcada como entregada.
+    if($codigo_ff > 0 && $numero_caja > 0)
+        {
+        $sql_quedan = "SELECT COUNT(*) AS QUEDAN
+            FROM detalle_factura_finca
+            WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+              AND NUMEROCAJA = ".$numero_caja;
+        $res_quedan = mysqli_query($link, $sql_quedan);
+        if($res_quedan && mysqli_num_rows($res_quedan) > 0)
+            {
+            $fila_quedan = mysqli_fetch_assoc($res_quedan);
+            if((int)$fila_quedan["QUEDAN"] == 0)
+                {
+                $sql_borra = "DELETE FROM caja_factura_finca
+                    WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+                      AND NUMEROCAJA = ".$numero_caja;
+                mysqli_query($link, $sql_borra);
+                }
+            }
+        }
+
     return "OK";
     }
 
@@ -3255,6 +4482,27 @@ function cambiar_producto_caja_dsft($codigo_ff, $numero_caja, $codigo_tipo)
 
 // Desasocia una factura del consolidado al que esta asignada (no la borra).
 // Usada por el icono icon-remove del header de cada tarjeta.
+// Limpia la guia de todas las cajas de una factura. Se llama cuando la factura
+// cambia de consolidado (o se desasocia): la guia pertenece al consolidado
+// viejo, asi que dejarla puesta rompe el invariante que los asignar_guia_*
+// validan al escribir, y ademas mostraria como asignadas cajas que no lo estan.
+function limpiar_guias_factura_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return;
+
+    $sql = "UPDATE caja_factura_finca SET
+        CODIGOGUIA        = NULL,
+        FECHAMODIFICACION = NOW()
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND CODIGOGUIA IS NOT NULL";
+    mysqli_query($link, $sql);
+    }
+
 function quitar_factura_consolidado_dsft($codigo_ff)
     {
     global $link;
@@ -3270,6 +4518,9 @@ function quitar_factura_consolidado_dsft($codigo_ff)
     $r = mysqli_query($link, $sql);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+
+    // Las guias eran del consolidado del que se acaba de sacar la factura.
+    limpiar_guias_factura_dsft($codigo_ff);
     return "OK";
     }
 
@@ -3550,10 +4801,42 @@ function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usua
 function quitar_guia_consolidado_dsft($codigo_consolidado, $codigo_guia)
     {
     global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
     $codigo_consolidado = (int)$codigo_consolidado;
     $codigo_guia        = (int)$codigo_guia;
     if($codigo_consolidado <= 0 || $codigo_guia <= 0)
         return "Codigos invalidos";
+
+    // Si alguna caja tiene esta guia asignada, no se puede quitar del
+    // consolidado: quedaria apuntando a una guia que ya no le pertenece.
+    // Mismo criterio que con las medidas en uso.
+    // Se cuentan solo las cajas que TODAVIA tienen lineas. Una regeneracion
+    // borra el detalle de golpe sin pasar por eliminar_linea_detalle_dsft, asi
+    // que pueden quedar filas de cajas que ya no existen; si se contaran, la
+    // guia quedaria bloqueada para siempre sin ninguna caja visible que la use.
+    // Mismo criterio defensivo que los demas contadores del modulo.
+    $sql_uso = "SELECT COUNT(DISTINCT CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA)) AS CAJAS
+        FROM detalle_factura_finca d
+        INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+        INNER JOIN caja_factura_finca c
+                ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+               AND c.NUMEROCAJA = d.NUMEROCAJA
+        WHERE ff.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND d.ESTADO >= 0
+          AND c.CODIGOGUIA = ".$codigo_guia;
+    $res_uso = mysqli_query($link, $sql_uso);
+    if(!$res_uso)
+        return "Error SQL: ".mysqli_error($link);
+    $fila_uso = mysqli_fetch_assoc($res_uso);
+    $cajas    = (int)$fila_uso["CAJAS"];
+    if($cajas > 0)
+        {
+        $numero_guia = numero_guia_dsft($codigo_guia);
+        if($numero_guia == "")
+            $numero_guia = (string)$codigo_guia;
+        return "No se puede quitar la guia ".$numero_guia.": ".$cajas." caja".(($cajas == 1) ? "" : "s")." la ".(($cajas == 1) ? "tiene" : "tienen")." asignada";
+        }
 
     $sql = "DELETE FROM guia_consolidado
         WHERE CODIGOGUIA = ".$codigo_guia."
@@ -4165,21 +5448,32 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
 
     $sheet->setTitle('Consolidado');
 
-    $cms = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $cms       = lista_cms_dsft($codigo_consolidado);
+    $total_cms = count($cms);
 
-    // Anchos de columna: A=FB, B=FARM, C=VARIETY, D..O=cm, P=ST PRICE, Q=TOTAL.
+    // Las columnas de cm arrancan en D, una por medida. ST PRICE y TOTAL van
+    // inmediatamente despues de la ultima medida, asi que sus letras dependen
+    // de cuantas medidas tenga el consolidado: con 12 medidas eran P y Q,
+    // con 14 son R y S. $col_ultima es la ultima columna de la tabla y se usa
+    // en los rangos de estilo, el fondo blanco y el area de impresion.
+    $indice_primera_cm = 4;
+    $col_precio = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $total_cms);
+    $col_total  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $total_cms + 1);
+    $col_ultima = $col_total;
+
+    // Anchos de columna: A=FB, B=FARM, C=VARIETY, una por cada medida desde D,
+    // y al final ST PRICE y TOTAL.
     $sheet->getColumnDimension('A')->setWidth(5);
     $sheet->getColumnDimension('B')->setWidth(22);
     $sheet->getColumnDimension('C')->setWidth(22);
     $col_letra = 'D';
-    $total_cms = count($cms);
     for($c=0; $c<$total_cms; $c++)
         {
         $sheet->getColumnDimension($col_letra)->setWidth(7);
         $col_letra++;
         }
-    $sheet->getColumnDimension('P')->setWidth(9);
-    $sheet->getColumnDimension('Q')->setWidth(10);
+    $sheet->getColumnDimension($col_precio)->setWidth(9);
+    $sheet->getColumnDimension($col_total)->setWidth(10);
 
     // --- HEADER (filas 1-7) ---
     $sheet->setCellValue('D1', 'INVOICE NUM:');
@@ -4228,6 +5522,14 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
     $keys_grupos    = array_keys($grupos);
     $total_grupos   = count($keys_grupos);
     $resumen_grupos = array();
+
+    // Filas con relleno de color. El fondo blanco que se aplica al final sobre
+    // todo el rango con datos pisa cualquier relleno, asi que cada fila de color
+    // se registra aca (fila + ultima columna + color) y el relleno se vuelve a
+    // aplicar DESPUES del fondo blanco. El texto y los bordes sobreviven al
+    // fondo blanco porque el fill solo pisa el relleno. Mismo mecanismo que
+    // generar_excel_factura_cliente_dsft.
+    $filas_con_relleno = array();
     for($g=0; $g<$total_grupos; $g++)
         {
         $nombre_grupo = $keys_grupos[$g];
@@ -4256,12 +5558,13 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
             }
 
         // Estilo header: fondo crimson, texto blanco, centrado, bold.
-        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
             array(
             'font'      => array('bold' => true, 'color' => array('rgb' => 'FFFFFF'), 'size' => 9),
             'fill'      => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E')),
             'alignment' => array('horizontal' => 'center')
             ));
+        $filas_con_relleno[] = array('FILA' => $fila_actual, 'COLUMNA' => $col_ultima, 'COLOR' => '88010E');
         $fila_actual++;
 
         // Acumuladores de la seccion (para la fila TOTAL).
@@ -4303,24 +5606,24 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
             $sheet->setCellValue('B'.$fila_actual, strtoupper((string)$lin["FINCA"]));
             $sheet->setCellValue('C'.$fila_actual, strtoupper((string)$lin["VARIEDAD"]));
 
-            // Columnas cm (D=40cm .. O=150cm) segun el LARGO de la linea.
+            // Columnas cm (una por medida, desde D) segun el LARGO de la linea.
             if($largo !== null && $tallos !== null)
                 {
                 $idx_cm = array_search($largo, $cms);
                 if($idx_cm !== false)
                     {
-                    $col_cm = chr(ord('D') + $idx_cm);
+                    $col_cm = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $idx_cm);
                     $sheet->setCellValue($col_cm.$fila_actual, $tallos);
                     }
                 }
 
             if($lin["PRECIOUNITARIO"] !== null)
-                $sheet->setCellValue('P'.$fila_actual, (float)$lin["PRECIOUNITARIO"]);
+                $sheet->setCellValue($col_precio.$fila_actual, (float)$lin["PRECIOUNITARIO"]);
             if($lin["PRECIOTOTAL"] !== null)
-                $sheet->setCellValue('Q'.$fila_actual, (float)$lin["PRECIOTOTAL"]);
+                $sheet->setCellValue($col_total.$fila_actual, (float)$lin["PRECIOTOTAL"]);
 
-            // Formato numerico en P y Q (numeros crudos para que Excel sume).
-            $sheet->getStyle('P'.$fila_actual.':Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+            // Formato numerico en ST PRICE y TOTAL (numeros crudos para que Excel sume).
+            $sheet->getStyle($col_precio.$fila_actual.':'.$col_ultima.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
 
             // Acumular totales de la seccion.
             if($fb !== "")
@@ -4336,13 +5639,13 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
                 $total_costo_grupo += (float)$lin["PRECIOTOTAL"];
 
             // Bordes finos + alineacion + tamano.
-            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+            $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
                 array('borders' => array('allBorders' => array(
                     'borderStyle' => 'thin', 'color' => array('rgb' => 'CCCCCC')
                     ))));  
             $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
-            $sheet->getStyle('D'.$fila_actual.':Q'.$fila_actual)->getAlignment()->setHorizontal('right');
-            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->getFont()->setSize(9);
+            $sheet->getStyle('D'.$fila_actual.':'.$col_ultima.$fila_actual)->getAlignment()->setHorizontal('right');
+            $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->getFont()->setSize(9);
 
             $fila_actual++;
             }
@@ -4352,15 +5655,15 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
         $sheet->setCellValue('B'.$fila_actual, number_format($total_fb, 1));
         for($tc=0; $tc<$total_cms; $tc++)
             {
-            $col_cm = chr(ord('D') + $tc);
+            $col_cm = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $tc);
             if($total_cms_grupo[$tc] > 0)
                 $sheet->setCellValue($col_cm.$fila_actual, $total_cms_grupo[$tc]);
             }
-        $sheet->setCellValue('Q'.$fila_actual, $total_costo_grupo);
-        $sheet->getStyle('Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->setCellValue($col_total.$fila_actual, $total_costo_grupo);
+        $sheet->getStyle($col_total.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
 
         // Estilo: bold, borde superior medio, fondo gris claro.
-        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
             array(
             'font'    => array('bold' => true, 'size' => 9),
             'borders' => array('top' => array(
@@ -4370,6 +5673,7 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
             'fill'    => array('fillType' => 'solid',
                 'startColor' => array('rgb' => 'F0F0F0'))
             ));
+        $filas_con_relleno[] = array('FILA' => $fila_actual, 'COLUMNA' => $col_ultima, 'COLOR' => 'F0F0F0');
 
         // Guardar totales de la seccion para la tabla resumen.
         $resumen_grupos[] = array(
@@ -4407,6 +5711,7 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
         'fill'      => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E')),
         'alignment' => array('horizontal' => 'center')
         ));
+    $filas_con_relleno[] = array('FILA' => $fila_actual, 'COLUMNA' => 'K', 'COLOR' => '88010E');
     $fila_actual++;
 
     // Una fila por grupo + acumulado general.
@@ -4473,6 +5778,7 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
             'startColor' => array('rgb' => 'F0F0F0'))
         ));
     $sheet->getStyle('D'.$fila_actual.':K'.$fila_actual)->getAlignment()->setHorizontal('right');
+    $filas_con_relleno[] = array('FILA' => $fila_actual, 'COLUMNA' => 'K', 'COLOR' => 'F0F0F0');
 
     // Eliminar filas vacias despues del contenido para que Google Drive no
     // genere paginas en blanco al exportar a PDF. La super total es la ultima
@@ -4485,12 +5791,25 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
         }
 
     // Fondo blanco SOLO en el rango con datos (no en toda la hoja).
-    $sheet->getStyle('A1:Q'.$ultima_fila)->getFill()
+    $sheet->getStyle('A1:'.$col_ultima.$ultima_fila)->getFill()
         ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
         ->getStartColor()->setRGB('FFFFFF');
 
+    // Re-aplicar el relleno de las filas de color: el fondo blanco de arriba
+    // las pisa a todas, asi que este bloque tiene que correr SIEMPRE DESPUES.
+    // Encabezados de seccion y de la tabla resumen = crimson; totales de
+    // seccion y gran total = gris claro.
+    $total_con_relleno = count($filas_con_relleno);
+    for($fr=0; $fr<$total_con_relleno; $fr++)
+        {
+        $relleno = $filas_con_relleno[$fr];
+        $sheet->getStyle('A'.$relleno['FILA'].':'.$relleno['COLUMNA'].$relleno['FILA'])->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB($relleno['COLOR']);
+        }
+
     // Forzar dimensiones de impresion.
-    $sheet->getPageSetup()->setPrintArea('A1:Q'.$ultima_fila);
+    $sheet->getPageSetup()->setPrintArea('A1:'.$col_ultima.$ultima_fila);
     $sheet->getPageSetup()->setFitToWidth(1);
     $sheet->getPageSetup()->setFitToHeight(0);
 
@@ -5401,7 +6720,7 @@ function detalle_factura_cliente_dsft($codigo_factura_cliente)
     if($codigo_factura_cliente <= 0)
         return "Invoice invalido";
 
-    $cms       = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $cms       = lista_cms_factura_cliente_dsft($codigo_factura_cliente);
     $total_cms = count($cms);
 
     // Detalle con grupo de producto (ORDENGRUPO desde tipo_producto.CAMPOE1).
@@ -5636,9 +6955,21 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         $logo->setWorksheet($sheet);
         }
 
-    $cms       = array(40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150);
+    $cms       = lista_cms_factura_cliente_dsft($codigo_factura_cliente);
     $total_cms = count($cms);
 
+    // Las columnas de cm arrancan en D, una por medida. ST PRICE y TOTAL van
+    // inmediatamente despues de la ultima medida, asi que sus letras dependen
+    // de cuantas medidas tenga el invoice: con 12 medidas eran P y Q,
+    // con 14 son R y S. $col_ultima es la ultima columna de la tabla y se usa
+    // en los rangos de estilo, el fondo blanco y el area de impresion.
+    $indice_primera_cm = 4;
+    $col_precio = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $total_cms);
+    $col_total  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $total_cms + 1);
+    $col_ultima = $col_total;
+
+    // Anchos de columna: A=FB, B=FARM, C=VARIETY, una por cada medida desde D,
+    // y al final ST PRICE y TOTAL.
     $sheet->getColumnDimension('A')->setWidth(5);
     $sheet->getColumnDimension('B')->setWidth(22);
     $sheet->getColumnDimension('C')->setWidth(22);
@@ -5648,8 +6979,8 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         $sheet->getColumnDimension($col_letra)->setWidth(7);
         $col_letra++;
         }
-    $sheet->getColumnDimension('P')->setWidth(9);
-    $sheet->getColumnDimension('Q')->setWidth(10);
+    $sheet->getColumnDimension($col_precio)->setWidth(9);
+    $sheet->getColumnDimension($col_total)->setWidth(10);
 
     // --- HEADER ---
     // Datos superiores a la derecha: titulos en negrita en F, valores en H (filas 1-6).
@@ -5703,8 +7034,9 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         $total_lineas = count($lineas);
         $titulo       = isset($titulos_producto[$nombre_grupo]) ? $titulos_producto[$nombre_grupo] : strtoupper($nombre_grupo);
 
-        // Titulo de la seccion centrado sobre toda la tabla (merge A:Q).
-        $sheet->mergeCells('A'.$fila_actual.':Q'.$fila_actual);
+        // Titulo de la seccion centrado sobre toda la tabla (merge A hasta la
+        // ultima columna).
+        $sheet->mergeCells('A'.$fila_actual.':'.$col_ultima.$fila_actual);
         $sheet->setCellValue('A'.$fila_actual, $titulo);
         $sheet->getStyle('A'.$fila_actual)->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
@@ -5723,7 +7055,7 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
             $sheet->setCellValue($col.$fila_actual, $headers[$h]);
             $col++;
             }
-        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
             array(
             'font'      => array('bold' => true, 'color' => array('rgb' => 'FFFFFF'), 'size' => 9),
             'fill'      => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E')),
@@ -5754,29 +7086,29 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
                 $idx_cm = array_search($largo, $cms);
                 if($idx_cm !== false)
                     {
-                    $col_cm = chr(ord('D') + $idx_cm);
+                    $col_cm = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $idx_cm);
                     $sheet->setCellValue($col_cm.$fila_actual, $tallos);
                     $total_cms_grupo[$idx_cm] += $tallos;
                     }
                 }
 
             if($lin["PRECIOUNITARIO"] !== null)
-                $sheet->setCellValue('P'.$fila_actual, (float)$lin["PRECIOUNITARIO"]);
+                $sheet->setCellValue($col_precio.$fila_actual, (float)$lin["PRECIOUNITARIO"]);
             if($lin["PRECIOTOTAL"] !== null)
-                $sheet->setCellValue('Q'.$fila_actual, (float)$lin["PRECIOTOTAL"]);
-            $sheet->getStyle('P'.$fila_actual.':Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->setCellValue($col_total.$fila_actual, (float)$lin["PRECIOTOTAL"]);
+            $sheet->getStyle($col_precio.$fila_actual.':'.$col_ultima.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
 
             $total_fb += $fb;
             if($lin["PRECIOTOTAL"] !== null)
                 $total_costo_grupo += (float)$lin["PRECIOTOTAL"];
 
-            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+            $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
                 array('borders' => array('allBorders' => array(
                     'borderStyle' => 'thin', 'color' => array('rgb' => 'CCCCCC')
                     ))));
             $sheet->getStyle('A'.$fila_actual)->getAlignment()->setHorizontal('center');
-            $sheet->getStyle('D'.$fila_actual.':Q'.$fila_actual)->getAlignment()->setHorizontal('right');
-            $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->getFont()->setSize(9);
+            $sheet->getStyle('D'.$fila_actual.':'.$col_ultima.$fila_actual)->getAlignment()->setHorizontal('right');
+            $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->getFont()->setSize(9);
             $fila_actual++;
             }
 
@@ -5785,15 +7117,15 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         $sheet->setCellValue('A'.$fila_actual, ($total_fb > 0) ? $total_fb : "");
         for($tc=0; $tc<$total_cms; $tc++)
             {
-            $col_cm = chr(ord('D') + $tc);
+            $col_cm = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($indice_primera_cm + $tc);
             if($total_cms_grupo[$tc] > 0)
                 $sheet->setCellValue($col_cm.$fila_actual, $total_cms_grupo[$tc]);
             }
-        $sheet->setCellValue('Q'.$fila_actual, $total_costo_grupo);
-        $sheet->getStyle('Q'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->setCellValue($col_total.$fila_actual, $total_costo_grupo);
+        $sheet->getStyle($col_total.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
         // Celdas de total claramente delimitadas: negrita, bordes finos en todas +
         // borde superior mas marcado, fondo gris claro. Numeros a la derecha, FB centrado.
-        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+        $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
             array(
             'font'      => array('bold' => true, 'size' => 9),
             'borders'   => array(
@@ -5825,8 +7157,8 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
     $fila_actual++;
 
     $sheet->setCellValue('C'.$fila_actual, 'NAME');
-    $sheet->setCellValue('P'.$fila_actual, 'AMOUNT');
-    $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+    $sheet->setCellValue($col_precio.$fila_actual, 'AMOUNT');
+    $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
         array(
         'font' => array('bold' => true, 'color' => array('rgb' => 'FFFFFF'), 'size' => 9),
         'fill' => array('fillType' => 'solid', 'startColor' => array('rgb' => '88010E'))
@@ -5841,23 +7173,23 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         $monto = (float)$co["MONTO"];
         $suma_cobros += $monto;
         $sheet->setCellValue('C'.$fila_actual, strtoupper((string)$co["NOMBRECOBRO"]));
-        $sheet->setCellValue('P'.$fila_actual, $monto);
-        $sheet->getStyle('P'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('P'.$fila_actual)->getAlignment()->setHorizontal('right');
-        $sheet->getStyle('A'.$fila_actual.':Q'.$fila_actual)->getFont()->setSize(9);
+        $sheet->setCellValue($col_precio.$fila_actual, $monto);
+        $sheet->getStyle($col_precio.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle($col_precio.$fila_actual)->getAlignment()->setHorizontal('right');
+        $sheet->getStyle('A'.$fila_actual.':'.$col_ultima.$fila_actual)->getFont()->setSize(9);
         $fila_actual++;
         }
 
     // Fila TOTAL de la tabla de cobros (suma de todos los cobros).
     $sheet->setCellValue('C'.$fila_actual, 'TOTAL CHARGES');
-    $sheet->setCellValue('P'.$fila_actual, $suma_cobros);
-    $sheet->getStyle('P'.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
-    $sheet->getStyle('C'.$fila_actual.':Q'.$fila_actual)->applyFromArray(
+    $sheet->setCellValue($col_precio.$fila_actual, $suma_cobros);
+    $sheet->getStyle($col_precio.$fila_actual)->getNumberFormat()->setFormatCode('#,##0.00');
+    $sheet->getStyle('C'.$fila_actual.':'.$col_ultima.$fila_actual)->applyFromArray(
         array(
         'font'    => array('bold' => true, 'size' => 9),
         'borders' => array('top' => array('borderStyle' => 'medium', 'color' => array('rgb' => '333333')))
         ));
-    $sheet->getStyle('P'.$fila_actual)->getAlignment()->setHorizontal('right');
+    $sheet->getStyle($col_precio.$fila_actual)->getAlignment()->setHorizontal('right');
     $fila_actual++;
 
     // Separacion entre la tabla ADDITIONAL CHARGES y el bloque de totales.
@@ -6019,7 +7351,7 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         }
 
     // Fondo blanco SOLO en el rango con datos (no en toda la hoja).
-    $sheet->getStyle('A1:Q'.$ultima_fila_con_datos)->getFill()
+    $sheet->getStyle('A1:'.$col_ultima.$ultima_fila_con_datos)->getFill()
         ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
         ->getStartColor()->setRGB('FFFFFF');
 
@@ -6031,7 +7363,7 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
     for($e=0; $e<$total_encabezados; $e++)
         {
         $fh = $filas_encabezado[$e];
-        $sheet->getStyle('A'.$fh.':Q'.$fh)->getFill()
+        $sheet->getStyle('A'.$fh.':'.$col_ultima.$fh)->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('88010E');
         }
@@ -6039,7 +7371,7 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
     for($t=0; $t<$total_tot_secc; $t++)
         {
         $ft = $filas_total_seccion[$t];
-        $sheet->getStyle('A'.$ft.':Q'.$ft)->getFill()
+        $sheet->getStyle('A'.$ft.':'.$col_ultima.$ft)->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('F0F0F0');
         }
@@ -6051,7 +7383,7 @@ function generar_excel_factura_cliente_dsft($codigo_factura_cliente, $formato = 
         }
 
     // Forzar dimensiones de impresion.
-    $sheet->getPageSetup()->setPrintArea('A1:Q'.$ultima_fila_con_datos);
+    $sheet->getPageSetup()->setPrintArea('A1:'.$col_ultima.$ultima_fila_con_datos);
     $sheet->getPageSetup()->setFitToWidth(1);
     $sheet->getPageSetup()->setFitToHeight(0);
 
