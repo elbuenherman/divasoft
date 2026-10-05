@@ -1,7 +1,7 @@
 <?php           
 include("variables_globales.php");
 include("funciones.php");
-include("funciones_v2.php");        
+include("funciones_v2.php");         
 // ini_set('display_errors', 1); 
 // error_reporting(E_ALL); 
 // Dispatch POST con archivo: detectado antes del flujo normal porque
@@ -481,8 +481,19 @@ if($funcion == 'mover_lineas_medida_dsft')
     echo mover_lineas_medida_dsft($parametro1, $parametro2, $parametro3, $parametro4);
 
 // Guia (AWB) por caja: dialogo, asignacion en los tres niveles y textos.
-if($funcion == 'render_guias_asignar_dsft')
-    echo render_guias_asignar_dsft($parametro1, $parametro2, $parametro3);
+// Selector de guias comun a los tres iconos # (asignar y transferir).
+if($funcion == 'render_selector_guias_dsft')
+    echo render_selector_guias_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5);
+if($funcion == 'render_transferir_consolidados_dsft')
+    echo render_transferir_consolidados_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5, $parametro6);
+if($funcion == 'render_confirma_transferencia_dsft')
+    echo render_confirma_transferencia_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5);
+if($funcion == 'transferir_factura_dsft')
+    echo transferir_factura_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5);
+if($funcion == 'transferir_consolidado_dsft')
+    echo transferir_consolidado_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5);
+if($funcion == 'render_resumen_guias_dsft')
+    echo render_resumen_guias_dsft($parametro1);
 if($funcion == 'render_confirma_guia_dsft')
     echo render_confirma_guia_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'render_icono_guia_factura_dsft')

@@ -431,7 +431,7 @@ function extraer_correos()
                 { 
                 var p = JSON.parse(data);
                 if(p.estado == "en_curso")
-                    {    
+                    {     
                     var html = "Procesando dia: " + (p.dia_actual || "...") + "<br>";
                     html += "Correos: " + p.procesados + " procesados<br>";
                     html += "Guardados: " + p.guardados + " | Saltados: " + p.saltados;

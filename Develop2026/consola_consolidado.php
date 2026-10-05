@@ -159,7 +159,7 @@ textarea, input[type="text"] {
     position: sticky;
     top: 0;
     z-index: 5; 
-    }  
+    }   
 .grid_consolidados thead th {
     font-size: 11px;
     padding: 8px 5px;
@@ -798,7 +798,7 @@ function refrescar_por_cambio_de_guias()
     actualiza_listado();
     }
 
-// Resumen corto para el formulario: "3 guias".
+// Resumen corto de guias para el formulario.
 function cargar_resumen_guias(codigo_consolidado)
     {
     if(codigo_consolidado <= 0)
@@ -806,16 +806,11 @@ function cargar_resumen_guias(codigo_consolidado)
         $("#id_resumen_guias_consolidado").html("&mdash;");
         return;
         }
-    var url = "funciones_ajax.php?funcion=render_guias_asignar_dsft"
-        + "&parametro1=" + codigo_consolidado
-        + "&parametro2=resumen"
-        + "&parametro3=0";
+    var url = "funciones_ajax.php?funcion=render_resumen_guias_dsft"
+        + "&parametro1=" + codigo_consolidado;
     $.get(url, function(data)
         {
-        var cuantas = $("<div>").html(data).find("a[onclick^='elegir_guia_asignar']").length;
-        $("#id_resumen_guias_consolidado").html(
-            (cuantas == 0) ? "Sin gu&iacute;as"
-                           : cuantas + ((cuantas == 1) ? " gu&iacute;a" : " gu&iacute;as"));
+        $("#id_resumen_guias_consolidado").html(data);
         });
     }
 
@@ -1335,60 +1330,63 @@ $(document).on("keydown", function(e)
         limpiar_modo_seleccion();
     });
 
-// ===== GUIA (AWB) POR CAJA =====
-// Cada caja queda asignada a UNA guia, elegida entre las que ya tiene su
-// consolidado. El mismo dialogo sirve en los tres niveles (caja, factura y
-// consolidado); el destino se guarda en estas globales ANTES de abrirlo, porque
-// las filas del dialogo las dibuja el servidor y no lo conocen.
-var global_guia_contexto    = "caja";
-var global_guia_codigo_ff   = 0;
-var global_guia_numero_caja = 0;
-var global_guia_consolidado = 0;
-var global_guia_origen      = null;
+// ===== SELECTOR DE GUIAS (iconos #): asignar y transferir =====
+// Un solo dialogo para los tres niveles. El destino se guarda en estas globales
+// ANTES de abrirlo, porque las filas las dibuja el servidor y no lo conocen.
+// Nombres con prefijo sel_ para que no choquen con los del dialogo GUIAS
+// (dialog_gestion_guias) ni con nada previo.
+var sel_nivel        = "caja";   // "caja" | "factura" | "consolidado"
+var sel_codigo_ff    = 0;
+var sel_numero_caja  = 0;
+var sel_consolidado  = 0;
+var sel_origen       = null;     // elemento clicado, para el aviso_breve
+var sel_flat_rango   = null;
 
-function dialog_guias_caja(codigo_ff, numero_caja, codigo_consolidado, codigo_guia_actual, elemento)
+function sel_guia_abrir_caja(codigo_ff, numero_caja, codigo_consolidado, codigo_guia_actual, elemento)
     {
-    global_guia_contexto    = "caja";
-    global_guia_codigo_ff   = codigo_ff;
-    global_guia_numero_caja = numero_caja;
-    global_guia_consolidado = codigo_consolidado;
-    global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "caja", codigo_guia_actual, "Guía de la caja " + numero_caja);
+    sel_nivel       = "caja";
+    sel_codigo_ff   = codigo_ff;
+    sel_numero_caja = numero_caja;
+    sel_consolidado = codigo_consolidado;
+    sel_origen      = elemento;
+    sel_guia_cargar(codigo_guia_actual, "Guía de la caja " + numero_caja);
     }
 
-function dialog_guias_factura(codigo_ff, codigo_consolidado, elemento)
+function sel_guia_abrir_factura(codigo_ff, codigo_consolidado, elemento)
     {
-    global_guia_contexto    = "factura";
-    global_guia_codigo_ff   = codigo_ff;
-    global_guia_numero_caja = 0;
-    global_guia_consolidado = codigo_consolidado;
-    global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "factura", 0, "Guía de la factura " + codigo_ff);
+    sel_nivel       = "factura";
+    sel_codigo_ff   = codigo_ff;
+    sel_numero_caja = 0;
+    sel_consolidado = codigo_consolidado;
+    sel_origen      = elemento;
+    sel_guia_cargar(0, "Guía de la factura " + codigo_ff);
     }
 
-function dialog_guias_consolidado(codigo_consolidado, elemento)
+function sel_guia_abrir_consolidado(codigo_consolidado, elemento)
     {
-    global_guia_contexto    = "consolidado";
-    global_guia_codigo_ff   = 0;
-    global_guia_numero_caja = 0;
-    global_guia_consolidado = codigo_consolidado;
-    global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "consolidado", 0, "Guía del consolidado " + codigo_consolidado);
+    sel_nivel       = "consolidado";
+    sel_codigo_ff   = 0;
+    sel_numero_caja = 0;
+    sel_consolidado = codigo_consolidado;
+    sel_origen      = elemento;
+    sel_guia_cargar(0, "Guía del consolidado " + codigo_consolidado);
     }
 
-function abrir_dialog_guias(codigo_consolidado, contexto, codigo_guia_actual, titulo)
+function sel_guia_cargar(codigo_guia_actual, titulo)
     {
-    var url = "funciones_ajax.php?funcion=render_guias_asignar_dsft"
-        + "&parametro1=" + codigo_consolidado
-        + "&parametro2=" + contexto
-        + "&parametro3=" + codigo_guia_actual;
+    var url = "funciones_ajax.php?funcion=render_selector_guias_dsft"
+        + "&parametro1=" + sel_nivel
+        + "&parametro2=" + sel_codigo_ff
+        + "&parametro3=" + sel_numero_caja
+        + "&parametro4=" + sel_consolidado
+        + "&parametro5=" + codigo_guia_actual;
     $.get(url, function(data)
         {
-        $("#id_dialog_guias").html(data);
-        $("#id_dialog_guias").dialog(
+        $("#id_dialog_selector_guias").html(data);
+        $("#id_dialog_selector_guias").dialog(
             {
             modal: true,
-            width: 360,
+            width: 560,
             title: titulo,
             dialogClass: 'myTitleClass',
             buttons:
@@ -1400,37 +1398,81 @@ function abrir_dialog_guias(codigo_consolidado, contexto, codigo_guia_actual, ti
                     }
                 ]
             });
+        sel_guia_armar_filtros();
         });
     }
 
-// Una fila del dialogo. codigo_guia 0 = quitar la guia.
-function elegir_guia_asignar(codigo_guia, numero_guia)
+// Flatpickr y Select2 de la seccion de transferir. dropdownParent apunta al
+// dialogo: si no, el desplegable del Select2 queda detras del modal.
+function sel_guia_armar_filtros()
     {
-    $("#id_dialog_guias").dialog("close");
+    if($("#id_sel_rango_transferir").length == 0)
+        return;
+    sel_flat_rango = flatpickr("#id_sel_rango_transferir",
+        {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        locale: "es",
+        allowInput: false,
+        onClose: function() { sel_guia_recargar_transferir(); }
+        });
+    $("#id_sel_marcacion_transferir").select2(
+        {
+        width: '170px',
+        dropdownParent: $("#id_dialog_selector_guias").closest(".ui-dialog"),
+        minimumResultsForSearch: 3
+        });
+    $("#id_sel_marcacion_transferir").on('change', function()
+        {
+        sel_guia_recargar_transferir();
+        });
+    }
 
-    // El destino se CONGELA aca. Si se leyeran las globales al confirmar, un
-    // clic en otro icono mientras viaja el AJAX del texto de confirmacion las
-    // cambiaria y la asignacion caeria en el destino equivocado.
-    var destino = {
-        contexto:    global_guia_contexto,
-        codigo_ff:   global_guia_codigo_ff,
-        numero_caja: global_guia_numero_caja,
-        consolidado: global_guia_consolidado,
-        origen:      global_guia_origen
+// Recarga SOLO la lista de consolidados de la seccion de transferir.
+function sel_guia_recargar_transferir()
+    {
+    var texto  = $("#id_sel_rango_transferir").val();
+    var fechas = (texto || "").match(/\d{4}-\d{2}-\d{2}/g);
+    var desde  = (fechas && fechas.length >= 1) ? fechas[0] : "";
+    var hasta  = (fechas && fechas.length >= 2) ? fechas[1] : desde;
+    var marcacion = $("#id_sel_marcacion_transferir").val();
+    if(!marcacion)
+        marcacion = 0;
+
+    var url = "funciones_ajax.php?funcion=render_transferir_consolidados_dsft"
+        + "&parametro1=" + sel_nivel
+        + "&parametro2=" + sel_codigo_ff
+        + "&parametro3=" + sel_consolidado
+        + "&parametro4=" + desde
+        + "&parametro5=" + hasta
+        + "&parametro6=" + marcacion;
+    $.get(url, function(data)
+        {
+        $("#id_sel_lista_transferir").html(data);
+        });
+    }
+
+// ----- A) ASIGNAR una guia de ESTE consolidado. codigo_guia 0 = quitar. -----
+function sel_guia_asignar(codigo_guia, numero_guia, texto_fecha)
+    {
+    $("#id_dialog_selector_guias").dialog("close");
+
+    // El destino se congela aca: si se leyeran las globales al confirmar, un
+    // clic en otro icono mientras viaja el AJAX las cambiaria.
+    var d = {
+        nivel: sel_nivel, codigo_ff: sel_codigo_ff, numero_caja: sel_numero_caja,
+        consolidado: sel_consolidado, origen: sel_origen
         };
 
-    // Una sola caja: se aplica directo, es reversible con otro clic.
-    if(destino.contexto == "caja")
+    if(d.nivel == "caja")
         {
-        guardar_guia_caja(destino, codigo_guia, numero_guia);
+        sel_guia_guardar_caja(d, codigo_guia, numero_guia);
         return;
         }
 
-    // Factura o consolidado completo: confirmar SI / NO. El texto con los
-    // numeros lo arma el servidor, que es el que sabe cuantas cajas cambian.
-    var codigo = (destino.contexto == "factura") ? destino.codigo_ff : destino.consolidado;
+    var codigo = (d.nivel == "factura") ? d.codigo_ff : d.consolidado;
     var url = "funciones_ajax.php?funcion=render_confirma_guia_dsft"
-        + "&parametro1=" + destino.contexto
+        + "&parametro1=" + d.nivel
         + "&parametro2=" + codigo
         + "&parametro3=" + codigo_guia;
     $.get(url, function(texto)
@@ -1449,7 +1491,7 @@ function elegir_guia_asignar(codigo_guia, numero_guia)
                     click: function()
                         {
                         $(this).dialog("close");
-                        guardar_guia_masivo(destino, codigo_guia, numero_guia);
+                        sel_guia_guardar_masivo(d, codigo_guia, numero_guia);
                         }
                     },
                     {
@@ -1461,60 +1503,46 @@ function elegir_guia_asignar(codigo_guia, numero_guia)
         });
     }
 
-function guardar_guia_caja(destino, codigo_guia, numero_guia)
+function sel_guia_guardar_caja(d, codigo_guia, numero_guia)
     {
-    var codigo_ff   = destino.codigo_ff;
-    var numero_caja = destino.numero_caja;
-    var origen      = destino.origen;
     var url = "funciones_ajax.php?funcion=asignar_guia_caja_dsft"
-        + "&parametro1=" + codigo_ff
-        + "&parametro2=" + numero_caja
+        + "&parametro1=" + d.codigo_ff
+        + "&parametro2=" + d.numero_caja
         + "&parametro3=" + codigo_guia
         + "&parametro4=" + global_codigo_usuario;
     $.get(url, function(data)
         {
-        if(data == "OK")
-            {
-            if(codigo_guia > 0)
-                aviso_breve("Caja " + numero_caja + " asignada a la guía " + numero_guia, origen);
-            else
-                aviso_breve("Caja " + numero_caja + " sin guía", origen);
-            recargar_grid_factura_por_codigo(codigo_ff);
-            // El color de la fila del listado depende de TODAS las cajas del
-            // consolidado, asi que tambien cambia al tocar una sola.
-            actualiza_listado();
-            }
-        else
+        if(data != "OK")
             {
             messageBox(data);
+            return;
             }
+        if(codigo_guia > 0)
+            aviso_breve("Caja " + d.numero_caja + " asignada a la guía " + numero_guia, d.origen);
+        else
+            aviso_breve("Caja " + d.numero_caja + " sin guía", d.origen);
+        recargar_grid_factura_por_codigo(d.codigo_ff);
+        actualiza_listado();
         });
     }
 
-function guardar_guia_masivo(destino, codigo_guia, numero_guia)
+function sel_guia_guardar_masivo(d, codigo_guia, numero_guia)
     {
-    var contexto  = destino.contexto;
-    var codigo_ff = destino.codigo_ff;
-    var codigo_co = destino.consolidado;
-    var origen    = destino.origen;
-
-    // Solo estos dos contextos son masivos. Cualquier otro valor se ignora en
-    // lugar de caer por descarte en la rama del consolidado completo.
-    if(contexto != "factura" && contexto != "consolidado")
+    if(d.nivel != "factura" && d.nivel != "consolidado")
         return;
 
     var url = "";
-    if(contexto == "factura")
+    if(d.nivel == "factura")
         {
         url = "funciones_ajax.php?funcion=asignar_guia_factura_dsft"
-            + "&parametro1=" + codigo_ff
+            + "&parametro1=" + d.codigo_ff
             + "&parametro2=" + codigo_guia
             + "&parametro3=" + global_codigo_usuario;
         }
     else
         {
         url = "funciones_ajax.php?funcion=asignar_guia_consolidado_cajas_dsft"
-            + "&parametro1=" + codigo_co
+            + "&parametro1=" + d.consolidado
             + "&parametro2=" + codigo_guia
             + "&parametro3=" + global_codigo_usuario;
         }
@@ -1528,26 +1556,159 @@ function guardar_guia_masivo(destino, codigo_guia, numero_guia)
             messageBox(data);
             return;
             }
-
-        if(contexto == "factura")
+        if(d.nivel == "factura")
             {
-            if(codigo_guia > 0)
-                aviso_breve("Factura asignada a la guía " + numero_guia, origen);
-            else
-                aviso_breve("Guía quitada de la factura", origen);
-            recargar_grid_factura_por_codigo(codigo_ff);
+            aviso_breve((codigo_guia > 0) ? "Factura asignada a la guía " + numero_guia
+                                          : "Guía quitada de la factura", d.origen);
+            recargar_grid_factura_por_codigo(d.codigo_ff);
             actualiza_listado();
             return;
             }
+        aviso_breve((codigo_guia > 0) ? "Consolidado asignado a la guía " + numero_guia
+                                      : "Guía quitada de todas las cajas", d.origen);
+        if(global_codigo_seleccionado == d.consolidado)
+            cargar_detalle_consolidado(d.consolidado);
+        actualiza_listado();
+        });
+    }
 
-        // Consolidado: cambio en todas las facturas, asi que se redibuja el
-        // detalle completo, y el listado para que se actualice el color de la fila.
-        if(codigo_guia > 0)
-            aviso_breve("Consolidado asignado a la guía " + numero_guia, origen);
-        else
-            aviso_breve("Guía quitada de todas las cajas", origen);
-        if(global_codigo_seleccionado == codigo_co)
-            cargar_detalle_consolidado(codigo_co);
+// ----- B) TRANSFERIR a otro consolidado -----
+// Clic en el encabezado de un consolidado: hay que elegir que pasa con las guias.
+function sel_guia_transferir_a(codigo_destino)
+    {
+    var d = {
+        nivel: sel_nivel, codigo_ff: sel_codigo_ff,
+        consolidado: sel_consolidado, origen: sel_origen
+        };
+    $("#id_dialog_selector_guias").dialog("close");
+
+    var url = "funciones_ajax.php?funcion=render_confirma_transferencia_dsft"
+        + "&parametro1=" + d.nivel
+        + "&parametro2=" + d.codigo_ff
+        + "&parametro3=" + d.consolidado
+        + "&parametro4=" + codigo_destino
+        + "&parametro5=0";
+    $.get(url, function(texto)
+        {
+        $("#id_dialog_confirma_factura").html(texto);
+        $("#id_dialog_confirma_factura").dialog(
+            {
+            modal: true,
+            width: 470,
+            dialogClass: 'myTitleClass',
+            buttons:
+                [
+                    {
+                    text: "CON LAS MISMAS GUÍAS",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        sel_guia_ejecutar_transferencia(d, codigo_destino, "mismas", 0);
+                        }
+                    },
+                    {
+                    text: "SIN GUÍA",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        sel_guia_ejecutar_transferencia(d, codigo_destino, "sin_guia", 0);
+                        }
+                    },
+                    {
+                    text: "CANCELAR",
+                    click: function() { $(this).dialog("close"); }
+                    }
+                ]
+            });
+        });
+    }
+
+// Clic en una guia de otro consolidado: transferir y asignar esa guia.
+function sel_guia_transferir_con_guia(codigo_destino, codigo_guia, numero_guia, texto_fecha)
+    {
+    var d = {
+        nivel: sel_nivel, codigo_ff: sel_codigo_ff,
+        consolidado: sel_consolidado, origen: sel_origen
+        };
+    $("#id_dialog_selector_guias").dialog("close");
+
+    var url = "funciones_ajax.php?funcion=render_confirma_transferencia_dsft"
+        + "&parametro1=" + d.nivel
+        + "&parametro2=" + d.codigo_ff
+        + "&parametro3=" + d.consolidado
+        + "&parametro4=" + codigo_destino
+        + "&parametro5=" + codigo_guia;
+    $.get(url, function(texto)
+        {
+        $("#id_dialog_confirma_factura").html(texto);
+        $("#id_dialog_confirma_factura").dialog(
+            {
+            modal: true,
+            width: 470,
+            dialogClass: 'myTitleClass',
+            buttons:
+                [
+                    {
+                    text: "SI",
+                    class: 'cancelButton',
+                    click: function()
+                        {
+                        $(this).dialog("close");
+                        sel_guia_ejecutar_transferencia(d, codigo_destino, "guia", codigo_guia);
+                        }
+                    },
+                    {
+                    text: "NO",
+                    click: function() { $(this).dialog("close"); }
+                    }
+                ]
+            });
+        });
+    }
+
+function sel_guia_ejecutar_transferencia(d, codigo_destino, modo, codigo_guia)
+    {
+    var url = "";
+    if(d.nivel == "factura")
+        {
+        url = "funciones_ajax.php?funcion=transferir_factura_dsft"
+            + "&parametro1=" + d.codigo_ff
+            + "&parametro2=" + codigo_destino
+            + "&parametro3=" + modo
+            + "&parametro4=" + codigo_guia
+            + "&parametro5=" + global_codigo_usuario;
+        }
+    else
+        {
+        url = "funciones_ajax.php?funcion=transferir_consolidado_dsft"
+            + "&parametro1=" + d.consolidado
+            + "&parametro2=" + codigo_destino
+            + "&parametro3=" + modo
+            + "&parametro4=" + codigo_guia
+            + "&parametro5=" + global_codigo_usuario;
+        }
+
+    $("#id_espera").show();
+    $.get(url, function(data)
+        {
+        $("#id_espera").hide();
+        if(data.substring(0, 2) != "OK")
+            {
+            messageBox(data);
+            return;
+            }
+        var partes   = data.split("|");
+        var facturas = (partes.length > 1) ? parseInt(partes[1]) : 0;
+        if(isNaN(facturas))
+            facturas = 0;
+        aviso_breve((facturas == 1) ? "Factura transferida al consolidado " + codigo_destino
+                                    : facturas + " facturas transferidas al consolidado " + codigo_destino,
+                    d.origen);
+        // La factura desaparece del detalle actual, y el listado cambia conteos,
+        // guias y colores de las dos filas.
+        cargar_detalle_consolidado(d.consolidado);
         actualiza_listado();
         });
     }
@@ -3243,7 +3404,7 @@ $(document).ready(function()
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_dialog_invoice_cliente" title="Invoice Cliente"></div>
     <div id="id_dialog_medidas" title="Medidas (cm) del consolidado"></div>
-    <div id="id_dialog_guias" title="Guías"></div>
+    <div id="id_dialog_selector_guias" title="Guías"></div>
     <div id="id_dialog_guias_consolidado" title="Guías del consolidado"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 

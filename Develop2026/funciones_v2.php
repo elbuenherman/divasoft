@@ -1132,7 +1132,7 @@ function compara_extracciones($json1, $json2)
         $v2 = isset($json2["CABECERA"][$campo]) ? $json2["CABECERA"][$campo] : null;
         if(!compara_texto($v1, $v2))
             $discrepancias[] = "CABECERA.".$campo.": [".$v1."] vs [".$v2."]";
-        }
+        } 
      
     if(!compara_decimal((isset($json1["CABECERA"]["SUBTOTAL"]) ? $json1["CABECERA"]["SUBTOTAL"] : 0), (isset($json2["CABECERA"]["SUBTOTAL"]) ? $json2["CABECERA"]["SUBTOTAL"] : 0), 0.01))
         $discrepancias[] = "CABECERA.SUBTOTAL: [".((isset($json1["CABECERA"]["SUBTOTAL"]) ? $json1["CABECERA"]["SUBTOTAL"] : "null"))."] vs [".((isset($json2["CABECERA"]["SUBTOTAL"]) ? $json2["CABECERA"]["SUBTOTAL"] : "null"))."]";
@@ -2286,7 +2286,7 @@ function lista_consolidados_dsft($campo_orden = "FECHACONSOLIDADO", $direccion_o
         $guia_total   = (int)$conteo_guias["TOTAL"];
         $guia_conguia = (int)$conteo_guias["CONGUIA"];
         $guia_titulo  = htmlspecialchars(titulo_icono_guia_dsft($conteo_guias), ENT_QUOTES, "UTF-8");
-        $html .= '<a onclick="dialog_guias_consolidado('.$codigo.', this);" style="cursor:pointer; color:'.color_icono_guia_dsft($guia_total, $guia_conguia).'; margin-right:4px;" title="'.$guia_titulo.'"><i class="icon-hash"></i></a>';
+        $html .= '<a onclick="sel_guia_abrir_consolidado('.$codigo.', this);" style="cursor:pointer; color:'.color_icono_guia_dsft($guia_total, $guia_conguia).'; margin-right:4px;" title="'.$guia_titulo.'"><i class="icon-hash"></i></a>';
         $html .= '<a onclick="messageBox(\'Packing - proximamente\');" style="cursor:pointer; color:#d4890e; margin-right:4px;" title="Packing"><i class="icon-bus"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
@@ -3664,75 +3664,6 @@ function titulo_icono_guia_dsft($conteo)
     return "Guía asignada en ".$con_guia." de ".$total." cajas";
     }
 
-// Contenido del dialogo de guias. Las filas llaman siempre a la misma funcion
-// JS (elegir_guia_asignar); el destino concreto (caja, factura o consolidado)
-// lo guarda el JS antes de abrir el dialogo, porque aca no se conoce.
-//   $contexto:            "caja" | "factura" | "consolidado", solo para el texto.
-//   $codigo_guia_actual:  guia actual, para marcarla. 0 = no marcar ninguna.
-function render_guias_asignar_dsft($codigo_consolidado, $contexto = "caja", $codigo_guia_actual = 0)
-    {
-    $codigo_consolidado = (int)$codigo_consolidado;
-    $codigo_guia_actual = (int)$codigo_guia_actual;
-    $contexto           = strtolower(trim((string)$contexto));
-    if($codigo_consolidado <= 0)
-        return '<div style="color:#88010e; font-size:12px;">Consolidado inválido</div>';
-
-    $guias = guias_del_consolidado_dsft($codigo_consolidado);
-    $total = count($guias);
-
-    if($total == 0)
-        return '<div style="font-size:12px; color:#88010e; padding:4px 0;">'
-             .'Este consolidado no tiene guías. Agréguelas primero.</div>';
-
-    if($contexto == "factura")
-        $ayuda = 'Toque una guía para asignarla a TODAS las cajas de esta factura.';
-    else if($contexto == "consolidado")
-        $ayuda = 'Toque una guía para asignarla a TODAS las cajas de este consolidado.';
-    else
-        $ayuda = 'Toque una guía para asignarla a esta caja.';
-
-    $html  = '<div style="font-size:11px; color:#666; padding:0 0 6px 0;">'.$ayuda.'</div>';
-    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
-    for($i=0; $i<$total; $i++)
-        {
-        $codigo_guia = (int)$guias[$i]["CODIGO"];
-        $numero_guia = (string)$guias[$i]["NUMEROGUIA"];
-        $es_actual   = ($codigo_guia_actual > 0 && $codigo_guia == $codigo_guia_actual);
-        $bg          = ($i % 2 == 0) ? "#fff" : "#f9f9f9";
-        $numero_js   = htmlspecialchars(addslashes($numero_guia), ENT_QUOTES, "UTF-8");
-        $numero_html = htmlspecialchars($numero_guia, ENT_QUOTES, "UTF-8");
-
-        $html .= '<tr style="background:'.$bg.';">';
-        $html .= '<td style="padding:4px 6px; border:1px solid #ddd;">';
-        $fecha_guia = isset($guias[$i]["FECHAVUELO"]) ? trim((string)$guias[$i]["FECHAVUELO"]) : "";
-        $html .= '<a onclick="elegir_guia_asignar('.$codigo_guia.', \''.$numero_js.'\');"';
-        $html .= ' style="cursor:pointer; color:#88010e; font-weight:bold;"';
-        $html .= ' title="Asignar la guía '.$numero_html.'">'.$numero_html.'</a>';
-        $html .= ' <span style="color:#888; font-size:11px;">('.htmlspecialchars(texto_fecha_vuelo_dsft($fecha_guia), ENT_QUOTES, "UTF-8").')</span>';
-        $html .= '</td>';
-        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:70px;">';
-        if($es_actual)
-            $html .= '<span style="color:#2e7d32; font-size:11px;"><i class="icon-checkmark"></i> actual</span>';
-        $html .= '</td>';
-        $html .= '</tr>';
-        }
-    $html .= '</table>';
-
-    // Quitar la guia: misma lista, accion opuesta. codigo_guia 0 = quitar.
-    if($contexto == "factura")
-        $texto_quitar = 'QUITAR GUÍA DE TODAS LAS CAJAS';
-    else if($contexto == "consolidado")
-        $texto_quitar = 'QUITAR GUÍA DE TODAS LAS CAJAS';
-    else
-        $texto_quitar = 'QUITAR GUÍA';
-
-    $html .= '<div style="margin-top:10px; padding-top:8px; border-top:1px solid #ddd;">';
-    $html .= '<a onclick="elegir_guia_asignar(0, \'\');" style="cursor:pointer; color:#c62828; font-size:12px; font-weight:bold;">';
-    $html .= '<i class="icon-remove" style="margin-right:4px;"></i>'.$texto_quitar.'</a>';
-    $html .= '</div>';
-    return $html;
-    }
-
 // Asigna (o quita, con $codigo_guia = 0) la guia de UNA caja.
 function asignar_guia_caja_dsft($codigo_ff, $numero_caja, $codigo_guia, $codigo_usuario)
     {
@@ -3896,7 +3827,7 @@ function render_icono_guia_factura_dsft($codigo_ff, $codigo_consolidado = 0)
     $conteo = cuenta_cajas_con_guia_dsft($codigo_ff);
     $color  = color_icono_guia_dsft($conteo["TOTAL"], $conteo["CONGUIA"]);
     $titulo = htmlspecialchars(titulo_icono_guia_dsft($conteo), ENT_QUOTES, "UTF-8");
-    return '<a onclick="dialog_guias_factura('.$codigo_ff.', '.(int)$codigo_consolidado.', this);"'
+    return '<a onclick="sel_guia_abrir_factura('.$codigo_ff.', '.(int)$codigo_consolidado.', this);"'
         .' style="cursor:pointer; color:'.$color.'; margin-left:8px;" title="'.$titulo.'">'
         .'<i class="icon-hash"></i></a>';
     }
@@ -4299,7 +4230,7 @@ function _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado = 0
                              . " en la caja ".$num_caja.". Click para cambiarla.";
             else
                 $titulo_guia = "Caja ".$num_caja." sin guía. Click para asignarle una.";
-            $html .= '<a id="id_guia_caja_'.(int)$codigo_ff.'_'.$num_caja.'" data-guia="'.$codigo_guia_caja.'" onclick="dialog_guias_caja('.(int)$codigo_ff.', '.$num_caja.', '.(int)$codigo_consolidado.', '.$codigo_guia_caja.', this);" style="cursor:pointer; color:'.$color_guia.'; margin-right:4px;" title="'.htmlspecialchars($titulo_guia, ENT_QUOTES, "UTF-8").'"><i class="icon-hash" style="font-size:11px;"></i></a>';
+            $html .= '<a id="id_guia_caja_'.(int)$codigo_ff.'_'.$num_caja.'" data-guia="'.$codigo_guia_caja.'" onclick="sel_guia_abrir_caja('.(int)$codigo_ff.', '.$num_caja.', '.(int)$codigo_consolidado.', '.$codigo_guia_caja.', this);" style="cursor:pointer; color:'.$color_guia.'; margin-right:4px;" title="'.htmlspecialchars($titulo_guia, ENT_QUOTES, "UTF-8").'"><i class="icon-hash" style="font-size:11px;"></i></a>';
 
             // Borrar la caja COMPLETA. icon-cancel para no confundirlo con el
             // icon-minus que borra una sola linea y convive en esta misma fila.
@@ -5118,27 +5049,16 @@ function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usua
     if(guia_duplicada_consolidado_dsft($codigo_consolidado, $numero, $fecha_sql) > 0)
         return "Este consolidado ya tiene la guía ".$numero." con esa fecha";
 
-    $numero_sql = mysqli_real_escape_string($link, $numero);
-
     mysqli_begin_transaction($link);
 
-    $sql_ins = "INSERT INTO guia (CODIGO, NUMEROGUIA, FECHAVUELO, ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO)
-        VALUES (0, '".$numero_sql."', ".$fecha_sql.", 1, ".$codigo_usuario.", NOW())";
-    if(!mysqli_query($link, $sql_ins))
+    // Un solo lugar crea guias: crear_guia_en_consolidado_dsft, que tambien usa
+    // la transferencia en modo "mismas".
+    $codigo_guia = crear_guia_en_consolidado_dsft($codigo_consolidado, $numero, $fecha_sql, $codigo_usuario);
+    if($codigo_guia <= 0)
         {
         $error = mysqli_error($link);
         mysqli_rollback($link);
         return "Error SQL al crear la guía: ".$error;
-        }
-    $codigo_guia = (int)mysqli_insert_id($link);
-
-    $sql_aso = "INSERT INTO guia_consolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
-        VALUES (".$codigo_guia.", ".$codigo_consolidado.")";
-    if(!mysqli_query($link, $sql_aso))
-        {
-        $error = mysqli_error($link);
-        mysqli_rollback($link);
-        return "Error SQL al asociar la guía: ".$error;
         }
 
     mysqli_commit($link);
@@ -5188,6 +5108,620 @@ function editar_guia_dsft($codigo_guia, $codigo_consolidado, $numero, $fecha, $c
     if(!mysqli_query($link, $sql))
         return "Error SQL: ".mysqli_error($link);
     return "OK";
+    }
+
+// Resumen corto de guias para el formulario del consolidado: "3 guías".
+function render_resumen_guias_dsft($codigo_consolidado)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return "&mdash;";
+    $total = count(guias_del_consolidado_dsft($codigo_consolidado));
+    if($total == 0)
+        return "Sin guías";
+    return $total.(($total == 1) ? " guía" : " guías");
+    }
+
+// ----------------------------------------------------------------------------
+// SELECTOR DE GUIAS: un solo dialogo para los tres iconos #
+//
+// Dos secciones bien separadas, para que nadie transfiera creyendo que asigna:
+//   A) ESTE CONSOLIDADO  -> asigna una de sus guias (o la quita).
+//   B) TRANSFERIR A OTRO -> mueve la factura o el consolidado entero.
+// La seccion B solo aparece en los niveles factura y consolidado: las cajas
+// sueltas no se transfieren.
+// ----------------------------------------------------------------------------
+
+// Consolidados candidatos para transferir, con sus guias. Excluye el actual.
+// Filtra por rango de FECHACONSOLIDADO y por marcacion (0 = todas).
+function consolidados_para_transferir_dsft($codigo_actual, $fecha_desde = "", $fecha_hasta = "", $codigo_marcacion = 0)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_actual    = (int)$codigo_actual;
+    $codigo_marcacion = (int)$codigo_marcacion;
+    $lista            = array();
+
+    $where = "";
+    if(preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($fecha_desde)) && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($fecha_hasta)))
+        $where .= " AND c.FECHACONSOLIDADO >= '".trim($fecha_desde)."' AND c.FECHACONSOLIDADO <= '".trim($fecha_hasta)."'";
+    if($codigo_marcacion > 0)
+        $where .= " AND c.CODIGOMARCACION = ".$codigo_marcacion;
+
+    $sql = "SELECT c.CODIGO AS CODIGO,
+        c.FECHACONSOLIDADO AS FECHACONSOLIDADO,
+        m.NOMBREMARCACION AS MARCACION
+        FROM consolidado c
+        LEFT JOIN marcacion m ON c.CODIGOMARCACION = m.CODIGO
+        WHERE c.ESTADO >= 0
+          AND c.CODIGO <> ".$codigo_actual.
+          $where."
+        ORDER BY c.FECHACONSOLIDADO DESC, c.CODIGO DESC
+        LIMIT 60";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $lista;
+
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila    = mysqli_fetch_assoc($res);
+        $codigo  = (int)$fila["CODIGO"];
+        $lista[] = array(
+            "CODIGO"           => $codigo,
+            "FECHACONSOLIDADO" => (string)$fila["FECHACONSOLIDADO"],
+            "MARCACION"        => (string)$fila["MARCACION"],
+            "GUIAS"            => guias_del_consolidado_dsft($codigo)
+            );
+        }
+    return $lista;
+    }
+
+// Solo la seccion B, para poder recargarla cuando cambian sus filtros sin
+// redibujar todo el dialogo.
+function render_transferir_consolidados_dsft($nivel, $codigo_ff, $codigo_consolidado, $fecha_desde = "", $fecha_hasta = "", $codigo_marcacion = 0)
+    {
+    $nivel              = trim((string)$nivel);
+    $codigo_ff          = (int)$codigo_ff;
+    $codigo_consolidado = (int)$codigo_consolidado;
+
+    $lista = consolidados_para_transferir_dsft($codigo_consolidado, $fecha_desde, $fecha_hasta, $codigo_marcacion);
+    $total = count($lista);
+    if($total == 0)
+        return '<div style="font-size:12px; color:#888; padding:6px 0;">Ningún consolidado cumple el filtro.</div>';
+
+    $html = '';
+    for($i=0; $i<$total; $i++)
+        {
+        $codigo    = (int)$lista[$i]["CODIGO"];
+        $fecha     = htmlspecialchars((string)$lista[$i]["FECHACONSOLIDADO"], ENT_QUOTES, "UTF-8");
+        $marcacion = htmlspecialchars((string)$lista[$i]["MARCACION"], ENT_QUOTES, "UTF-8");
+        $guias     = $lista[$i]["GUIAS"];
+        $total_g   = count($guias);
+
+        // Encabezado del consolidado: clic = transferir sin elegir guia.
+        $tramos = array($codigo);
+        if(trim($fecha) !== '')
+            $tramos[] = $fecha;
+        if(trim($marcacion) !== '')
+            $tramos[] = $marcacion;
+
+        $html .= '<div style="border:1px solid #ddd; border-radius:4px; margin-bottom:6px; background:#fff;">';
+        $html .= '<div style="padding:4px 8px; background:#f2f2f2; border-radius:4px 4px 0 0;">';
+        $html .= '<a onclick="sel_guia_transferir_a('.$codigo.');" style="cursor:pointer; color:#88010e; font-weight:bold; font-size:12px;"';
+        $html .= ' title="Transferir a este consolidado">'.implode(' - ', $tramos).'</a>';
+        $html .= '</div>';
+
+        if($total_g == 0)
+            {
+            $html .= '<div style="padding:4px 8px; font-size:11px; color:#999;">Sin guías</div>';
+            }
+        else
+            {
+            $html .= '<div style="padding:4px 8px;">';
+            for($g=0; $g<$total_g; $g++)
+                {
+                $codigo_guia = (int)$guias[$g]["CODIGO"];
+                $numero      = htmlspecialchars((string)$guias[$g]["NUMEROGUIA"], ENT_QUOTES, "UTF-8");
+                $numero_js   = htmlspecialchars(addslashes((string)$guias[$g]["NUMEROGUIA"]), ENT_QUOTES, "UTF-8");
+                $fecha_g     = trim((string)$guias[$g]["FECHAVUELO"]);
+                $texto_fecha = htmlspecialchars(texto_fecha_vuelo_dsft($fecha_g), ENT_QUOTES, "UTF-8");
+                $html .= '<a onclick="sel_guia_transferir_con_guia('.$codigo.', '.$codigo_guia.', \''.$numero_js.'\', \''.$texto_fecha.'\');"';
+                $html .= ' style="cursor:pointer; color:#2e7d32; font-size:11px; display:inline-block; margin-right:10px;"';
+                $html .= ' title="Transferir y asignar esta guía">'.$numero.' <span style="color:#888;">('.$texto_fecha.')</span></a>';
+                }
+            $html .= '</div>';
+            }
+        $html .= '</div>';
+        }
+    return $html;
+    }
+
+// El dialogo completo. $nivel: "caja" | "factura" | "consolidado".
+function render_selector_guias_dsft($nivel, $codigo_ff, $numero_caja, $codigo_consolidado, $codigo_guia_actual = 0)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $nivel              = trim((string)$nivel);
+    $codigo_ff          = (int)$codigo_ff;
+    $numero_caja        = (int)$numero_caja;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_guia_actual = (int)$codigo_guia_actual;
+    if($codigo_consolidado <= 0)
+        return '<div style="color:#88010e; font-size:12px;">Consolidado inválido</div>';
+
+    // ---------- A) ESTE CONSOLIDADO: asignar ----------
+    $guias   = guias_del_consolidado_dsft($codigo_consolidado);
+    $total_g = count($guias);
+
+    $html  = '<div style="background:#f7f7f7; border:1px solid #ddd; border-radius:4px; padding:8px; margin-bottom:10px;">';
+    $html .= '<div style="font-weight:bold; color:#88010e; font-size:12px; margin-bottom:6px;">';
+    $html .= '<i class="icon-hash" style="margin-right:4px;"></i>Asignar guía de este consolidado</div>';
+
+    if($total_g == 0)
+        {
+        $html .= '<div style="font-size:12px; color:#88010e;">Este consolidado no tiene guías. Agréguelas con el botón GUÍAS.</div>';
+        }
+    else
+        {
+        $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+        for($i=0; $i<$total_g; $i++)
+            {
+            $codigo_guia = (int)$guias[$i]["CODIGO"];
+            $numero      = htmlspecialchars((string)$guias[$i]["NUMEROGUIA"], ENT_QUOTES, "UTF-8");
+            $numero_js   = htmlspecialchars(addslashes((string)$guias[$i]["NUMEROGUIA"]), ENT_QUOTES, "UTF-8");
+            $fecha_g     = trim((string)$guias[$i]["FECHAVUELO"]);
+            $texto_fecha = htmlspecialchars(texto_fecha_vuelo_dsft($fecha_g), ENT_QUOTES, "UTF-8");
+            $cajas       = (int)$guias[$i]["CAJAS"];
+            $es_actual   = ($codigo_guia_actual > 0 && $codigo_guia == $codigo_guia_actual);
+            $bg          = ($i % 2 == 0) ? "#fff" : "#fafafa";
+
+            $html .= '<tr style="background:'.$bg.';">';
+            $html .= '<td style="padding:4px 6px; border:1px solid #e0e0e0;">';
+            $html .= '<a onclick="sel_guia_asignar('.$codigo_guia.', \''.$numero_js.'\', \''.$texto_fecha.'\');"';
+            $html .= ' style="cursor:pointer; color:#88010e; font-weight:bold;" title="Asignar esta guía">'.$numero.'</a>';
+            $html .= '</td>';
+            $html .= '<td style="padding:4px 6px; border:1px solid #e0e0e0; color:#666;">'.$texto_fecha.'</td>';
+            $html .= '<td style="padding:4px 6px; border:1px solid #e0e0e0; text-align:center; width:70px; color:#666;">';
+            $html .= ($cajas > 0) ? $cajas.' caja'.(($cajas == 1) ? '' : 's') : '&mdash;';
+            $html .= '</td>';
+            $html .= '<td style="padding:4px 6px; border:1px solid #e0e0e0; text-align:center; width:60px;">';
+            if($es_actual)
+                $html .= '<span style="color:#2e7d32; font-size:11px;"><i class="icon-checkmark"></i> actual</span>';
+            $html .= '</td>';
+            $html .= '</tr>';
+            }
+        $html .= '</table>';
+        }
+
+    $texto_quitar = ($nivel == "caja") ? 'QUITAR GUÍA' : 'QUITAR GUÍA DE TODAS LAS CAJAS';
+    $html .= '<div style="margin-top:8px;">';
+    $html .= '<a onclick="sel_guia_asignar(0, \'\', \'\');" style="cursor:pointer; color:#c62828; font-size:12px; font-weight:bold;">';
+    $html .= '<i class="icon-remove" style="margin-right:4px;"></i>'.$texto_quitar.'</a>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    // ---------- B) TRANSFERIR: solo factura y consolidado ----------
+    if($nivel == "caja")
+        return $html;
+
+    // Rango por defecto: la fecha del consolidado actual mas o menos 7 dias.
+    $fecha_cons = "";
+    $sql_f = "SELECT FECHACONSOLIDADO AS FECHACONSOLIDADO FROM consolidado WHERE CODIGO = ".$codigo_consolidado;
+    $res_f = mysqli_query($link, $sql_f);
+    if($res_f && mysqli_num_rows($res_f) > 0)
+        {
+        $fila_f     = mysqli_fetch_assoc($res_f);
+        $fecha_cons = trim((string)$fila_f["FECHACONSOLIDADO"]);
+        }
+    if($fecha_cons == "")
+        $fecha_cons = date("Y-m-d");
+    $desde = date("Y-m-d", strtotime($fecha_cons." -7 days"));
+    $hasta = date("Y-m-d", strtotime($fecha_cons." +7 days"));
+
+    $html .= '<div style="background:#fff8e1; border:1px solid #e0c060; border-radius:4px; padding:8px;">';
+    $html .= '<div style="font-weight:bold; color:#8a6d00; font-size:12px; margin-bottom:6px;">';
+    $html .= '<i class="icon-arrow-right-3" style="margin-right:4px;"></i>Transferir a otro consolidado</div>';
+
+    // Filtros de la seccion B.
+    $html .= '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; font-size:11px;">';
+    $html .= '<input type="text" id="id_sel_rango_transferir" readonly placeholder="Rango de fechas"';
+    $html .= ' value="'.htmlspecialchars($desde.' a '.$hasta, ENT_QUOTES, "UTF-8").'"';
+    $html .= ' style="width:175px; font-size:11px; background:#fff; cursor:pointer;" />';
+    $html .= '<select id="id_sel_marcacion_transferir" style="width:170px;">';
+    $html .= '<option value="0">-- Todas las marcaciones --</option>';
+    $html .= opciones_marcaciones_dsft();
+    $html .= '</select>';
+    $html .= '<a onclick="sel_guia_recargar_transferir();" style="cursor:pointer; color:#88010e;" title="Aplicar el filtro">';
+    $html .= '<i class="icon-loop"></i></a>';
+    $html .= '</div>';
+
+    $html .= '<div id="id_sel_lista_transferir">';
+    $html .= render_transferir_consolidados_dsft($nivel, $codigo_ff, $codigo_consolidado, $desde, $hasta, 0);
+    $html .= '</div>';
+    $html .= '</div>';
+    return $html;
+    }
+
+// Options de marcaciones activas para el Select2 del filtro.
+function opciones_marcaciones_dsft()
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $sql = "SELECT CODIGO AS CODIGO, NOMBREMARCACION AS NOMBREMARCACION
+        FROM marcacion
+        WHERE ESTADO >= 0
+        ORDER BY NOMBREMARCACION";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return "";
+    $html  = "";
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila  = mysqli_fetch_assoc($res);
+        $html .= '<option value="'.(int)$fila["CODIGO"].'">'
+               .htmlspecialchars((string)$fila["NOMBREMARCACION"], ENT_QUOTES, "UTF-8").'</option>';
+        }
+    return $html;
+    }
+
+// Texto del dialogo de confirmacion de una transferencia. Avisa si hay invoice
+// creado en el origen o en el destino, y si el origen va a quedar vacio.
+//   $nivel: "factura" | "consolidado"
+function render_confirma_transferencia_dsft($nivel, $codigo_ff, $codigo_origen, $codigo_destino, $codigo_guia_destino = 0)
+    {
+    $nivel               = trim((string)$nivel);
+    $codigo_ff           = (int)$codigo_ff;
+    $codigo_origen       = (int)$codigo_origen;
+    $codigo_destino      = (int)$codigo_destino;
+    $codigo_guia_destino = (int)$codigo_guia_destino;
+
+    if($nivel == "consolidado")
+        {
+        $conteo   = cuenta_cajas_con_guia_consolidado_dsft($codigo_origen);
+        $facturas = (int)$conteo["FACTURAS"];
+        $que      = ($facturas == 1) ? 'la <strong>1</strong> factura de este consolidado'
+                                     : 'las <strong>'.$facturas.'</strong> facturas de este consolidado';
+        }
+    else
+        {
+        $que = 'la factura <strong>'.htmlspecialchars(numero_factura_finca_dsft($codigo_ff), ENT_QUOTES, "UTF-8").'</strong>';
+        }
+
+    $html = '<p>¿Transferir '.$que.' al consolidado <strong>'.$codigo_destino.'</strong>';
+    if($codigo_guia_destino > 0)
+        {
+        $numero = numero_guia_dsft($codigo_guia_destino);
+        $html .= ' y asignar la guía <strong>'.htmlspecialchars($numero, ENT_QUOTES, "UTF-8").'</strong>';
+        }
+    $html .= '?</p>';
+
+    // Avisos.
+    $avisos = array();
+    if($nivel == "consolidado")
+        $avisos[] = 'el consolidado de origen quedará <strong>vacío</strong> (no se borra)';
+    if(tiene_invoice_consolidado_dsft($codigo_origen) == 1)
+        $avisos[] = 'el consolidado de <strong>origen</strong> tiene invoice creado y quedará desactualizado';
+    if(tiene_invoice_consolidado_dsft($codigo_destino) == 1)
+        $avisos[] = 'el consolidado de <strong>destino</strong> tiene invoice creado y quedará desactualizado';
+    if(count($avisos) > 0)
+        $html .= '<p style="color:#88010e;"><strong>Atención:</strong> '.implode('; ', $avisos).'.</p>';
+    return $html;
+    }
+
+// Numero de una factura_finca, para los textos.
+function numero_factura_finca_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    if($codigo_ff <= 0)
+        return "";
+    $sql = "SELECT NUMEROFACTURA AS NUMEROFACTURA FROM factura_finca WHERE CODIGO = ".$codigo_ff;
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return (string)$codigo_ff;
+    $fila   = mysqli_fetch_assoc($res);
+    $numero = trim((string)$fila["NUMEROFACTURA"]);
+    return ($numero == "") ? (string)$codigo_ff : $numero;
+    }
+
+// ----------------------------------------------------------------------------
+// TRANSFERENCIA DE FACTURAS ENTRE CONSOLIDADOS
+//
+// Mover una factura (o todas las de un consolidado) a otro consolidado. El
+// problema son las guias: son propias de cada consolidado, asi que las cajas
+// NUNCA pueden quedar apuntando a una guia del origen. Hay tres modos:
+//   sin_guia -> las cajas quedan sin guia.
+//   mismas   -> se busca en el destino una guia con el mismo numero y fecha; si
+//               no existe, se crea una propia del destino.
+//   guia     -> se asigna una guia concreta del destino a todas las cajas.
+// El estado de ENTREGA de las cajas se conserva en los tres modos.
+// ----------------------------------------------------------------------------
+
+// Crea una guia propia de un consolidado: el registro y su vinculo. SIN
+// transaccion propia, para poder usarse dentro de una. Devuelve el CODIGO nuevo
+// o 0 si falla. Es el unico lugar que crea guias, asi que agregar y transferir
+// no duplican la logica.
+function crear_guia_en_consolidado_dsft($codigo_consolidado, $numero, $fecha_sql, $codigo_usuario)
+    {
+    global $link;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_usuario     = (int)$codigo_usuario;
+    $numero_sql         = mysqli_real_escape_string($link, $numero);
+
+    $sql_ins = "INSERT INTO guia (CODIGO, NUMEROGUIA, FECHAVUELO, ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO)
+        VALUES (0, '".$numero_sql."', ".$fecha_sql.", 1, ".$codigo_usuario.", NOW())";
+    if(!mysqli_query($link, $sql_ins))
+        return 0;
+    $codigo_guia = (int)mysqli_insert_id($link);
+
+    $sql_aso = "INSERT INTO guia_consolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
+        VALUES (".$codigo_guia.", ".$codigo_consolidado.")";
+    if(!mysqli_query($link, $sql_aso))
+        return 0;
+    return $codigo_guia;
+    }
+
+// Guia del destino equivalente a (numero, fecha): la que ya existe o una nueva.
+// Reutiliza guia_duplicada_consolidado_dsft, que es justamente la que sabe
+// buscar por numero + fecha NULL-safe dentro de un consolidado.
+function guia_equivalente_destino_dsft($codigo_destino, $numero, $fecha, $codigo_usuario)
+    {
+    $fecha_sql = fecha_vuelo_sql_dsft($fecha);
+    $existente = guia_duplicada_consolidado_dsft($codigo_destino, $numero, $fecha_sql);
+    if($existente > 0)
+        return $existente;
+    return crear_guia_en_consolidado_dsft($codigo_destino, $numero, $fecha_sql, $codigo_usuario);
+    }
+
+// El consolidado tiene invoice creado? Las transferencias lo avisan, porque el
+// invoice copia las lineas al crearse y queda desactualizado.
+function tiene_invoice_consolidado_dsft($codigo_consolidado)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return 0;
+
+    $sql = "SELECT CODIGO AS CODIGO FROM factura_cliente
+        WHERE CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND ESTADO >= 0
+        LIMIT 1";
+    $res = mysqli_query($link, $sql);
+    return ($res && mysqli_num_rows($res) > 0) ? 1 : 0;
+    }
+
+// Mueve UNA factura al destino y arregla las guias de sus cajas. SIN
+// transaccion propia: la abre quien llama, para que transferir un consolidado
+// entero sea una sola operacion. Devuelve "OK|<cajas tocadas>" o "ERROR: ...".
+function _transferir_factura_sin_tx($codigo_ff, $codigo_destino, $modo, $codigo_guia_destino, $codigo_usuario)
+    {
+    global $link;
+    $codigo_ff           = (int)$codigo_ff;
+    $codigo_destino      = (int)$codigo_destino;
+    $codigo_guia_destino = (int)$codigo_guia_destino;
+    $codigo_usuario      = (int)$codigo_usuario;
+
+    // 1) La factura pasa al destino.
+    $sql_ff = "UPDATE factura_finca SET
+        CODIGOCONSOLIDADO     = ".$codigo_destino.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo_ff;
+    if(!mysqli_query($link, $sql_ff))
+        return "ERROR: ".mysqli_error($link);
+
+    // 2) Las guias de sus cajas, segun el modo.
+    if($modo == "sin_guia")
+        {
+        // Las cajas quedan sin guia; la entrega NO se toca.
+        $sql = "UPDATE caja_factura_finca SET
+            CODIGOGUIA            = NULL,
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()
+            WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+              AND CODIGOGUIA IS NOT NULL";
+        if(!mysqli_query($link, $sql))
+            return "ERROR: ".mysqli_error($link);
+        return "OK|".mysqli_affected_rows($link);
+        }
+
+    if($modo == "guia")
+        {
+        if(guia_pertenece_consolidado_dsft($codigo_destino, $codigo_guia_destino) == 0)
+            return "ERROR: Esa guía no pertenece al consolidado de destino";
+
+        // Todas las cajas de la factura, creando el registro si no existia.
+        $sql_cajas = "SELECT DISTINCT NUMEROCAJA AS NUMEROCAJA
+            FROM detalle_factura_finca
+            WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+              AND ESTADO >= 0
+            ORDER BY NUMEROCAJA";
+        $res_cajas = mysqli_query($link, $sql_cajas);
+        if(!$res_cajas)
+            return "ERROR: ".mysqli_error($link);
+        $total = mysqli_num_rows($res_cajas);
+        if($total == 0)
+            return "OK|0";
+
+        $valores = array();
+        for($i=1; $i<=$total; $i++)
+            {
+            $fila      = mysqli_fetch_assoc($res_cajas);
+            $valores[] = "(".$codigo_ff.", ".(int)$fila["NUMEROCAJA"].", ".$codigo_guia_destino.", "
+                       .$codigo_usuario.", NOW(), ".$codigo_usuario.", NOW())";
+            }
+        $sql = "INSERT INTO caja_factura_finca
+            (CODIGOFACTURAFINCA, NUMEROCAJA, CODIGOGUIA,
+             CODIGOUSUARIOREGISTRA, FECHAREGISTRO, CODIGOUSUARIOMODIFICA, FECHAMODIFICACION)
+            VALUES ".implode(", ", $valores)."
+            ON DUPLICATE KEY UPDATE
+            CODIGOGUIA            = ".$codigo_guia_destino.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()";
+        if(!mysqli_query($link, $sql))
+            return "ERROR: ".mysqli_error($link);
+        return "OK|".$total;
+        }
+
+    // modo "mismas": una guia del destino por cada (numero, fecha) en uso.
+    $sql_usadas = "SELECT DISTINCT c.CODIGOGUIA AS CODIGOGUIA,
+        g.NUMEROGUIA AS NUMEROGUIA,
+        g.FECHAVUELO AS FECHAVUELO
+        FROM caja_factura_finca c
+        INNER JOIN guia g ON c.CODIGOGUIA = g.CODIGO
+        WHERE c.CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND c.CODIGOGUIA IS NOT NULL";
+    $res_usadas = mysqli_query($link, $sql_usadas);
+    if(!$res_usadas)
+        return "ERROR: ".mysqli_error($link);
+
+    $total_usadas = mysqli_num_rows($res_usadas);
+    $usadas       = array();
+    for($i=1; $i<=$total_usadas; $i++)
+        {
+        $fila      = mysqli_fetch_assoc($res_usadas);
+        $usadas[]  = array(
+            "CODIGOGUIA" => (int)$fila["CODIGOGUIA"],
+            "NUMEROGUIA" => (string)$fila["NUMEROGUIA"],
+            "FECHAVUELO" => (string)$fila["FECHAVUELO"]
+            );
+        }
+
+    $tocadas = 0;
+    for($i=0; $i<$total_usadas; $i++)
+        {
+        $nueva = guia_equivalente_destino_dsft($codigo_destino, $usadas[$i]["NUMEROGUIA"],
+                                               $usadas[$i]["FECHAVUELO"], $codigo_usuario);
+        if($nueva <= 0)
+            return "ERROR: No se pudo crear la guía ".$usadas[$i]["NUMEROGUIA"]." en el destino";
+
+        // Repuntar solo las cajas que usaban esa guia del origen.
+        $sql_rep = "UPDATE caja_factura_finca SET
+            CODIGOGUIA            = ".$nueva.",
+            CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+            FECHAMODIFICACION     = NOW()
+            WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+              AND CODIGOGUIA = ".$usadas[$i]["CODIGOGUIA"];
+        if(!mysqli_query($link, $sql_rep))
+            return "ERROR: ".mysqli_error($link);
+        $tocadas += mysqli_affected_rows($link);
+        }
+    return "OK|".$tocadas;
+    }
+
+// Transfiere UNA factura a otro consolidado.
+function transferir_factura_dsft($codigo_ff, $codigo_consolidado_destino, $modo, $codigo_guia_destino, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $codigo_destino = (int)$codigo_consolidado_destino;
+    $modo           = trim((string)$modo);
+    if($codigo_ff <= 0)
+        return "ERROR: Factura inválida";
+    if($codigo_destino <= 0)
+        return "ERROR: Consolidado de destino inválido";
+    if($modo != "sin_guia" && $modo != "mismas" && $modo != "guia")
+        return "ERROR: Modo de transferencia inválido";
+
+    $origen = consolidado_de_factura_dsft($codigo_ff);
+    if($origen == $codigo_destino)
+        return "ERROR: La factura ya está en ese consolidado";
+    if(consolidado_existe_dsft($codigo_destino) == 0)
+        return "ERROR: El consolidado de destino no existe";
+
+    mysqli_begin_transaction($link);
+    $r = _transferir_factura_sin_tx($codigo_ff, $codigo_destino, $modo, $codigo_guia_destino, $codigo_usuario);
+    if(substr($r, 0, 2) != "OK")
+        {
+        mysqli_rollback($link);
+        return $r;
+        }
+    mysqli_commit($link);
+
+    $partes = explode("|", $r);
+    return "OK|1|".(isset($partes[1]) ? $partes[1] : 0);
+    }
+
+// Transfiere TODAS las facturas de un consolidado. El origen queda vacio, NO se
+// borra. Todo en una sola transaccion.
+function transferir_consolidado_dsft($codigo_origen, $codigo_destino, $modo, $codigo_guia_destino, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_origen  = (int)$codigo_origen;
+    $codigo_destino = (int)$codigo_destino;
+    $modo           = trim((string)$modo);
+    if($codigo_origen <= 0)
+        return "ERROR: Consolidado de origen inválido";
+    if($codigo_destino <= 0)
+        return "ERROR: Consolidado de destino inválido";
+    if($codigo_origen == $codigo_destino)
+        return "ERROR: El origen y el destino son el mismo consolidado";
+    if($modo != "sin_guia" && $modo != "mismas" && $modo != "guia")
+        return "ERROR: Modo de transferencia inválido";
+    if(consolidado_existe_dsft($codigo_destino) == 0)
+        return "ERROR: El consolidado de destino no existe";
+
+    $sql_ff = "SELECT CODIGO AS CODIGO FROM factura_finca
+        WHERE CODIGOCONSOLIDADO = ".$codigo_origen."
+        ORDER BY CODIGO";
+    $res_ff = mysqli_query($link, $sql_ff);
+    if(!$res_ff)
+        return "ERROR: ".mysqli_error($link);
+    $total_ff = mysqli_num_rows($res_ff);
+    if($total_ff == 0)
+        return "ERROR: El consolidado de origen no tiene facturas";
+
+    $facturas = array();
+    for($i=1; $i<=$total_ff; $i++)
+        {
+        $fila       = mysqli_fetch_assoc($res_ff);
+        $facturas[] = (int)$fila["CODIGO"];
+        }
+
+    mysqli_begin_transaction($link);
+    $cajas = 0;
+    for($i=0; $i<$total_ff; $i++)
+        {
+        $r = _transferir_factura_sin_tx($facturas[$i], $codigo_destino, $modo, $codigo_guia_destino, $codigo_usuario);
+        if(substr($r, 0, 2) != "OK")
+            {
+            mysqli_rollback($link);
+            return $r;
+            }
+        $partes = explode("|", $r);
+        $cajas += (isset($partes[1]) ? (int)$partes[1] : 0);
+        }
+    mysqli_commit($link);
+    return "OK|".$total_ff."|".$cajas;
+    }
+
+// Existe el consolidado (y esta activo)?
+function consolidado_existe_dsft($codigo_consolidado)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return 0;
+    $sql = "SELECT CODIGO AS CODIGO FROM consolidado
+        WHERE CODIGO = ".$codigo_consolidado."
+          AND ESTADO >= 0";
+    $res = mysqli_query($link, $sql);
+    return ($res && mysqli_num_rows($res) > 0) ? 1 : 0;
     }
 
 // Contenido del dialogo GUIAS: alta, filtro por fecha y la lista de las guias de
