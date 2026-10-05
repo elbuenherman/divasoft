@@ -1,7 +1,7 @@
 <?php           
 include("variables_globales.php");
 include("funciones.php");
-include("funciones_v2.php");         
+include("funciones_v2.php");          
 // ini_set('display_errors', 1); 
 // error_reporting(E_ALL); 
 // Dispatch POST con archivo: detectado antes del flujo normal porque

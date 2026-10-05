@@ -52,6 +52,8 @@ for($i=0; $i<$numero_consolidados; $i++)
 <!-- Select2 -->
 <link href="css/select2.min.css" rel="stylesheet" />
 <script src="js/select2.min.js"></script>
+<!-- JS compartido: aviso breve y selector de guias (asignar y transferir). -->
+<script src="js_comun_dsft.js?v=20261004"></script>
 <style>
 body.metro {
     background-color: #edededff !important;
@@ -286,6 +288,8 @@ div[id^="ui-tooltip"] {
     }
 </style>
 <script language="javascript">
+// El selector de guias del JS comun necesita el usuario de sesion.
+var global_codigo_usuario = <?php echo (int)$_SESSION['s_codigo']; ?>;
 var global_codigo_correo_seleccionado = 0;
 var global_ordenamiento = "FECHAHORA";
 var global_direccion = "DESC";
@@ -296,6 +300,9 @@ function messageBox(texto)
     $("#id_espera").hide();
     $("#dialog").html(texto);
     $("#dialog").dialog("open");
+    // Si ya habia otro dialogo abierto (el selector de guias), el aviso nace
+    // con un z-index menor y quedaria detras. moveToTop lo sube al frente.
+    $("#dialog").dialog("moveToTop");
     }
 
 // ===== Filtro local por texto (maqueta: recorre los grupos de correo del grid) =====
@@ -424,7 +431,7 @@ function extraer_correos()
     if(global_intervalo_progreso != null)
         clearInterval(global_intervalo_progreso);
     global_intervalo_progreso = setInterval(function()
-        {
+        { 
         $.get("funciones_ajax.php?funcion=progreso_extraccion", function(data)
             {
             try
@@ -471,6 +478,28 @@ function extraer_correos()
     } 
  
 // ===== Asignar una factura ya procesada al consolidado seleccionado en la barra =====
+// La flecha tiene dos comportamientos. Sin consolidado asignado: asigna al que
+// este elegido en la barra, rapido. Ya asignada: abre el MISMO selector de la
+// consola de consolidados en nivel FACTURA, para poder transferirla a otro
+// consolidado o cambiarle la guia.
+function transferir_desde_correos(codigo_factura, codigo_consolidado)
+    {
+    if(codigo_consolidado <= 0)
+        {
+        asignar_consolidado(codigo_factura);
+        return;
+        }
+    sel_guia_abrir_factura(codigo_factura, codigo_consolidado, null);
+    }
+
+// Que redibujar en ESTA consola despues de asignar o transferir. El listado se
+// recarga completo y actualiza_listado() reaplica el buscador y el check
+// "Solo sin consolidado", asi que no se pierde el estado de los filtros.
+function sel_guia_refrescar_consola(info)
+    {
+    actualiza_listado();
+    }
+
 function asignar_consolidado(codigo_factura)
     {
     // Leer el consolidado seleccionado en la barra superior.
@@ -1068,6 +1097,7 @@ $(document).ready(function()
     <div id="id_dialog_cuerpo" title=""></div>
     <div id="id_dialog_pdf" title=""></div>
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
+    <div id="id_dialog_selector_guias" title="Guías"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
     <div id="id_progreso_extraccion" style="position:fixed; z-index:1001; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.95); padding:20px 30px; border-radius:8px; border:2px solid #88010e; font-size:14px; font-weight:bold; color:#88010e; display:none; text-align:center; min-width:280px;"></div>
 

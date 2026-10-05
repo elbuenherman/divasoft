@@ -1081,8 +1081,14 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                     // Si esta asignada a un consolidado, mostrar icono reply (quitar) a la izquierda.
                     if($cc_actual > 0)
                         $html .= '<a onclick="desasignar_consolidado('.$codigo_ff.');" title="Quitar del consolidado" style="cursor:pointer; color:#2e7d32; margin-right:4px;"><i class="icon-reply"></i></a>';
-                    // Icono forward (asignar al consolidado seleccionado en la barra).
-                    $html .= '<a onclick="asignar_consolidado('.$codigo_ff.');" title="Asignar a consolidado" style="cursor:pointer; color:#88010e; margin-right:4px;"><i class="icon-forward"></i></a>';
+                    // Icono forward. Sin consolidado asignado asigna al elegido en
+                    // la barra; ya asignada abre el selector de guias en nivel
+                    // FACTURA, para transferirla o cambiarle la guia. El title lo
+                    // aclara, porque es la misma flecha con dos comportamientos.
+                    $titulo_flecha = ($cc_actual > 0)
+                                   ? "Transferir a otro consolidado / cambiar guía"
+                                   : "Asignar al consolidado seleccionado";
+                    $html .= '<a onclick="transferir_desde_correos('.$codigo_ff.', '.$cc_actual.');" title="'.htmlspecialchars($titulo_flecha, ENT_QUOTES, "UTF-8").'" style="cursor:pointer; color:#88010e; margin-right:4px;"><i class="icon-forward"></i></a>';
                     // Icono target verde pastel: ver la factura procesada.
                     $html .= '<a onclick="window.open(\'ver_factura_finca.php?codigo='.$codigo_ff.'\', \'_blank\');" title="Procesada - factura_finca CODIGO: '.$codigo_ff.'" style="cursor:pointer; color:#8fbc8f; margin-right:6px;"><i class="icon-target"></i></a>';
                     }
@@ -1126,7 +1132,7 @@ function compara_extracciones($json1, $json2)
 
     $campos_texto_cabecera = array("FINCA_PROVEEDOR", "RUC_PROVEEDOR", "NUMERO_FACTURA", "FECHA_FACTURACION", "CLIENTE_MARCACION");
     for($i = 0; $i < count($campos_texto_cabecera); $i++)
-        {
+        { 
         $campo = $campos_texto_cabecera[$i];
         $v1 = isset($json1["CABECERA"][$campo]) ? $json1["CABECERA"][$campo] : null;
         $v2 = isset($json2["CABECERA"][$campo]) ? $json2["CABECERA"][$campo] : null;
