@@ -710,6 +710,9 @@ function desasignar_factura_consolidado_dsft($codigo_factura)
     $r = mysqli_query($link, $sql);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+
+    // Las guias eran del consolidado del que se acaba de sacar la factura.
+    limpiar_guias_factura_dsft($codigo_factura);
     return "OK";
     }
 
@@ -746,10 +749,10 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
             }
         }
 
-    // Lookup de consolidados (CODIGO -> FECHAVUELO) para mostrar "COD - FECHA"
+    // Lookup de consolidados (CODIGO -> FECHACONSOLIDADO) para mostrar "COD - FECHA"
     // en la celda CONSOLIDADO de las filas de adjunto procesado.
     $consolidados_lookup = array();
-    $sql_cl = "SELECT CODIGO, FECHAVUELO FROM consolidado WHERE ESTADO >= 0";
+    $sql_cl = "SELECT CODIGO, FECHACONSOLIDADO FROM consolidado WHERE ESTADO >= 0";
     $res_cl = mysqli_query($link, $sql_cl);
     if($res_cl)
         {
@@ -757,7 +760,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
         for($cl=1; $cl<=$total_cl; $cl++)
             {
             $fila_cl = mysqli_fetch_assoc($res_cl);
-            $consolidados_lookup[(int)$fila_cl["CODIGO"]] = $fila_cl["FECHAVUELO"];
+            $consolidados_lookup[(int)$fila_cl["CODIGO"]] = $fila_cl["FECHACONSOLIDADO"];
             }
         }
 
@@ -1012,7 +1015,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                 $celda_tam         = $adj_tamano;  // por defecto: "38.8 KB"
                 $celda_fulles      = '';           // TOTALCAJASEQUIVALENTES solo cuando esta procesado
                 $celda_estado_adj  = '';           // ESTADO de factura_finca solo cuando esta procesado
-                $celda_consolidado = '';           // "COD - FECHAVUELO" solo si esta procesado y asignado
+                $celda_consolidado = '';           // "COD - FECHACONSOLIDADO" solo si esta procesado y asignado
                 $visor_title       = $adj_visor_titulo_base;
 
                 if($proc !== null)
@@ -1034,13 +1037,13 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
                     $est_ff = isset($proc["ESTADO"]) ? (string)$proc["ESTADO"] : '';
                     if($est_ff !== '')  
                         $celda_estado_adj = '<strong>'.htmlspecialchars($est_ff, ENT_QUOTES, 'UTF-8').'</strong>';
-                    // CONSOLIDADO asignado a la factura: "COD - FECHAVUELO" como link
+                    // CONSOLIDADO asignado a la factura: "COD - FECHACONSOLIDADO" como link
                     // a consola_consolidado.php?codigo=N (abre el consolidado).
                     $cc_asignado = isset($proc["CODIGOCONSOLIDADO"]) ? (int)$proc["CODIGOCONSOLIDADO"] : 0;
                     if($cc_asignado > 0 && isset($consolidados_lookup[$cc_asignado]))
                         {
-                        $fechavuelo_lookup = htmlspecialchars((string)$consolidados_lookup[$cc_asignado], ENT_QUOTES, 'UTF-8');
-                        $celda_consolidado = '<a href="consola_consolidado.php?codigo='.$cc_asignado.'" style="color:#88010e; text-decoration:underline; cursor:pointer;" title="Ir al consolidado"><strong>'.$cc_asignado.' - '.$fechavuelo_lookup.'</strong></a>';
+                        $fechaconsolidado_lookup = htmlspecialchars((string)$consolidados_lookup[$cc_asignado], ENT_QUOTES, 'UTF-8');
+                        $celda_consolidado = '<a href="consola_consolidado.php?codigo='.$cc_asignado.'" style="color:#88010e; text-decoration:underline; cursor:pointer;" title="Ir al consolidado"><strong>'.$cc_asignado.' - '.$fechaconsolidado_lookup.'</strong></a>';
                         }
                     // Agregar font-weight:bold al style del <a> del nombre del archivo.
                     $adj_nombre_link = str_replace('color:#003366;', 'color:#003366; font-weight:bold;', $adj_nombre_link);
@@ -1061,7 +1064,7 @@ function lista_correos_facturas($campo_orden = "FECHAHORA", $direccion_orden = "
 
                 $html .= '<tr class="fila_adjunto" data-asignado="'.$adj_asignado.'" data-excluido="'.($es_excluido ? 1 : 0).'">';
                 $html .= '<td class="td_centro" style="'.$est_adj.' box-shadow:none;"><i class="icon-arrow-right-2" title="'.$adj_codigo.'" style="color:#7fa7c9;"></i></td>';
-                // Celda CONSOLIDADO: "COD - FECHAVUELO" si la factura tiene consolidado asignado, vacia si no.
+                // Celda CONSOLIDADO: "COD - FECHACONSOLIDADO" si la factura tiene consolidado asignado, vacia si no.
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_consolidado.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_finca.'</td>';
                 $html .= '<td class="td_centro" style="'.$est_adj.'">'.$celda_cons.'</td>';
@@ -1130,13 +1133,13 @@ function compara_extracciones($json1, $json2)
         if(!compara_texto($v1, $v2))
             $discrepancias[] = "CABECERA.".$campo.": [".$v1."] vs [".$v2."]";
         }
-
-    if(!compara_decimal($json1["CABECERA"]["SUBTOTAL"] ?? 0, $json2["CABECERA"]["SUBTOTAL"] ?? 0, 0.01))
-        $discrepancias[] = "CABECERA.SUBTOTAL: [".($json1["CABECERA"]["SUBTOTAL"] ?? "null")."] vs [".($json2["CABECERA"]["SUBTOTAL"] ?? "null")."]";
-    if(!compara_decimal($json1["CABECERA"]["TOTAL"] ?? 0, $json2["CABECERA"]["TOTAL"] ?? 0, 0.01))
-        $discrepancias[] = "CABECERA.TOTAL: [".($json1["CABECERA"]["TOTAL"] ?? "null")."] vs [".($json2["CABECERA"]["TOTAL"] ?? "null")."]";
-    if(!compara_decimal($json1["CABECERA"]["IVA_VALOR"] ?? 0, $json2["CABECERA"]["IVA_VALOR"] ?? 0, 0.01))
-        $discrepancias[] = "CABECERA.IVA_VALOR: [".($json1["CABECERA"]["IVA_VALOR"] ?? "null")."] vs [".($json2["CABECERA"]["IVA_VALOR"] ?? "null")."]";
+     
+    if(!compara_decimal((isset($json1["CABECERA"]["SUBTOTAL"]) ? $json1["CABECERA"]["SUBTOTAL"] : 0), (isset($json2["CABECERA"]["SUBTOTAL"]) ? $json2["CABECERA"]["SUBTOTAL"] : 0), 0.01))
+        $discrepancias[] = "CABECERA.SUBTOTAL: [".((isset($json1["CABECERA"]["SUBTOTAL"]) ? $json1["CABECERA"]["SUBTOTAL"] : "null"))."] vs [".((isset($json2["CABECERA"]["SUBTOTAL"]) ? $json2["CABECERA"]["SUBTOTAL"] : "null"))."]";
+    if(!compara_decimal((isset($json1["CABECERA"]["TOTAL"]) ? $json1["CABECERA"]["TOTAL"] : 0), (isset($json2["CABECERA"]["TOTAL"]) ? $json2["CABECERA"]["TOTAL"] : 0), 0.01))
+        $discrepancias[] = "CABECERA.TOTAL: [".((isset($json1["CABECERA"]["TOTAL"]) ? $json1["CABECERA"]["TOTAL"] : "null"))."] vs [".((isset($json2["CABECERA"]["TOTAL"]) ? $json2["CABECERA"]["TOTAL"] : "null"))."]";
+    if(!compara_decimal((isset($json1["CABECERA"]["IVA_VALOR"]) ? $json1["CABECERA"]["IVA_VALOR"] : 0), (isset($json2["CABECERA"]["IVA_VALOR"]) ? $json2["CABECERA"]["IVA_VALOR"] : 0), 0.01))
+        $discrepancias[] = "CABECERA.IVA_VALOR: [".((isset($json1["CABECERA"]["IVA_VALOR"]) ? $json1["CABECERA"]["IVA_VALOR"] : "null"))."] vs [".((isset($json2["CABECERA"]["IVA_VALOR"]) ? $json2["CABECERA"]["IVA_VALOR"] : "null"))."]";
 
     $campos_logistica = array("PAIS_DESTINO", "MAWB", "HAWB", "DAE");
     for($i = 0; $i < count($campos_logistica); $i++)
@@ -1148,12 +1151,12 @@ function compara_extracciones($json1, $json2)
             $discrepancias[] = "LOGISTICA.".$campo.": [".$v1."] vs [".$v2."]";
         }
 
-    if(!compara_decimal($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? 0, $json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? 0, 0.001))
-        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_CAJAS_EQUIVALENTES: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] ?? "null")."]";
-    if(($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? 0) != ($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? 0))
-        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_RAMOS: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] ?? "null")."]";
-    if(($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? 0) != ($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? 0))
-        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_TALLOS: [".($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? "null")."] vs [".($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] ?? "null")."]";
+    if(!compara_decimal((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] : 0), (isset($json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] : 0), 0.001))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_CAJAS_EQUIVALENTES: [".((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] : "null"))."] vs [".((isset($json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_CAJAS_EQUIVALENTES"] : "null"))."]";
+    if(((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] : 0)) != ((isset($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] : 0)))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_RAMOS: [".((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] : "null"))."] vs [".((isset($json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_RAMOS"] : "null"))."]";
+    if(((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] : 0)) != ((isset($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] : 0)))
+        $discrepancias[] = "RESUMEN_EMPAQUE.TOTAL_TALLOS: [".((isset($json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"]) ? $json1["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] : "null"))."] vs [".((isset($json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"]) ? $json2["RESUMEN_EMPAQUE"]["TOTAL_TALLOS"] : "null"))."]";
 
     $cajas1 = isset($json1["CAJAS"]) ? $json1["CAJAS"] : array();
     $cajas2 = isset($json2["CAJAS"]) ? $json2["CAJAS"] : array();
@@ -1178,22 +1181,22 @@ function compara_extracciones($json1, $json2)
         $l2 = $lineas2[$i];
         if(!compara_texto($l1["VARIEDAD_NORM"], $l2["VARIEDAD_NORM"]))
             $discrepancias[] = "LINEA[".$i."].VARIEDAD: [".$l1["VARIEDAD"]."] vs [".$l2["VARIEDAD"]."]";
-        if(!compara_texto($l1["PRODUCTO"] ?? null, $l2["PRODUCTO"] ?? null))
-            $discrepancias[] = "LINEA[".$i."].PRODUCTO: [".($l1["PRODUCTO"] ?? "null")."] vs [".($l2["PRODUCTO"] ?? "null")."]";
-        if(($l1["LARGO"] ?? null) != ($l2["LARGO"] ?? null))
-            $discrepancias[] = "LINEA[".$i."].LARGO: [".($l1["LARGO"] ?? "null")."] vs [".($l2["LARGO"] ?? "null")."]";
-        if(!compara_texto($l1["GRADO"] ?? null, $l2["GRADO"] ?? null))
-            $discrepancias[] = "LINEA[".$i."].GRADO: [".($l1["GRADO"] ?? "null")."] vs [".($l2["GRADO"] ?? "null")."]";
-        if(($l1["TALLOS_POR_RAMO"] ?? 0) != ($l2["TALLOS_POR_RAMO"] ?? 0))
-            $discrepancias[] = "LINEA[".$i."].TALLOS_POR_RAMO: [".($l1["TALLOS_POR_RAMO"] ?? "null")."] vs [".($l2["TALLOS_POR_RAMO"] ?? "null")."]";
-        if(($l1["RAMOS"] ?? 0) != ($l2["RAMOS"] ?? 0))
-            $discrepancias[] = "LINEA[".$i."].RAMOS: [".($l1["RAMOS"] ?? "null")."] vs [".($l2["RAMOS"] ?? "null")."]";
-        if(($l1["TALLOS_TOTAL"] ?? 0) != ($l2["TALLOS_TOTAL"] ?? 0))
-            $discrepancias[] = "LINEA[".$i."].TALLOS_TOTAL: [".($l1["TALLOS_TOTAL"] ?? "null")."] vs [".($l2["TALLOS_TOTAL"] ?? "null")."]";
-        if(!compara_decimal($l1["PRECIO_UNITARIO"] ?? 0, $l2["PRECIO_UNITARIO"] ?? 0, 0.0001))
-            $discrepancias[] = "LINEA[".$i."].PRECIO_UNITARIO: [".($l1["PRECIO_UNITARIO"] ?? "null")."] vs [".($l2["PRECIO_UNITARIO"] ?? "null")."]";
-        if(!compara_decimal($l1["PRECIO_TOTAL"] ?? 0, $l2["PRECIO_TOTAL"] ?? 0, 0.01))
-            $discrepancias[] = "LINEA[".$i."].PRECIO_TOTAL: [".($l1["PRECIO_TOTAL"] ?? "null")."] vs [".($l2["PRECIO_TOTAL"] ?? "null")."]";
+        if(!compara_texto((isset($l1["PRODUCTO"]) ? $l1["PRODUCTO"] : null), (isset($l2["PRODUCTO"]) ? $l2["PRODUCTO"] : null)))
+            $discrepancias[] = "LINEA[".$i."].PRODUCTO: [".((isset($l1["PRODUCTO"]) ? $l1["PRODUCTO"] : "null"))."] vs [".((isset($l2["PRODUCTO"]) ? $l2["PRODUCTO"] : "null"))."]";
+        if(((isset($l1["LARGO"]) ? $l1["LARGO"] : null)) != ((isset($l2["LARGO"]) ? $l2["LARGO"] : null)))
+            $discrepancias[] = "LINEA[".$i."].LARGO: [".((isset($l1["LARGO"]) ? $l1["LARGO"] : "null"))."] vs [".((isset($l2["LARGO"]) ? $l2["LARGO"] : "null"))."]";
+        if(!compara_texto((isset($l1["GRADO"]) ? $l1["GRADO"] : null), (isset($l2["GRADO"]) ? $l2["GRADO"] : null)))
+            $discrepancias[] = "LINEA[".$i."].GRADO: [".((isset($l1["GRADO"]) ? $l1["GRADO"] : "null"))."] vs [".((isset($l2["GRADO"]) ? $l2["GRADO"] : "null"))."]";
+        if(((isset($l1["TALLOS_POR_RAMO"]) ? $l1["TALLOS_POR_RAMO"] : 0)) != ((isset($l2["TALLOS_POR_RAMO"]) ? $l2["TALLOS_POR_RAMO"] : 0)))
+            $discrepancias[] = "LINEA[".$i."].TALLOS_POR_RAMO: [".((isset($l1["TALLOS_POR_RAMO"]) ? $l1["TALLOS_POR_RAMO"] : "null"))."] vs [".((isset($l2["TALLOS_POR_RAMO"]) ? $l2["TALLOS_POR_RAMO"] : "null"))."]";
+        if(((isset($l1["RAMOS"]) ? $l1["RAMOS"] : 0)) != ((isset($l2["RAMOS"]) ? $l2["RAMOS"] : 0)))
+            $discrepancias[] = "LINEA[".$i."].RAMOS: [".((isset($l1["RAMOS"]) ? $l1["RAMOS"] : "null"))."] vs [".((isset($l2["RAMOS"]) ? $l2["RAMOS"] : "null"))."]";
+        if(((isset($l1["TALLOS_TOTAL"]) ? $l1["TALLOS_TOTAL"] : 0)) != ((isset($l2["TALLOS_TOTAL"]) ? $l2["TALLOS_TOTAL"] : 0)))
+            $discrepancias[] = "LINEA[".$i."].TALLOS_TOTAL: [".((isset($l1["TALLOS_TOTAL"]) ? $l1["TALLOS_TOTAL"] : "null"))."] vs [".((isset($l2["TALLOS_TOTAL"]) ? $l2["TALLOS_TOTAL"] : "null"))."]";
+        if(!compara_decimal((isset($l1["PRECIO_UNITARIO"]) ? $l1["PRECIO_UNITARIO"] : 0), (isset($l2["PRECIO_UNITARIO"]) ? $l2["PRECIO_UNITARIO"] : 0), 0.0001))
+            $discrepancias[] = "LINEA[".$i."].PRECIO_UNITARIO: [".((isset($l1["PRECIO_UNITARIO"]) ? $l1["PRECIO_UNITARIO"] : "null"))."] vs [".((isset($l2["PRECIO_UNITARIO"]) ? $l2["PRECIO_UNITARIO"] : "null"))."]";
+        if(!compara_decimal((isset($l1["PRECIO_TOTAL"]) ? $l1["PRECIO_TOTAL"] : 0), (isset($l2["PRECIO_TOTAL"]) ? $l2["PRECIO_TOTAL"] : 0), 0.01))
+            $discrepancias[] = "LINEA[".$i."].PRECIO_TOTAL: [".((isset($l1["PRECIO_TOTAL"]) ? $l1["PRECIO_TOTAL"] : "null"))."] vs [".((isset($l2["PRECIO_TOTAL"]) ? $l2["PRECIO_TOTAL"] : "null"))."]";
         }
 
     return $discrepancias;
@@ -1237,7 +1240,7 @@ function aplana_lineas($cajas)
         for($j = 0; $j < count($contenido); $j++)
             {
             $l = $contenido[$j];
-            $l["VARIEDAD_NORM"] = normaliza_variedad($l["VARIEDAD"] ?? "");
+            $l["VARIEDAD_NORM"] = normaliza_variedad((isset($l["VARIEDAD"]) ? $l["VARIEDAD"] : ""));
             $lineas[] = $l;
             }
         }
@@ -1247,10 +1250,15 @@ function aplana_lineas($cajas)
         $cmp = strcmp($a["VARIEDAD_NORM"], $b["VARIEDAD_NORM"]);
         if($cmp != 0)
             return $cmp;
-        $cmp = (($a["LARGO"] ?? 0) - ($b["LARGO"] ?? 0));
+        $cmp = (((isset($a["LARGO"]) ? $a["LARGO"] : 0)) - ((isset($b["LARGO"]) ? $b["LARGO"] : 0)));
         if($cmp != 0)
             return $cmp;
-        return (float)($a["PRECIO_UNITARIO"] ?? 0) <=> (float)($b["PRECIO_UNITARIO"] ?? 0);
+        // Equivalente al operador <=> (que es de PHP 7): devuelve -1, 0 o 1.
+        $pa = (float)(isset($a["PRECIO_UNITARIO"]) ? $a["PRECIO_UNITARIO"] : 0);
+        $pb = (float)(isset($b["PRECIO_UNITARIO"]) ? $b["PRECIO_UNITARIO"] : 0);
+        if($pa == $pb)
+            return 0;
+        return ($pa < $pb) ? -1 : 1;
         });
 
     return $lineas;
@@ -2140,11 +2148,11 @@ function _ind_orden_consolidado($campo, $orden_valido, $direccion_valida)
     }
 
 // Lista el grid de consolidados (HTML completo: thead + tbody + total).
-function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
+function lista_consolidados_dsft($campo_orden = "FECHACONSOLIDADO", $direccion_orden = "DESC", $fecha_desde = "", $fecha_hasta = "")
     {
     global $link;
 
-    // Filtro por rango de FECHAVUELO si ambas fechas son validas (Y-m-d).
+    // Filtro por rango de FECHACONSOLIDADO si ambas fechas son validas (Y-m-d).
     $valida_desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_desde);
     $valida_hasta = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fecha_hasta);
     $where_fechas = "";
@@ -2152,14 +2160,14 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         {
         $fecha_desde = mysqli_real_escape_string($link, $fecha_desde);
         $fecha_hasta = mysqli_real_escape_string($link, $fecha_hasta);
-        $where_fechas = " AND c.FECHAVUELO >= '".$fecha_desde."' AND c.FECHAVUELO <= '".$fecha_hasta."'";
+        $where_fechas = " AND c.FECHACONSOLIDADO >= '".$fecha_desde."' AND c.FECHACONSOLIDADO <= '".$fecha_hasta."'";
         }
 
     // Validar campo y direccion contra lista blanca.
     // AGENCIA ya no es columna del grid; queda fuera de la lista de orden permitido.
-    $campos_permitidos = array(1=>"CODIGO", 2=>"FECHAVUELO", 3=>"GUIA", 4=>"NOMBREMARCACION", 5=>"NOMBRECLIENTE", 6=>"ESTADO");
+    $campos_permitidos = array(1=>"CODIGO", 2=>"FECHACONSOLIDADO", 3=>"GUIA", 4=>"NOMBREMARCACION", 5=>"NOMBRECLIENTE", 6=>"ESTADO");
     $total_campos = count($campos_permitidos);
-    $orden_valido = "FECHAVUELO";
+    $orden_valido = "FECHACONSOLIDADO";
     for($c=1; $c<=$total_campos; $c++)
         {
         if($campos_permitidos[$c] == $campo_orden)
@@ -2173,7 +2181,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     // Mapear alias logico a la columna real del JOIN para el ORDER BY.
     $map_orden = array(
         "CODIGO"          => "c.CODIGO",
-        "FECHAVUELO"      => "c.FECHAVUELO",
+        "FECHACONSOLIDADO"      => "c.FECHACONSOLIDADO",
         "GUIA"            => "c.GUIA",
         "NOMBREMARCACION" => "m.NOMBREMARCACION",
         "NOMBRECLIENTE"   => "cl.NOMBRECLIENTE",
@@ -2183,7 +2191,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
 
     // Se elimino el LEFT JOIN con proveedor (ya no se muestra NOMBREAGENCIA en el grid).
     $sql = "SELECT c.CODIGO          AS CODIGO,
-        c.FECHAVUELO       AS FECHAVUELO,
+        c.FECHACONSOLIDADO       AS FECHACONSOLIDADO,
         (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
             FROM guia_consolidado gc
             INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
@@ -2212,7 +2220,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         {
         $fila = mysqli_fetch_array($resultado);
         $arreglo[$i]['CODIGO']          = $fila['CODIGO'];
-        $arreglo[$i]['FECHAVUELO']      = $fila['FECHAVUELO'];
+        $arreglo[$i]['FECHACONSOLIDADO']      = $fila['FECHACONSOLIDADO'];
         $arreglo[$i]['GUIA']            = $fila['GUIAS_CONCAT'];
         $arreglo[$i]['NOMBREMARCACION'] = $fila['NOMBREMARCACION'];
         $arreglo[$i]['NOMBRECLIENTE']   = $fila['NOMBRECLIENTE'];
@@ -2221,7 +2229,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
 
     // Indicadores de ordenamiento por columna.
     $ind_codigo  = _ind_orden_consolidado("CODIGO",          $orden_valido, $direccion_valida);
-    $ind_fecha   = _ind_orden_consolidado("FECHAVUELO",      $orden_valido, $direccion_valida);
+    $ind_fecha   = _ind_orden_consolidado("FECHACONSOLIDADO",      $orden_valido, $direccion_valida);
     $ind_guia    = _ind_orden_consolidado("GUIA",            $orden_valido, $direccion_valida);
     $ind_marca   = _ind_orden_consolidado("NOMBREMARCACION", $orden_valido, $direccion_valida);
     $ind_cliente = _ind_orden_consolidado("NOMBRECLIENTE",   $orden_valido, $direccion_valida);
@@ -2232,7 +2240,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     $html  = '<table class="grid_consolidados">';
     $html .= '<thead><tr>';
     $html .= '<th style="width: 5%; cursor: pointer;" onclick="ordenar_por(\'CODIGO\')">COD'.$ind_codigo.'</th>';
-    $html .= '<th style="width: 10%; cursor: pointer;" onclick="ordenar_por(\'FECHAVUELO\')">FECHA VUELO'.$ind_fecha.'</th>';
+    $html .= '<th style="width: 10%; cursor: pointer;" onclick="ordenar_por(\'FECHACONSOLIDADO\')">FECHA'.$ind_fecha.'</th>';
     $html .= '<th style="width: 22%; cursor: pointer;" onclick="ordenar_por(\'GUIA\')">GUIA'.$ind_guia.'</th>';
     $html .= '<th style="width: 13%; cursor: pointer;" onclick="ordenar_por(\'NOMBREMARCACION\')">MARCA'.$ind_marca.'</th>';
     $html .= '<th style="width: 17%; cursor: pointer;" onclick="ordenar_por(\'NOMBRECLIENTE\')">CLIENTE'.$ind_cliente.'</th>';
@@ -2248,7 +2256,7 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
     for($i=0; $i<$numero; $i++)
         {
         $codigo  = (int)$arreglo[$i]['CODIGO'];
-        $fecha   = htmlspecialchars((string)(isset($arreglo[$i]['FECHAVUELO']) ? $arreglo[$i]['FECHAVUELO'] : ''), ENT_QUOTES, 'UTF-8');
+        $fecha   = htmlspecialchars((string)(isset($arreglo[$i]['FECHACONSOLIDADO']) ? $arreglo[$i]['FECHACONSOLIDADO'] : ''), ENT_QUOTES, 'UTF-8');
         $guia    = htmlspecialchars((string)(isset($arreglo[$i]['GUIA']) ? $arreglo[$i]['GUIA'] : ''), ENT_QUOTES, 'UTF-8');
         $marca   = htmlspecialchars((string)(isset($arreglo[$i]['NOMBREMARCACION']) ? $arreglo[$i]['NOMBREMARCACION'] : ''), ENT_QUOTES, 'UTF-8');
         $cliente = htmlspecialchars((string)(isset($arreglo[$i]['NOMBRECLIENTE']) ? $arreglo[$i]['NOMBRECLIENTE'] : ''), ENT_QUOTES, 'UTF-8');
@@ -2272,9 +2280,13 @@ function lista_consolidados_dsft($campo_orden = "FECHAVUELO", $direccion_orden =
         $html .= '<a onclick="abrir_factura_cliente('.$codigo.');" style="cursor:pointer; color:#2196F3; margin-right:4px;" title="Factura cliente"><i class="icon-dollar"></i></a>';
         // Guia (AWB) de todas las cajas del consolidado. El conteo sale del
         // resumen que se trajo ANTES del bucle, no de una consulta por fila.
-        $guia_total   = isset($resumen_guias[$codigo]) ? (int)$resumen_guias[$codigo]["TOTAL"]   : 0;
-        $guia_conguia = isset($resumen_guias[$codigo]) ? (int)$resumen_guias[$codigo]["CONGUIA"] : 0;
-        $html .= '<a onclick="dialog_guias_consolidado('.$codigo.', this);" style="cursor:pointer; color:'.color_icono_guia_dsft($guia_total, $guia_conguia).'; margin-right:4px;" title="Guia asignada en '.$guia_conguia.' de '.$guia_total.' cajas"><i class="icon-hash"></i></a>';
+        $conteo_guias = isset($resumen_guias[$codigo])
+                      ? $resumen_guias[$codigo]
+                      : array("TOTAL" => 0, "CONGUIA" => 0, "GUIASDISTINTAS" => 0, "NUMEROGUIA" => "", "FECHAVUELO" => "");
+        $guia_total   = (int)$conteo_guias["TOTAL"];
+        $guia_conguia = (int)$conteo_guias["CONGUIA"];
+        $guia_titulo  = htmlspecialchars(titulo_icono_guia_dsft($conteo_guias), ENT_QUOTES, "UTF-8");
+        $html .= '<a onclick="dialog_guias_consolidado('.$codigo.', this);" style="cursor:pointer; color:'.color_icono_guia_dsft($guia_total, $guia_conguia).'; margin-right:4px;" title="'.$guia_titulo.'"><i class="icon-hash"></i></a>';
         $html .= '<a onclick="messageBox(\'Packing - proximamente\');" style="cursor:pointer; color:#d4890e; margin-right:4px;" title="Packing"><i class="icon-bus"></i></a>';
         $html .= '<a href="javascript: muestra_trazabilidad_consolidado('.$codigo.');" title="Trazabilidad"><i class="icon-accessibility fg-teal"></i></a>';
         $html .= '<a href="javascript: devuelve_consolidado('.$codigo.');" title="Editar"><i class="icon-pencil fg-brown"></i></a>';
@@ -2295,7 +2307,7 @@ function devuelve_consolidado_dsft($codigo)
     if($codigo == 0)
         return json_encode(array("ERROR" => "Codigo invalido"));
 
-    $sql = "SELECT CODIGO, FECHAVUELO, GUIA, CODIGOMARCACION, CODIGOCLIENTE,
+    $sql = "SELECT CODIGO, FECHACONSOLIDADO, GUIA, CODIGOMARCACION, CODIGOCLIENTE,
         CODIGOTRUCK, CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES, ESTADO
         FROM consolidado WHERE CODIGO = ".$codigo;
     $resultado = mysqli_query($link, $sql);
@@ -2305,7 +2317,7 @@ function devuelve_consolidado_dsft($codigo)
     $fila = mysqli_fetch_array($resultado);
     $respuesta = array();
     $respuesta['CODIGO']          = $fila['CODIGO'];
-    $respuesta['FECHAVUELO']      = $fila['FECHAVUELO'];
+    $respuesta['FECHACONSOLIDADO']      = $fila['FECHACONSOLIDADO'];
     $respuesta['GUIA']            = $fila['GUIA'];
     $respuesta['CODIGOMARCACION'] = $fila['CODIGOMARCACION'];
     $respuesta['CODIGOCLIENTE']   = $fila['CODIGOCLIENTE'];
@@ -2322,16 +2334,16 @@ function devuelve_consolidado_dsft($codigo)
 // La GUIA ya NO se escribe en consolidado.GUIA -> se maneja por la tabla
 // guia_consolidado (uno a muchos). La columna legacy queda en la BD pero
 // no se toca desde esta consola.
-function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
+function graba_consolidado_dsft($codigo, $fechaconsolidado, $codigomarcacion, $codigocliente, $codigotruck, $codigopais, $codigoagencia, $observaciones, $estado, $codigo_usuario)
     {
     global $link;
 
     // Validaciones identicas al cliente JS.
-    $fechavuelo = trim((string)$fechavuelo);
-    if($fechavuelo == "")
-        return "Por favor ingrese la FECHA DE VUELO";
-    if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechavuelo))
-        return "FECHA DE VUELO con formato invalido (Y-m-d)";
+    $fechaconsolidado = trim((string)$fechaconsolidado);
+    if($fechaconsolidado == "")
+        return "Por favor ingrese la FECHA del consolidado";
+    if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaconsolidado))
+        return "FECHA del consolidado con formato invalido (Y-m-d)";
 
     $codigo          = (int)$codigo;
     $codigo_usuario  = (int)$codigo_usuario;
@@ -2352,7 +2364,7 @@ function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigoc
     $valor_codigoagencia = ($codigoagencia == 0) ? "NULL" : $codigoagencia;
 
     // Escape de strings (sobrescribir misma variable).
-    $fechavuelo    = mysqli_real_escape_string($link, $fechavuelo);
+    $fechaconsolidado = mysqli_real_escape_string($link, $fechaconsolidado);
     $observaciones = mysqli_real_escape_string($link, strtoupper(trim((string)$observaciones)));
 
     if($codigo == 0)
@@ -2362,11 +2374,11 @@ function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigoc
         // desde el boton MEDIDAS de la consola.
         $medidas_defecto = medidas_cm_a_texto_dsft(medidas_cm_defecto_dsft());
         $sql = "INSERT INTO consolidado (
-            CODIGO, FECHAVUELO, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
+            CODIGO, FECHACONSOLIDADO, CODIGOMARCACION, CODIGOCLIENTE, CODIGOTRUCK,
             CODIGOAGENCIA, CODIGOPAIS, OBSERVACIONES, MEDIDASCM,
             ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO
         ) VALUES (
-            0, '".$fechavuelo."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
+            0, '".$fechaconsolidado."', ".$codigomarcacion.", ".$valor_codigocliente.", ".$valor_codigotruck.",
             ".$valor_codigoagencia.", ".$valor_codigopais.", '".$observaciones."', '".$medidas_defecto."',
             ".$estado.", ".$codigo_usuario.", NOW()
         )";
@@ -2375,7 +2387,7 @@ function graba_consolidado_dsft($codigo, $fechavuelo, $codigomarcacion, $codigoc
         {
         // GUIA y DESTINO no se tocan en el UPDATE.
         $sql = "UPDATE consolidado SET
-            FECHAVUELO            = '".$fechavuelo."',
+            FECHACONSOLIDADO            = '".$fechaconsolidado."',
             CODIGOMARCACION       = ".$codigomarcacion.",
             CODIGOCLIENTE         = ".$valor_codigocliente.",
             CODIGOTRUCK           = ".$valor_codigotruck.",
@@ -2422,7 +2434,7 @@ function trazabilidad_consolidado_dsft($codigo)
     if($codigo == 0)
         return "Codigo invalido";
 
-    $sql = "SELECT CODIGO, GUIA, FECHAVUELO,
+    $sql = "SELECT CODIGO, GUIA, FECHACONSOLIDADO,
         CODIGOUSUARIOREGISTRA, FECHAREGISTRO,
         CODIGOUSUARIOMODIFICA, FECHAMODIFICACION
         FROM consolidado WHERE CODIGO = ".$codigo;
@@ -2438,7 +2450,7 @@ function trazabilidad_consolidado_dsft($codigo)
     $fecha_mod   = (isset($fila['FECHAMODIFICACION'])     && $fila['FECHAMODIFICACION']     !== null) ? $fila['FECHAMODIFICACION']     : "N/A";
 
     $html  = '<div style="font-size: 12px; line-height: 1.7;">';
-    $html .= '<b>Consolidado:</b> ('.$fila['CODIGO'].') GUIA: '.htmlspecialchars((string)$fila['GUIA'], ENT_QUOTES, 'UTF-8').' / FECHA VUELO: '.htmlspecialchars((string)$fila['FECHAVUELO'], ENT_QUOTES, 'UTF-8').'<br><br>';
+    $html .= '<b>Consolidado:</b> ('.$fila['CODIGO'].') GUIA: '.htmlspecialchars((string)$fila['GUIA'], ENT_QUOTES, 'UTF-8').' / FECHA: '.htmlspecialchars((string)$fila['FECHACONSOLIDADO'], ENT_QUOTES, 'UTF-8').'<br><br>';
     $html .= '<b>Registrado por usuario:</b> '.htmlspecialchars((string)$usuario_reg, ENT_QUOTES, 'UTF-8').'<br>';
     $html .= '<b>Fecha registro:</b> '.htmlspecialchars((string)$fecha_reg, ENT_QUOTES, 'UTF-8').'<br><br>';
     $html .= '<b>Ultima modificacion por usuario:</b> '.htmlspecialchars((string)$usuario_mod, ENT_QUOTES, 'UTF-8').'<br>';
@@ -2688,12 +2700,34 @@ function detalle_consolidado_dsft($codigo_consolidado)
 
 
         // LINEA 2: metadata extraida.
-        $html .= '<div style="background:#fafafa; padding:4px 12px; border-left:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; color:#555;">';
-        $html .= 'No.FAC: <strong>'.$nfac.'</strong>';
-        $html .= ' | SHIP: <strong>'.$fecha.'</strong>';
-        $html .= ' | MARCA: <strong>'.$marca.'</strong>';
-        $html .= ' | '.$pais;
-        $html .= ' | AWB: <strong>'.$guia.'</strong>'; 
+        // Contenedor flex para que el check y los datos queden en UNA sola linea,
+        // centrados verticalmente. Hace falta porque metro-bootstrap define
+        // ".metro label { display:block; margin:5px 0; }" y el label, suelto,
+        // ocupaba todo el ancho y empujaba el texto al renglon siguiente.
+        $html .= '<div style="background:#fafafa; padding:4px 12px; border-left:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; color:#555; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">';
+        // Check de modo seleccion, a la izquierda de los datos de la factura.
+        $html .= '<label style="display:inline-flex; align-items:center; margin:0; white-space:nowrap; cursor:pointer;" title="Seleccionar lineas para cambiar de medida">';
+        $html .= '<input type="checkbox" id="id_chk_seleccion_'.$codigo_ff.'" onchange="toggle_modo_seleccion('.$codigo_ff.', this);" style="margin:0; vertical-align:middle;" />';
+        $html .= '</label>';
+
+        // Los datos se arman por tramos y se omiten los vacios, para que no
+        // queden dos separadores seguidos ni uno al principio o al final.
+        $tramos = array();
+        if(trim($nfac) !== '')
+            $tramos[] = 'No.FAC: <strong>'.$nfac.'</strong>';
+        if(trim($fecha) !== '')
+            $tramos[] = 'SHIP: <strong>'.$fecha.'</strong>';
+        if(trim($marca) !== '')
+            $tramos[] = 'MARCA: <strong>'.$marca.'</strong>';
+        if(trim($pais) !== '')
+            $tramos[] = $pais;
+        if(trim($guia) !== '')
+            $tramos[] = 'AWB: <strong>'.$guia.'</strong>';
+        $html .= '<span>'.implode(' | ', $tramos).'</span>';
+
+        // La ayuda del modo va al final con margin-left:auto: queda a la derecha
+        // de la misma linea y no corre el texto de la factura.
+        $html .= '<span id="id_ayuda_seleccion_'.$codigo_ff.'" style="margin-left:auto; color:#88010e; font-weight:bold; white-space:nowrap;"></span>';
         $html .= '</div>';   
     
         // CONTENEDOR 65/35: grid posicional (envuelto en id_grid_factura_N
@@ -3140,6 +3174,7 @@ function estado_cajas_factura_dsft($codigo_ff)
         c.FECHAENTREGA AS FECHAENTREGA,
         c.CODIGOGUIA AS CODIGOGUIA,
         g.NUMEROGUIA AS NUMEROGUIA,
+        g.FECHAVUELO AS FECHAVUELOGUIA,
         u.nombre_usuario AS NOMBREUSUARIO,
         u.apellido_usuario AS APELLIDOUSUARIO
         FROM caja_factura_finca c
@@ -3160,7 +3195,8 @@ function estado_cajas_factura_dsft($codigo_ff)
             "FECHAENTREGA" => (string)$fila["FECHAENTREGA"],
             "USUARIO"      => $nombre,
             "CODIGOGUIA"   => (int)$fila["CODIGOGUIA"],
-            "NUMEROGUIA"   => (string)$fila["NUMEROGUIA"]
+            "NUMEROGUIA"   => (string)$fila["NUMEROGUIA"],
+            "FECHAVUELO"   => (string)$fila["FECHAVUELOGUIA"]
             );
         }
     return $estados;
@@ -3371,11 +3407,25 @@ function guias_del_consolidado_dsft($codigo_consolidado)
     if($codigo_consolidado <= 0)
         return $guias;
 
-    $sql = "SELECT g.CODIGO AS CODIGO, g.NUMEROGUIA AS NUMEROGUIA
+    // Se trae tambien la fecha de vuelo y cuantas cajas VIVAS usan cada guia
+    // (el subquery cruza con detalle_factura_finca para no contar anotaciones de
+    // cajas que ya no existen). Ordenado por fecha y numero, como pide el dialogo.
+    $sql = "SELECT g.CODIGO AS CODIGO,
+        g.NUMEROGUIA AS NUMEROGUIA,
+        g.FECHAVUELO AS FECHAVUELO,
+        (SELECT COUNT(DISTINCT CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA))
+            FROM detalle_factura_finca d
+            INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
+            INNER JOIN caja_factura_finca c
+                    ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
+                   AND c.NUMEROCAJA = d.NUMEROCAJA
+            WHERE ff.CODIGOCONSOLIDADO = gc.CODIGOCONSOLIDADO
+              AND d.ESTADO >= 0
+              AND c.CODIGOGUIA = g.CODIGO) AS CAJAS
         FROM guia_consolidado gc
         INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
         WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado."
-        ORDER BY g.NUMEROGUIA";
+        ORDER BY g.FECHAVUELO IS NULL, g.FECHAVUELO, g.NUMEROGUIA";
     $res = mysqli_query($link, $sql);
     if(!$res)
         return $guias;
@@ -3386,7 +3436,9 @@ function guias_del_consolidado_dsft($codigo_consolidado)
         $fila    = mysqli_fetch_assoc($res);
         $guias[] = array(
             "CODIGO"     => (int)$fila["CODIGO"],
-            "NUMEROGUIA" => (string)$fila["NUMEROGUIA"]
+            "NUMEROGUIA" => (string)$fila["NUMEROGUIA"],
+            "FECHAVUELO" => (string)$fila["FECHAVUELO"],
+            "CAJAS"      => (int)$fila["CAJAS"]
             );
         }
     return $guias;
@@ -3466,27 +3518,39 @@ function cuenta_cajas_con_guia_dsft($codigo_ff, $codigo_guia = 0)
 
     $codigo_ff   = (int)$codigo_ff;
     $codigo_guia = (int)$codigo_guia;
-    $conteo      = array("TOTAL" => 0, "CONGUIA" => 0, "CAMBIAN" => 0);
+    $conteo      = array("TOTAL" => 0, "CONGUIA" => 0, "CAMBIAN" => 0,
+                         "GUIASDISTINTAS" => 0, "NUMEROGUIA" => "", "FECHAVUELO" => "");
     if($codigo_ff <= 0)
         return $conteo;
 
+    // GUIASDISTINTAS y los MIN de guia sirven para el title: cuando CONGUIA
+    // iguala a TOTAL y hay una sola guia distinta, se puede nombrarla (el MIN
+    // devuelve esa unica). COUNT(DISTINCT) ignora los NULL, pero eso no engana:
+    // si alguna caja no tiene guia, CONGUIA queda por debajo de TOTAL.
     $sql = "SELECT COUNT(DISTINCT d.NUMEROCAJA) AS TOTAL,
         COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN d.NUMEROCAJA END) AS CONGUIA,
-        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 AND c.CODIGOGUIA <> ".$codigo_guia." THEN d.NUMEROCAJA END) AS CAMBIAN
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 AND c.CODIGOGUIA <> ".$codigo_guia." THEN d.NUMEROCAJA END) AS CAMBIAN,
+        COUNT(DISTINCT c.CODIGOGUIA) AS GUIASDISTINTAS,
+        MIN(g.NUMEROGUIA) AS UNNUMEROGUIA,
+        MIN(g.FECHAVUELO) AS UNAFECHAGUIA
         FROM detalle_factura_finca d
         LEFT JOIN caja_factura_finca c
                ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
               AND c.NUMEROCAJA = d.NUMEROCAJA
+        LEFT JOIN guia g ON c.CODIGOGUIA = g.CODIGO
         WHERE d.CODIGOFACTURAFINCA = ".$codigo_ff."
           AND d.ESTADO >= 0";
     $res = mysqli_query($link, $sql);
     if(!$res || mysqli_num_rows($res) == 0)
         return $conteo;
 
-    $fila               = mysqli_fetch_assoc($res);
-    $conteo["TOTAL"]    = (int)$fila["TOTAL"];
-    $conteo["CONGUIA"]  = (int)$fila["CONGUIA"];
-    $conteo["CAMBIAN"]  = (int)$fila["CAMBIAN"];
+    $fila                      = mysqli_fetch_assoc($res);
+    $conteo["TOTAL"]           = (int)$fila["TOTAL"];
+    $conteo["CONGUIA"]         = (int)$fila["CONGUIA"];
+    $conteo["CAMBIAN"]         = (int)$fila["CAMBIAN"];
+    $conteo["GUIASDISTINTAS"]  = (int)$fila["GUIASDISTINTAS"];
+    $conteo["NUMEROGUIA"]      = (string)$fila["UNNUMEROGUIA"];
+    $conteo["FECHAVUELO"]      = (string)$fila["UNAFECHAGUIA"];
     return $conteo;
     }
 
@@ -3538,12 +3602,16 @@ function resumen_guias_consolidados_dsft()
     $resumen = array();
     $sql = "SELECT ff.CODIGOCONSOLIDADO AS CODIGOCONSOLIDADO,
         COUNT(DISTINCT CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA)) AS TOTAL,
-        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA) END) AS CONGUIA
+        COUNT(DISTINCT CASE WHEN c.CODIGOGUIA > 0 THEN CONCAT(d.CODIGOFACTURAFINCA, '-', d.NUMEROCAJA) END) AS CONGUIA,
+        COUNT(DISTINCT c.CODIGOGUIA) AS GUIASDISTINTAS,
+        MIN(g.NUMEROGUIA) AS UNNUMEROGUIA,
+        MIN(g.FECHAVUELO) AS UNAFECHAGUIA
         FROM detalle_factura_finca d
         INNER JOIN factura_finca ff ON d.CODIGOFACTURAFINCA = ff.CODIGO
         LEFT JOIN caja_factura_finca c
                ON c.CODIGOFACTURAFINCA = d.CODIGOFACTURAFINCA
               AND c.NUMEROCAJA = d.NUMEROCAJA
+        LEFT JOIN guia g ON c.CODIGOGUIA = g.CODIGO
         WHERE d.ESTADO >= 0
           AND ff.CODIGOCONSOLIDADO IS NOT NULL
         GROUP BY ff.CODIGOCONSOLIDADO";
@@ -3556,8 +3624,11 @@ function resumen_guias_consolidados_dsft()
         {
         $fila = mysqli_fetch_assoc($res);
         $resumen[(int)$fila["CODIGOCONSOLIDADO"]] = array(
-            "TOTAL"   => (int)$fila["TOTAL"],
-            "CONGUIA" => (int)$fila["CONGUIA"]
+            "TOTAL"          => (int)$fila["TOTAL"],
+            "CONGUIA"        => (int)$fila["CONGUIA"],
+            "GUIASDISTINTAS" => (int)$fila["GUIASDISTINTAS"],
+            "NUMEROGUIA"     => (string)$fila["UNNUMEROGUIA"],
+            "FECHAVUELO"     => (string)$fila["UNAFECHAGUIA"]
             );
         }
     return $resumen;
@@ -3572,6 +3643,25 @@ function color_icono_guia_dsft($total, $con_guia)
     if($total > 0 && $con_guia >= $total)
         return "#f9a825";
     return "#9e9e9e";
+    }
+
+// Title del icono icon-hash a partir de un conteo. Cuando TODAS las cajas
+// comparten una sola guia se la nombra con su fecha; si hay guias distintas o
+// alguna caja sin guia, se cae al conteo, que es lo unico cierto.
+function titulo_icono_guia_dsft($conteo)
+    {
+    $total     = (int)$conteo["TOTAL"];
+    $con_guia  = (int)$conteo["CONGUIA"];
+    $distintas = isset($conteo["GUIASDISTINTAS"]) ? (int)$conteo["GUIASDISTINTAS"] : 0;
+    $numero    = isset($conteo["NUMEROGUIA"]) ? trim((string)$conteo["NUMEROGUIA"]) : "";
+
+    if($total > 0 && $con_guia >= $total && $distintas == 1 && $numero != "")
+        {
+        $fecha  = isset($conteo["FECHAVUELO"]) ? (string)$conteo["FECHAVUELO"] : "";
+        $cuanta = ($total == 1) ? "en 1 caja" : "en las ".$total." cajas";
+        return "Guía ".$numero." (".texto_fecha_vuelo_dsft($fecha).") ".$cuanta;
+        }
+    return "Guía asignada en ".$con_guia." de ".$total." cajas";
     }
 
 // Contenido del dialogo de guias. Las filas llaman siempre a la misma funcion
@@ -3614,9 +3704,11 @@ function render_guias_asignar_dsft($codigo_consolidado, $contexto = "caja", $cod
 
         $html .= '<tr style="background:'.$bg.';">';
         $html .= '<td style="padding:4px 6px; border:1px solid #ddd;">';
+        $fecha_guia = isset($guias[$i]["FECHAVUELO"]) ? trim((string)$guias[$i]["FECHAVUELO"]) : "";
         $html .= '<a onclick="elegir_guia_asignar('.$codigo_guia.', \''.$numero_js.'\');"';
         $html .= ' style="cursor:pointer; color:#88010e; font-weight:bold;"';
         $html .= ' title="Asignar la guía '.$numero_html.'">'.$numero_html.'</a>';
+        $html .= ' <span style="color:#888; font-size:11px;">('.htmlspecialchars(texto_fecha_vuelo_dsft($fecha_guia), ENT_QUOTES, "UTF-8").')</span>';
         $html .= '</td>';
         $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:70px;">';
         if($es_actual)
@@ -3803,7 +3895,7 @@ function render_icono_guia_factura_dsft($codigo_ff, $codigo_consolidado = 0)
 
     $conteo = cuenta_cajas_con_guia_dsft($codigo_ff);
     $color  = color_icono_guia_dsft($conteo["TOTAL"], $conteo["CONGUIA"]);
-    $titulo = "Guía asignada en ".$conteo["CONGUIA"]." de ".$conteo["TOTAL"]." cajas";
+    $titulo = htmlspecialchars(titulo_icono_guia_dsft($conteo), ENT_QUOTES, "UTF-8");
     return '<a onclick="dialog_guias_factura('.$codigo_ff.', '.(int)$codigo_consolidado.', this);"'
         .' style="cursor:pointer; color:'.$color.'; margin-left:8px;" title="'.$titulo.'">'
         .'<i class="icon-hash"></i></a>';
@@ -3896,6 +3988,151 @@ function render_aviso_regenerar_dsft($codigo_ff)
     return $html;
     }
 
+// ----------------------------------------------------------------------------
+// MODO SELECCION: pasar varias lineas a otra medida
+//
+// Sirve para corregir rapido las medidas que la IA leyo mal. Cambia SOLO el
+// LARGO: el precio, los tallos y la caja quedan como estan, porque la finca
+// cobro lo que dice la factura y lo que estaba mal es la medida.
+//
+// No une las lineas que queden repetidas (misma caja, variedad y largo): se
+// dejan visibles y decide la usuaria, igual que con la edicion por doble clic.
+// ----------------------------------------------------------------------------
+
+// $codigos_lineas: CODIGO de detalle_factura_finca separados por coma.
+// Retorna "OK|<cantidad actualizada>" o el mensaje de error.
+function mover_lineas_medida_dsft($codigo_ff, $codigos_lineas, $largo, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $largo          = (int)$largo;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura invalida";
+    if($largo <= 0)
+        return "ERROR: Medida invalida";
+    if($largo > 500)
+        return "ERROR: La medida no puede ser mayor a 500 cm";
+
+    // Cada codigo a entero; se descartan los vacios y los que no sean validos.
+    $partes = explode(",", (string)$codigos_lineas);
+    $total  = count($partes);
+    $codigos = array();
+    for($i=0; $i<$total; $i++)
+        {
+        $n = (int)trim($partes[$i]);
+        if($n > 0 && !in_array($n, $codigos, true))
+            $codigos[] = $n;
+        }
+    if(count($codigos) == 0)
+        return "ERROR: No hay lineas seleccionadas";
+
+    // El filtro por CODIGOFACTURAFINCA es la garantia de que no se toque una
+    // linea de otra factura, aunque la peticion venga armada a mano.
+    $sql = "UPDATE detalle_factura_finca SET
+        LARGO                 = ".$largo.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO IN (".implode(",", $codigos).")
+          AND CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND ESTADO >= 0";
+    if(!mysqli_query($link, $sql))
+        return "ERROR: ".mysqli_error($link);
+
+    return "OK|".mysqli_affected_rows($link);
+    }
+
+// ----------------------------------------------------------------------------
+// BORRAR UNA CAJA COMPLETA
+// ----------------------------------------------------------------------------
+
+// Lineas y tallos de cada caja de una factura, en UNA sola consulta. El grid la
+// pide una vez y despues resuelve cada fila en memoria; los numeros van en el
+// icono de borrar para que el dialogo de confirmacion no necesite otra vuelta
+// al servidor. Devuelve un arreglo indexado por NUMEROCAJA.
+function resumen_cajas_factura_dsft($codigo_ff)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff = (int)$codigo_ff;
+    $resumen   = array();
+    if($codigo_ff <= 0)
+        return $resumen;
+
+    $sql = "SELECT NUMEROCAJA AS NUMEROCAJA,
+        COUNT(*) AS LINEAS,
+        COALESCE(SUM(TALLOSTOTAL), 0) AS TALLOS
+        FROM detalle_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND ESTADO >= 0
+        GROUP BY NUMEROCAJA";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $resumen;
+
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila = mysqli_fetch_assoc($res);
+        $resumen[(int)$fila["NUMEROCAJA"]] = array(
+            "LINEAS" => (int)$fila["LINEAS"],
+            "TALLOS" => (int)$fila["TALLOS"]
+            );
+        }
+    return $resumen;
+    }
+
+// Borra una caja entera: sus lineas de detalle y su registro de
+// caja_factura_finca, en una transaccion. El segundo DELETE no es opcional: sin
+// el queda una anotacion huerfana y, como agregar_caja_detalle_dsft numera con
+// MAX(NUMEROCAJA)+1, una caja nueva podria heredar la entrega o la guia de esta.
+// Es el mismo cierre que hace eliminar_linea_detalle_dsft cuando borra la ultima
+// linea de una caja. Los totales de la factura no se recalculan porque no estan
+// almacenados: render_totales_factura_dsft los suma al vuelo.
+// NO se renumeran las cajas restantes: queda el hueco, igual que hoy.
+function borrar_caja_detalle_dsft($codigo_ff, $numero_caja, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_ff      = (int)$codigo_ff;
+    $numero_caja    = (int)$numero_caja;
+    $codigo_usuario = (int)$codigo_usuario;
+    if($codigo_ff <= 0)
+        return "ERROR: Factura invalida";
+    if($numero_caja <= 0)
+        return "ERROR: Caja invalida";
+
+    mysqli_begin_transaction($link);
+
+    $sql_det = "DELETE FROM detalle_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND NUMEROCAJA = ".$numero_caja;
+    if(!mysqli_query($link, $sql_det))
+        {
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "ERROR: ".$error;
+        }
+    $borradas = mysqli_affected_rows($link);
+
+    $sql_caja = "DELETE FROM caja_factura_finca
+        WHERE CODIGOFACTURAFINCA = ".$codigo_ff."
+          AND NUMEROCAJA = ".$numero_caja;
+    if(!mysqli_query($link, $sql_caja))
+        {
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "ERROR: ".$error;
+        }
+
+    mysqli_commit($link);
+    return "OK|".$borradas;
+    }
+
 // Helper interno de detalle_consolidado_dsft. Renderiza el grid posicional de
 // detalle_factura_finca con una columna por cada medida de lista_cms_dsft() y
 // FB equivalente (FB=1, HB=0.5, QB=0.25, OB/EB=0.125) en la primera linea de
@@ -3926,6 +4163,8 @@ function _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado = 0
     // Estado de entrega de TODAS las cajas de la factura, de una sola vez.
     // Cada fila lo resuelve en memoria: ninguna consulta por caja.
     $entregas = estado_cajas_factura_dsft($codigo_ff);
+    // Lineas y tallos por caja, para el dialogo de "borrar caja completa".
+    $resumen_cajas = resumen_cajas_factura_dsft($codigo_ff);
 
     $html  = '<table class="grid_factura_detalle" style="width:100%; border-collapse:collapse; font-size:11px;">';
     $html .= '<tr style="background:#88010e; color:#fff;">';
@@ -3933,7 +4172,9 @@ function _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado = 0
     $html .= '<th style="padding:2px 4px;">PROD</th>';
     $html .= '<th style="padding:2px 4px;">VARIETY</th>';
     for($c=0; $c<$total_cms; $c++)
-        $html .= '<th style="padding:2px 3px; width:32px; text-align:center;">'.$cms[$c].'</th>';
+        // th_cm_sel + data-: en modo seleccion el JS los vuelve clicables para
+        // pasar las lineas marcadas a esa medida.
+        $html .= '<th class="th_cm_sel" data-cm="'.$cms[$c].'" data-ff="'.(int)$codigo_ff.'" style="padding:2px 3px; width:32px; text-align:center;">'.$cms[$c].'</th>';
     $html .= '<th style="padding:2px 4px; text-align:right;">ST PR</th>';
     $html .= '<th style="padding:2px 4px; text-align:right;">TOT</th>';
     $html .= '<th style="padding:2px 4px; width:25px;">A</th>';
@@ -4052,16 +4293,29 @@ function _render_grid_factura($link, $codigo_ff, $finca, $codigo_consolidado = 0
             $codigo_guia_caja = isset($entregas[$num_caja]) ? (int)$entregas[$num_caja]["CODIGOGUIA"] : 0;
             $numero_guia_caja = isset($entregas[$num_caja]) ? (string)$entregas[$num_caja]["NUMEROGUIA"] : "";
             $color_guia       = color_icono_guia_dsft(1, ($codigo_guia_caja > 0) ? 1 : 0);
+            $fecha_guia_caja = isset($entregas[$num_caja]) ? (string)$entregas[$num_caja]["FECHAVUELO"] : "";
             if($codigo_guia_caja > 0)
-                $titulo_guia = "Caja ".$num_caja." con la guia ".$numero_guia_caja.". Click para cambiarla.";
+                $titulo_guia = "Guía ".$numero_guia_caja." (".texto_fecha_vuelo_dsft($fecha_guia_caja).")"
+                             . " en la caja ".$num_caja.". Click para cambiarla.";
             else
-                $titulo_guia = "Caja ".$num_caja." sin guia. Click para asignarle una.";
+                $titulo_guia = "Caja ".$num_caja." sin guía. Click para asignarle una.";
             $html .= '<a id="id_guia_caja_'.(int)$codigo_ff.'_'.$num_caja.'" data-guia="'.$codigo_guia_caja.'" onclick="dialog_guias_caja('.(int)$codigo_ff.', '.$num_caja.', '.(int)$codigo_consolidado.', '.$codigo_guia_caja.', this);" style="cursor:pointer; color:'.$color_guia.'; margin-right:4px;" title="'.htmlspecialchars($titulo_guia, ENT_QUOTES, "UTF-8").'"><i class="icon-hash" style="font-size:11px;"></i></a>';
+
+            // Borrar la caja COMPLETA. icon-cancel para no confundirlo con el
+            // icon-minus que borra una sola linea y convive en esta misma fila.
+            // Los conteos y el estado viajan en data-: el dialogo los usa sin
+            // volver a consultar al servidor.
+            $cajas_lineas = isset($resumen_cajas[$num_caja]) ? (int)$resumen_cajas[$num_caja]["LINEAS"] : 0;
+            $cajas_tallos = isset($resumen_cajas[$num_caja]) ? (int)$resumen_cajas[$num_caja]["TALLOS"] : 0;
+            $html .= '<a onclick="borrar_caja_detalle('.(int)$codigo_ff.', '.$num_caja.', this);"';
+            $html .= ' data-lineas="'.$cajas_lineas.'" data-tallos="'.$cajas_tallos.'"';
+            $html .= ' data-entregada="'.($entregada ? 1 : 0).'" data-guia="'.htmlspecialchars($numero_guia_caja, ENT_QUOTES, "UTF-8").'"';
+            $html .= ' style="cursor:pointer; color:#88010e; margin-right:4px;" title="Borrar caja '.$num_caja.' completa"><i class="icon-cancel" style="font-size:11px;"></i></a>';
 
             $tipo_caja_js = htmlspecialchars(addslashes($tipo_caja), ENT_QUOTES, "UTF-8");
             $html .= '<a onclick="agregar_linea_a_caja('.(int)$codigo_ff.', '.$num_caja.', \''.$tipo_caja_js.'\');" style="cursor:pointer; color:#2e7d32; margin-right:4px;" title="Agregar linea a esta caja"><i class="icon-plus" style="font-size:10px;"></i></a>';
             }
-        $html .= '<a onclick="eliminar_linea_detalle('.$codigo_linea.', '.(int)$codigo_ff.');" style="cursor:pointer; color:#88010e;" title="Eliminar linea"><i class="icon-cancel" style="font-size:10px;"></i></a>';
+        $html .= '<a onclick="eliminar_linea_detalle('.$codigo_linea.', '.(int)$codigo_ff.');" style="cursor:pointer; color:#88010e;" title="Eliminar linea"><i class="icon-minus" style="font-size:10px;"></i></a>';
         $html .= '</td>';
         $html .= '</tr>';
         }
@@ -4234,6 +4488,15 @@ function regenerar_detalle_factura_dsft($codigo_ff)
         return "JSON definitivo invalido o sin CAJAS";
 
     // 3) Eliminar el detalle actual.
+    // El detalle se rehace desde cero y la numeracion de cajas arranca de nuevo,
+    // asi que TODAS las anotaciones de caja_factura_finca de esta factura quedan
+    // obsoletas. Sin este borrado quedan huerfanas: invisibles en el grid pero
+    // apuntando a una guia (que ademas puede haberse borrado, porque ahora la
+    // guia es propia del consolidado y se elimina al quitarla). Es lo que el
+    // dialogo de regenerar ya advierte que se pierde.
+    $sql_cajas = "DELETE FROM caja_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
+    mysqli_query($link, $sql_cajas);
+
     $sql_del = "DELETE FROM detalle_factura_finca WHERE CODIGOFACTURAFINCA = ".$codigo_ff;
     mysqli_query($link, $sql_del);
 
@@ -4684,6 +4947,9 @@ function asignar_consolidado_post_ia_dsft($codigo_adj, $codigo_consolidado)
     $r = mysqli_query($link, $sql2);
     if(!$r)
         return "Error SQL: ".mysqli_error($link);
+    // La factura cambia de consolidado: las guias que tuvieran sus cajas eran del
+    // consolidado anterior y ya no le pertenecen.
+    limpiar_guias_factura_dsft($codigo_ff);
     return "OK|".$codigo_ff;
     }
 
@@ -4729,75 +4995,294 @@ function opciones_marcaciones_por_cliente_dsft($codigo_cliente)
 //   - numerico puro -> es el CODIGO de una guia existente.
 //   - no numerico   -> es un NUMEROGUIA nuevo (el usuario lo escribio).
 // Si es nuevo, inserta en guia y luego usa el CODIGO autogenerado.
-// El INSERT en guia_consolidado usa IGNORE para evitar duplicar el par.
-function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usuario)
+// ----------------------------------------------------------------------------
+// GUIAS PROPIAS POR CONSOLIDADO
+//
+// Cada guia pertenece a UN solo consolidado. Aunque el numero y la fecha
+// coincidan con los de otro consolidado, son registros DISTINTOS en la tabla
+// guia: no se reutiliza ninguno.
+//
+// Unicidad SOLO dentro de cada consolidado: no puede haber dos guias con el
+// mismo NUMEROGUIA y la misma FECHAVUELO. El mismo numero con fechas distintas
+// si se admite, y entre consolidados distintos no hay ninguna restriccion.
+// La fecha se compara con <=> para que "sin fecha" (NULL) cuente como un valor
+// mas y dos guias sin fecha con el mismo numero choquen entre si.
+// ----------------------------------------------------------------------------
+
+// Normaliza y valida un numero de guia. Devuelve el numero listo para grabar, o
+// "" si no pasa la validacion (las mismas reglas de siempre).
+function normaliza_numero_guia_dsft($valor)
+    {
+    $numero = strtoupper(trim((string)$valor));
+    if($numero == "")
+        return "";
+    if(!preg_match('/^[0-9\-]{1,15}$/', $numero))
+        return "";
+    return $numero;
+    }
+
+// Convierte una fecha de entrada en el literal SQL a grabar: "'2026-09-30'" o
+// NULL. La fecha es OPCIONAL; cualquier cosa que no sea Y-m-d cuenta como vacia.
+function fecha_vuelo_sql_dsft($fecha)
+    {
+    $fecha = trim((string)$fecha);
+    if($fecha == "" || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha))
+        return "NULL";
+    return "'".$fecha."'";
+    }
+
+// Hay ya en ESTE consolidado otra guia con el mismo numero y la misma fecha?
+// $excluir_codigo permite editar una guia sin que choque consigo misma.
+// Devuelve el CODIGO de la que choca, o 0.
+function guia_duplicada_consolidado_dsft($codigo_consolidado, $numero, $fecha_sql, $excluir_codigo = 0)
     {
     global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $excluir_codigo     = (int)$excluir_codigo;
+    $numero_sql         = mysqli_real_escape_string($link, $numero);
+
+    $sql = "SELECT g.CODIGO AS CODIGO
+        FROM guia_consolidado gc
+        INNER JOIN guia g ON gc.CODIGOGUIA = g.CODIGO
+        WHERE gc.CODIGOCONSOLIDADO = ".$codigo_consolidado."
+          AND g.NUMEROGUIA = '".$numero_sql."'
+          AND g.FECHAVUELO <=> ".$fecha_sql."
+          AND g.CODIGO <> ".$excluir_codigo."
+        LIMIT 1";
+    $res = mysqli_query($link, $sql);
+    if(!$res || mysqli_num_rows($res) == 0)
+        return 0;
+    $fila = mysqli_fetch_assoc($res);
+    return (int)$fila["CODIGO"];
+    }
+
+// Texto de la fecha para los title y los dialogos.
+function texto_fecha_vuelo_dsft($fecha)
+    {
+    $fecha = trim((string)$fecha);
+    return ($fecha == "") ? "sin fecha" : "vuela ".$fecha;
+    }
+
+// Numeros de guia usados ultimamente, para ayudar a escribir en el dialogo.
+// Son solo sugerencias: al agregar se crea igual un registro nuevo para este
+// consolidado.
+function numeros_guia_recientes_dsft()
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $numeros = array();
+    $sql = "SELECT DISTINCT NUMEROGUIA AS NUMEROGUIA
+        FROM guia
+        WHERE NUMEROGUIA IS NOT NULL
+          AND NUMEROGUIA <> ''
+        ORDER BY CODIGO DESC
+        LIMIT 40";
+    $res = mysqli_query($link, $sql);
+    if(!$res)
+        return $numeros;
+    $total = mysqli_num_rows($res);
+    for($i=1; $i<=$total; $i++)
+        {
+        $fila      = mysqli_fetch_assoc($res);
+        $numeros[] = (string)$fila["NUMEROGUIA"];
+        }
+    return $numeros;
+    }
+
+// Agrega una guia al consolidado. SIEMPRE crea un registro nuevo en guia: no se
+// reutiliza el de otro consolidado, aunque el numero y la fecha coincidan.
+function agregar_guia_consolidado_dsft($codigo_consolidado, $valor, $codigo_usuario, $fecha = "")
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
     $codigo_consolidado = (int)$codigo_consolidado;
     $codigo_usuario     = (int)$codigo_usuario;
     if($codigo_consolidado <= 0)
         return "Codigo de consolidado invalido";
 
-    $valor = trim((string)$valor);
-    if($valor == "")
-        return "Valor de guia vacio";
-
-    $codigo_guia = 0;
-
-    // Detectar si $valor es codigo numerico (guia existente) o numeroguia nuevo.
-    if(ctype_digit($valor) && (int)$valor > 0)
+    $numero = normaliza_numero_guia_dsft($valor);
+    if($numero == "")
         {
-        // Verificar que esa guia existe.
-        $codigo_check = (int)$valor;
-        $sql_check = "SELECT CODIGO FROM guia WHERE CODIGO = ".$codigo_check;
-        $res_check = mysqli_query($link, $sql_check);
-        if($res_check && mysqli_num_rows($res_check) > 0)
-            $codigo_guia = $codigo_check;
+        if(trim((string)$valor) == "")
+            return "Valor de guía vacío";
+        return "La guía solo admite números y guiones (máximo 15 caracteres)";
         }
 
-    if($codigo_guia == 0)
+    $fecha_sql = fecha_vuelo_sql_dsft($fecha);
+
+    // Unicidad dentro del consolidado.
+    if(guia_duplicada_consolidado_dsft($codigo_consolidado, $numero, $fecha_sql) > 0)
+        return "Este consolidado ya tiene la guía ".$numero." con esa fecha";
+
+    $numero_sql = mysqli_real_escape_string($link, $numero);
+
+    mysqli_begin_transaction($link);
+
+    $sql_ins = "INSERT INTO guia (CODIGO, NUMEROGUIA, FECHAVUELO, ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO)
+        VALUES (0, '".$numero_sql."', ".$fecha_sql.", 1, ".$codigo_usuario.", NOW())";
+    if(!mysqli_query($link, $sql_ins))
         {
-        // Es un NUMEROGUIA nuevo (o el codigo no existia).
-        $numeroguia = strtoupper($valor);
-        // Validar formato: solo numeros y guiones, max 15 chars.
-        if(!preg_match('/^[0-9\-]{1,15}$/', $numeroguia))
-            return "La guia solo admite numeros y guiones (max 15 caracteres)";
-        $numeroguia_sql = mysqli_real_escape_string($link, $numeroguia);
-
-        // ¿Ya existe el NUMEROGUIA en la tabla guia?
-        $sql_busca = "SELECT CODIGO FROM guia WHERE NUMEROGUIA = '".$numeroguia_sql."' LIMIT 1";
-        $res_busca = mysqli_query($link, $sql_busca);
-        if($res_busca && mysqli_num_rows($res_busca) > 0)
-            {
-            $fila_b = mysqli_fetch_assoc($res_busca);
-            $codigo_guia = (int)$fila_b["CODIGO"];
-            }
-        else
-            {
-            // INSERT nueva guia.
-            $sql_ins = "INSERT INTO guia (CODIGO, NUMEROGUIA, ESTADO, CODIGOUSUARIOREGISTRA, FECHAREGISTRO)
-                VALUES (0, '".$numeroguia_sql."', 1, ".$codigo_usuario.", NOW())";
-            $r_ins = mysqli_query($link, $sql_ins);
-            if(!$r_ins)
-                return "Error SQL al crear guia: ".mysqli_error($link);
-            $codigo_guia = (int)mysqli_insert_id($link);
-            }
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "Error SQL al crear la guía: ".$error;
         }
+    $codigo_guia = (int)mysqli_insert_id($link);
 
-    if($codigo_guia <= 0)
-        return "No se pudo determinar el CODIGO de guia";
-
-    // Asociar al consolidado (IGNORE por si ya estaba).
-    $sql_aso = "INSERT IGNORE INTO guia_consolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
+    $sql_aso = "INSERT INTO guia_consolidado (CODIGOGUIA, CODIGOCONSOLIDADO)
         VALUES (".$codigo_guia.", ".$codigo_consolidado.")";
-    $r_aso = mysqli_query($link, $sql_aso);
-    if(!$r_aso)
-        return "Error SQL al asociar guia: ".mysqli_error($link);
+    if(!mysqli_query($link, $sql_aso))
+        {
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "Error SQL al asociar la guía: ".$error;
+        }
 
+    mysqli_commit($link);
     return "OK";
     }
 
-// Desasocia una guia de un consolidado (no toca la tabla guia).
+// Edita el numero y la fecha de una guia de ESTE consolidado. Las cajas apuntan
+// al CODIGO, asi que siguen asignadas solas.
+function editar_guia_dsft($codigo_guia, $codigo_consolidado, $numero, $fecha, $codigo_usuario)
+    {
+    global $link;
+    mysqli_report(MYSQLI_REPORT_OFF);
+
+    $codigo_guia        = (int)$codigo_guia;
+    $codigo_consolidado = (int)$codigo_consolidado;
+    $codigo_usuario     = (int)$codigo_usuario;
+    if($codigo_guia <= 0)
+        return "Guía inválida";
+    if($codigo_consolidado <= 0)
+        return "Consolidado invalido";
+
+    // La guia tiene que pertenecer a ESTE consolidado: no se confia en el dialogo.
+    if(guia_pertenece_consolidado_dsft($codigo_consolidado, $codigo_guia) == 0)
+        return "Esa guía no pertenece a este consolidado";
+
+    $numero_nuevo = normaliza_numero_guia_dsft($numero);
+    if($numero_nuevo == "")
+        {
+        if(trim((string)$numero) == "")
+            return "Valor de guía vacío";
+        return "La guía solo admite números y guiones (máximo 15 caracteres)";
+        }
+
+    $fecha_sql = fecha_vuelo_sql_dsft($fecha);
+
+    // Unicidad dentro del consolidado, sin contarse a si misma.
+    if(guia_duplicada_consolidado_dsft($codigo_consolidado, $numero_nuevo, $fecha_sql, $codigo_guia) > 0)
+        return "Este consolidado ya tiene la guía ".$numero_nuevo." con esa fecha";
+
+    $numero_sql = mysqli_real_escape_string($link, $numero_nuevo);
+    $sql = "UPDATE guia SET
+        NUMEROGUIA            = '".$numero_sql."',
+        FECHAVUELO            = ".$fecha_sql.",
+        CODIGOUSUARIOMODIFICA = ".$codigo_usuario.",
+        FECHAMODIFICACION     = NOW()
+        WHERE CODIGO = ".$codigo_guia;
+    if(!mysqli_query($link, $sql))
+        return "Error SQL: ".mysqli_error($link);
+    return "OK";
+    }
+
+// Contenido del dialogo GUIAS: alta, filtro por fecha y la lista de las guias de
+// ESTE consolidado con su cantidad de cajas.
+function render_guias_consolidado_dsft($codigo_consolidado)
+    {
+    $codigo_consolidado = (int)$codigo_consolidado;
+    if($codigo_consolidado <= 0)
+        return '<div style="color:#88010e; font-size:12px;">Consolidado inválido</div>';
+
+    $guias = guias_del_consolidado_dsft($codigo_consolidado);
+    $total = count($guias);
+
+    // Alta: numero + fecha de vuelo (opcional) + AGREGAR.
+    $html  = '<div style="padding:0 0 8px 0; border-bottom:1px solid #ddd; margin-bottom:8px;">';
+    $html .= '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">';
+    $html .= '<input type="text" id="id_guia_numero_nueva" maxlength="15" placeholder="Número de guía" list="id_guias_sugeridas"';
+    $html .= ' style="width:150px; font-size:12px;" onkeypress="return ((event.charCode >= 48 && event.charCode <= 57) || event.charCode == 45)" />';
+    $html .= '<input type="text" id="id_guia_fecha_nueva" placeholder="Fecha de vuelo" readonly';
+    $html .= ' style="width:120px; font-size:12px; background:#fff; cursor:pointer;" />';
+    $html .= '<button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="agregar_guia_dialogo();" style="font-size:11px; padding:3px 10px;">AGREGAR</button>';
+    $html .= '</div>';
+
+    // Sugerencias de numeros ya usados: solo ayuda para escribir.
+    $recientes = numeros_guia_recientes_dsft();
+    $total_rec = count($recientes);
+    $html .= '<datalist id="id_guias_sugeridas">';
+    for($r=0; $r<$total_rec; $r++)
+        $html .= '<option value="'.htmlspecialchars($recientes[$r], ENT_QUOTES, "UTF-8").'"></option>';
+    $html .= '</datalist>';
+    $html .= '</div>';
+
+    // Filtro por fecha, en el cliente.
+    $html .= '<div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:11px; color:#666;">';
+    $html .= '<span>Filtrar por rango de fechas:</span>';
+    // Flatpickr en modo range, igual que el filtro del listado. Con un rango
+    // activo las guias sin fecha se ocultan, porque no se puede saber si entran.
+    $html .= '<input type="text" id="id_guia_fecha_filtro" placeholder="Todas las fechas" readonly';
+    $html .= ' style="width:175px; font-size:11px; background:#fff; cursor:pointer;" />';
+    $html .= '<a onclick="limpiar_filtro_guias();" style="cursor:pointer; color:#88010e;" title="Ver todas">';
+    $html .= '<i class="icon-remove"></i></a>';
+    $html .= '</div>';
+
+    if($total == 0)
+        {
+        $html .= '<div style="font-size:12px; color:#888; padding:4px 0;">Este consolidado no tiene guías.</div>';
+        return $html;
+        }
+
+    $html .= '<table id="id_tabla_guias" style="width:100%; border-collapse:collapse; font-size:12px;">';
+    for($i=0; $i<$total; $i++)
+        {
+        $codigo_guia = (int)$guias[$i]["CODIGO"];
+        $numero      = htmlspecialchars((string)$guias[$i]["NUMEROGUIA"], ENT_QUOTES, "UTF-8");
+        $fecha       = trim((string)$guias[$i]["FECHAVUELO"]);
+        $cajas       = (int)$guias[$i]["CAJAS"];
+        $bg          = ($i % 2 == 0) ? "#fff" : "#f9f9f9";
+        $numero_js   = htmlspecialchars(addslashes((string)$guias[$i]["NUMEROGUIA"]), ENT_QUOTES, "UTF-8");
+
+        // data-fecha lo usa el filtro del cliente.
+        $html .= '<tr class="fila_guia" data-fecha="'.htmlspecialchars($fecha, ENT_QUOTES, "UTF-8").'" style="background:'.$bg.';">';
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; font-weight:bold;">'.$numero.'</td>';
+        if($fecha == "")
+            $html .= '<td style="padding:4px 6px; border:1px solid #ddd; color:#999;">sin fecha</td>';
+        else
+            $html .= '<td style="padding:4px 6px; border:1px solid #ddd;">'.htmlspecialchars($fecha, ENT_QUOTES, "UTF-8").'</td>';
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:70px; color:#666;">';
+        $html .= ($cajas > 0) ? $cajas.' caja'.(($cajas == 1) ? '' : 's') : '&mdash;';
+        $html .= '</td>';
+
+        // Lapiz: editar numero y fecha.
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:28px;">';
+        $html .= '<a onclick="editar_guia_dialogo('.$codigo_guia.', \''.$numero_js.'\', \''.htmlspecialchars($fecha, ENT_QUOTES, "UTF-8").'\');"';
+        $html .= ' style="cursor:pointer; color:#88010e;" title="Editar número y fecha"><i class="icon-pencil"></i></a>';
+        $html .= '</td>';
+
+        // Quitar: apagado si la guia tiene cajas asignadas.
+        $html .= '<td style="padding:4px 6px; border:1px solid #ddd; text-align:center; width:28px;">';
+        if($cajas > 0)
+            {
+            $titulo = "No se puede quitar: ".$cajas." caja".(($cajas == 1) ? "" : "s")." la ".(($cajas == 1) ? "tiene" : "tienen")." asignada";
+            $html .= '<i class="icon-remove" style="color:#ccc;" title="'.htmlspecialchars($titulo, ENT_QUOTES, "UTF-8").'"></i>';
+            }
+        else
+            {
+            $html .= '<a onclick="quitar_guia_dialogo('.$codigo_guia.', \''.$numero_js.'\');"';
+            $html .= ' style="cursor:pointer; color:#c62828;" title="Quitar la guía '.$numero.'"><i class="icon-remove"></i></a>';
+            }
+        $html .= '</td>';
+        $html .= '</tr>';
+        }
+    $html .= '</table>';
+    return $html;
+    }
+
 function quitar_guia_consolidado_dsft($codigo_consolidado, $codigo_guia)
     {
     global $link;
@@ -4835,15 +5320,33 @@ function quitar_guia_consolidado_dsft($codigo_consolidado, $codigo_guia)
         $numero_guia = numero_guia_dsft($codigo_guia);
         if($numero_guia == "")
             $numero_guia = (string)$codigo_guia;
-        return "No se puede quitar la guia ".$numero_guia.": ".$cajas." caja".(($cajas == 1) ? "" : "s")." la ".(($cajas == 1) ? "tiene" : "tienen")." asignada";
+        return "No se puede quitar la guía ".$numero_guia.": ".$cajas." caja".(($cajas == 1) ? "" : "s")." la ".(($cajas == 1) ? "tiene" : "tienen")." asignada";
         }
+
+    // La guia es propia de este consolidado, asi que se borra el vinculo Y el
+    // registro: dejarlo suelto no tendria dueno. En transaccion para no quedar
+    // a medias.
+    mysqli_begin_transaction($link);
 
     $sql = "DELETE FROM guia_consolidado
         WHERE CODIGOGUIA = ".$codigo_guia."
           AND CODIGOCONSOLIDADO = ".$codigo_consolidado;
-    $r = mysqli_query($link, $sql);
-    if(!$r)
-        return "Error SQL: ".mysqli_error($link);
+    if(!mysqli_query($link, $sql))
+        {
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "Error SQL: ".$error;
+        }
+
+    $sql_guia = "DELETE FROM guia WHERE CODIGO = ".$codigo_guia;
+    if(!mysqli_query($link, $sql_guia))
+        {
+        $error = mysqli_error($link);
+        mysqli_rollback($link);
+        return "Error SQL: ".$error;
+        }
+
+    mysqli_commit($link);
     return "OK";
     }
 
@@ -4903,30 +5406,6 @@ function lista_guias_consolidado_dsft($codigo_consolidado)
         $html .= '</tr>';
         }
     $html .= '</table>';
-    return $html;
-    }
-
-
-// Retorna las options HTML de guias recientes (ultimos 15 dias) para refrescar
-// el Select2 con tags. La opcion default "-- Buscar o crear guia --" la pone
-// el frontend; aqui solo van las options reales.
-function opciones_guias_recientes_dsft()
-    {
-    global $link;
-    $sql = "SELECT CODIGO, NUMEROGUIA FROM guia
-        WHERE ESTADO >= 0
-          AND FECHAREGISTRO >= DATE_SUB(NOW(), INTERVAL 15 DAY)
-        ORDER BY NUMEROGUIA";
-    $res = mysqli_query($link, $sql);
-    if(!$res)
-        return "";
-    $total = mysqli_num_rows($res);
-    $html  = "";
-    for($i=1; $i<=$total; $i++)
-        {
-        $f = mysqli_fetch_assoc($res);
-        $html .= '<option value="'.(int)$f["CODIGO"].'">'.htmlspecialchars((string)$f["NUMEROGUIA"], ENT_QUOTES, 'UTF-8').'</option>';
-        }
     return $html;
     }
 
@@ -5369,7 +5848,7 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
     // 1) Cabecera del consolidado. Nombres de columna REALES: MAYUSCULAS en
     // consolidado/marcacion; pais es tabla legacy con minusculas.
     $sql_cons = "SELECT c.CODIGO AS CODIGO,
-        c.FECHAVUELO AS FECHAVUELO,
+        c.FECHACONSOLIDADO AS FECHACONSOLIDADO,
         c.CODIGOCLIENTE AS CODIGOCLIENTE,
         m.NOMBREMARCACION AS MARCACION,
         p.nombre_pais AS PAIS
@@ -5481,7 +5960,7 @@ function generar_consolidado_dsft($codigo_consolidado, $formato = "xlsx")
     $sheet->getStyle('D1')->getFont()->setBold(true);
 
     $sheet->setCellValue('D2', 'SHIP DATE:');
-    $sheet->setCellValue('G2', $cons["FECHAVUELO"]);
+    $sheet->setCellValue('G2', $cons["FECHACONSOLIDADO"]);
     $sheet->getStyle('D2')->getFont()->setBold(true);
 
     $sheet->setCellValue('D3', 'CUSTOMER NAME:');
@@ -6083,7 +6562,7 @@ function crear_factura_cliente_nueva_dsft($codigo_consolidado, $codigo_usuario =
 
     // 2) Leer datos del consolidado (marcacion y pais legacy).
     $sql_cons = "SELECT c.CODIGO AS CODIGO,
-        c.FECHAVUELO AS FECHAVUELO,
+        c.FECHACONSOLIDADO AS FECHACONSOLIDADO,
         c.CODIGOMARCACION AS CODIGOMARCACION,
         c.CODIGOCLIENTE AS CODIGOCLIENTE,
         m.NOMBREMARCACION AS NOMBREMARCACION,
@@ -6100,7 +6579,7 @@ function crear_factura_cliente_nueva_dsft($codigo_consolidado, $codigo_usuario =
 
     $codigo_marcacion = (int)$cons["CODIGOMARCACION"];
     $codigo_cliente   = (int)$cons["CODIGOCLIENTE"];
-    $fechavuelo       = (string)$cons["FECHAVUELO"];
+    $fechaconsolidado = (string)$cons["FECHACONSOLIDADO"];
     $nombremarcacion  = strtoupper(trim((string)$cons["NOMBREMARCACION"]));
     $pais             = strtoupper(trim((string)$cons["PAIS"]));
     $porcentaje       = (float)$cons["PORCENTAJECOMISION"];
@@ -6121,11 +6600,11 @@ function crear_factura_cliente_nueva_dsft($codigo_consolidado, $codigo_usuario =
     $awb_str = implode(", ", $awbs);
 
     // Escapes para el INSERT de cabecera.
-    $fechavuelo_esc      = mysqli_real_escape_string($link, $fechavuelo);
+    $fechaconsolidado_esc = mysqli_real_escape_string($link, $fechaconsolidado);
     $nombremarcacion_esc = mysqli_real_escape_string($link, $nombremarcacion);
     $pais_esc            = mysqli_real_escape_string($link, $pais);
     $awb_esc             = mysqli_real_escape_string($link, $awb_str);
-    $valor_fechavuelo    = (trim($fechavuelo) == "") ? "NULL" : "'".$fechavuelo_esc."'";
+    $valor_fechaconsolidado    = (trim($fechaconsolidado) == "") ? "NULL" : "'".$fechaconsolidado_esc."'";
     $valor_marcacion     = ($codigo_marcacion > 0) ? $codigo_marcacion : "NULL";
 
     // NUMEROINVOICE correlativo POR CLIENTE: CODIGOCLIENTE + 5 digitos (00001,
@@ -6164,7 +6643,7 @@ function crear_factura_cliente_nueva_dsft($codigo_consolidado, $codigo_usuario =
         CODIGOUSUARIOREGISTRA, FECHAREGISTRO
     ) VALUES (
         1, ".$codigo_consolidado.", ".$valor_marcacion.", ".$valor_numeroinvoice.",
-        CURDATE(), ".$valor_fechavuelo.", '".$nombremarcacion_esc."', '".$pais_esc."', '".$nombremarcacion_esc."', '".$awb_esc."',
+        CURDATE(), ".$valor_fechaconsolidado.", '".$nombremarcacion_esc."', '".$pais_esc."', '".$nombremarcacion_esc."', '".$awb_esc."',
         0, 0, 0, 0, 0, 0,
         ".$codigo_usuario.", NOW()
     )";

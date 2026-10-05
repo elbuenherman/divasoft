@@ -1,9 +1,9 @@
 <?php           
 include("variables_globales.php");
 include("funciones.php");
-include("funciones_v2.php");    
-// ini_set('display_errors', 1);
-// error_reporting(E_ALL);
+include("funciones_v2.php");        
+// ini_set('display_errors', 1); 
+// error_reporting(E_ALL); 
 // Dispatch POST con archivo: detectado antes del flujo normal porque
 // usa $_FILES en vez de los $parametroN tradicionales.
 if(isset($_POST["funcion"]) && $_POST["funcion"] == "subir_archivo_factura_dsft")
@@ -462,11 +462,23 @@ if($funcion == 'asignar_consolidado_factura_dsft')
 if($funcion == 'asignar_consolidado_post_ia_dsft')
     echo asignar_consolidado_post_ia_dsft($parametro1, $parametro2);
 if($funcion == 'agregar_guia_consolidado_dsft') 
-    echo agregar_guia_consolidado_dsft($parametro1, $parametro2, $parametro3);
+    echo agregar_guia_consolidado_dsft($parametro1, $parametro2, $parametro3, $parametro4);
+if($funcion == 'render_guias_consolidado_dsft')
+    echo render_guias_consolidado_dsft($parametro1);
+if($funcion == 'editar_guia_dsft')
+    echo editar_guia_dsft($parametro1, $parametro2, $parametro3, $parametro4, $parametro5);
 if($funcion == 'quitar_guia_consolidado_dsft')
     echo quitar_guia_consolidado_dsft($parametro1, $parametro2);
 if($funcion == 'lista_guias_consolidado_dsft')
     echo lista_guias_consolidado_dsft($parametro1);
+
+// Borrar una caja completa (lineas + registro de entrega/guia).
+if($funcion == 'borrar_caja_detalle_dsft')
+    echo borrar_caja_detalle_dsft($parametro1, $parametro2, $parametro3);
+
+// Modo seleccion: pasar varias lineas de una factura a otra medida.
+if($funcion == 'mover_lineas_medida_dsft')
+    echo mover_lineas_medida_dsft($parametro1, $parametro2, $parametro3, $parametro4);
 
 // Guia (AWB) por caja: dialogo, asignacion en los tres niveles y textos.
 if($funcion == 'render_guias_asignar_dsft')
@@ -501,8 +513,6 @@ if($funcion == 'agregar_medida_consolidado_dsft')
     echo agregar_medida_consolidado_dsft($parametro1, $parametro2, $parametro3);
 if($funcion == 'quitar_medida_consolidado_dsft')
     echo quitar_medida_consolidado_dsft($parametro1, $parametro2, $parametro3);
-if($funcion == 'opciones_guias_recientes_dsft')
-    echo opciones_guias_recientes_dsft();
 // Tablita read-only en consola_clientes_dsft.php
 if($funcion == 'lista_marcaciones_por_cliente_dsft')
     echo lista_marcaciones_por_cliente_dsft($parametro1);

@@ -13,12 +13,12 @@ $fecha_hoy      = date("Y-m-d");
 $fecha_hora_hoy = date("Y-m-d H:i:s");
 
 // Cargar consolidados activos para el Select2 visual de la barra.
-// Mostramos "FECHAVUELO - GUIAS_CONCAT" en cada option.
+// Mostramos "FECHACONSOLIDADO - GUIAS_CONCAT" en cada option.
 $link = mysqli_connect($ip_bd, $usuario_bd, $password_bd, $instancia_bd);
 mysqli_query($link, "SET CHARACTER SET utf8");
 // LEFT JOIN a marcacion: hay consolidados sin marcacion y con INNER se caerian
 // del selector.
-$sql_consolidados = "SELECT c.CODIGO, c.FECHAVUELO,
+$sql_consolidados = "SELECT c.CODIGO, c.FECHACONSOLIDADO,
     m.NOMBREMARCACION AS MARCACION,
     (SELECT GROUP_CONCAT(g.NUMEROGUIA SEPARATOR ', ')
         FROM guia_consolidado gc
@@ -27,7 +27,7 @@ $sql_consolidados = "SELECT c.CODIGO, c.FECHAVUELO,
     FROM consolidado c
     LEFT JOIN marcacion m ON c.CODIGOMARCACION = m.CODIGO
     WHERE c.ESTADO >= 0
-    ORDER BY c.FECHAVUELO DESC";
+    ORDER BY c.FECHACONSOLIDADO DESC";
 $resultado_consolidados = mysqli_query($link, $sql_consolidados);
 $numero_consolidados    = $resultado_consolidados ? mysqli_num_rows($resultado_consolidados) : 0;
 $arreglo_consolidados   = array();
@@ -35,7 +35,7 @@ for($i=0; $i<$numero_consolidados; $i++)
     {
     $fila = mysqli_fetch_array($resultado_consolidados);
     $arreglo_consolidados[$i]['CODIGO']     = $fila['CODIGO'];
-    $arreglo_consolidados[$i]['FECHAVUELO'] = $fila['FECHAVUELO'];
+    $arreglo_consolidados[$i]['FECHACONSOLIDADO'] = $fila['FECHACONSOLIDADO'];
     $arreglo_consolidados[$i]['GUIAS']      = $fila['GUIAS'];
     $arreglo_consolidados[$i]['MARCACION']  = $fila['MARCACION'];
     }
@@ -431,7 +431,7 @@ function extraer_correos()
                 { 
                 var p = JSON.parse(data);
                 if(p.estado == "en_curso")
-                    {
+                    {    
                     var html = "Procesando dia: " + (p.dia_actual || "...") + "<br>";
                     html += "Correos: " + p.procesados + " procesados<br>";
                     html += "Guardados: " + p.guardados + " | Saltados: " + p.saltados;
@@ -880,7 +880,7 @@ $(document).ready(function()
                         for($i=0; $i<$numero_consolidados; $i++)
                             {
                             $cc = (int)$arreglo_consolidados[$i]['CODIGO'];
-                            $cf = htmlspecialchars((string)$arreglo_consolidados[$i]['FECHAVUELO'], ENT_QUOTES, 'UTF-8');
+                            $cf = htmlspecialchars((string)$arreglo_consolidados[$i]['FECHACONSOLIDADO'], ENT_QUOTES, 'UTF-8');
                             $gc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['GUIAS']) ? $arreglo_consolidados[$i]['GUIAS'] : ''), ENT_QUOTES, 'UTF-8');
                             $mc = htmlspecialchars((string)(isset($arreglo_consolidados[$i]['MARCACION']) ? $arreglo_consolidados[$i]['MARCACION'] : ''), ENT_QUOTES, 'UTF-8');
                             // "COD - FECHA - MARCACION - GUIAS". Los tramos vacios se

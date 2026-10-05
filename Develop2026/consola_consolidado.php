@@ -67,21 +67,9 @@ for($i=0; $i<$numero_agencias; $i++)
     }
 
 // GUIAS recientes (ultimos 15 dias) para el Select2 con tags.
-// Si la usuaria escribe un NUMEROGUIA nuevo, Select2 lo manda como string;
-// el backend crea la guia.
-$sql_guias = "SELECT CODIGO, NUMEROGUIA FROM guia
-    WHERE ESTADO >= 0 AND FECHAREGISTRO >= DATE_SUB(NOW(), INTERVAL 15 DAY)
-    ORDER BY NUMEROGUIA";
-$resultado_guias = mysqli_query($link, $sql_guias);
-$numero_guias    = $resultado_guias ? mysqli_num_rows($resultado_guias) : 0;
-$arreglo_guias   = array();
-for($i=0; $i<$numero_guias; $i++)
-    {
-    $fila = mysqli_fetch_array($resultado_guias);
-    $arreglo_guias[$i]['CODIGO']     = $fila['CODIGO'];
-    $arreglo_guias[$i]['NUMEROGUIA'] = $fila['NUMEROGUIA'];
-    }
-
+// Las guias ya NO se cargan aca: cada consolidado tiene sus propias guias y la
+// gestion vive en el dialogo GUIAS (render_guias_consolidado_dsft), que las pide
+// por AJAX. Las sugerencias para escribir las da numeros_guia_recientes_dsft.
 // FINCAS (proveedor con codigo_tipo_proveedor = 1) para el Select2 del
 // dialog "Añadir factura". Se vuelca en una variable JS al inicio del
 // script para no requerir AJAX al abrir el dialog.
@@ -138,10 +126,10 @@ if($res_tipos_js)
 <style>
 body.metro {
     background-color: #edededff !important;
-    background-image: none !important;
-    }   
+    background-image: none !important; 
+    }     
 textarea, input[type="text"] {
-    text-transform: uppercase;
+    text-transform: uppercase;  
     }
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
@@ -159,9 +147,9 @@ textarea, input[type="text"] {
 .ui-button.cancelButton { background: #88010e; color: #FFFFFF; }
 
 /* ===== Grid de consolidados ===== */
-.grid_consolidados {
-    width: 100%;
-    border-collapse: collapse;
+.grid_consolidados { 
+    width: 100%; 
+    border-collapse: collapse; 
     font-size: 12px;
     table-layout: fixed;
     }
@@ -170,8 +158,8 @@ textarea, input[type="text"] {
     color: white;
     position: sticky;
     top: 0;
-    z-index: 5;
-    }
+    z-index: 5; 
+    }  
 .grid_consolidados thead th {
     font-size: 11px;
     padding: 8px 5px;
@@ -321,15 +309,45 @@ textarea, input[type="text"] {
     border-color: #88010e !important;
     color: #fff !important;
     }
+/* ===== MODO SELECCION (pasar lineas a otra medida) ===== */
+/* Mientras el modo esta activo, el grid no deja seleccionar texto: si no, un
+   Shift+clic para marcar un rango pintaria media tabla de azul. */
+.grid_factura_detalle.modo_seleccion
+    {
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+    }
+.grid_factura_detalle.modo_seleccion tr[data-codigo]:hover td
+    {
+    background-color: #fffaf0 !important;
+    }
+.grid_factura_detalle tr.fila_seleccionada td
+    {
+    background-color: #fff3cd !important;
+    border-top: 1px solid #d4a017 !important;
+    border-bottom: 1px solid #d4a017 !important;
+    }
+/* Cabeceras de cm clicables solo cuando hay lineas marcadas. */
+.grid_factura_detalle th.th_cm_sel.th_cm_activa
+    {
+    cursor: pointer;
+    text-decoration: underline;
+    }
+.grid_factura_detalle th.th_cm_sel.th_cm_activa:hover
+    {
+    background-color: #d4a017 !important;
+    color: #fff !important;
+    }
 </style>
 <script language="javascript">
 var global_codigo_seleccionado = 0;
-var global_ordenamiento = "FECHAVUELO";
+var global_ordenamiento = "FECHACONSOLIDADO";
 var global_direccion = "DESC";
 var global_codigo_usuario = <?php echo (int)$_SESSION['s_codigo']; ?>;
 var global_opciones_fincas = '<?php echo $opciones_fincas_js; ?>';
 var global_opciones_tipos_producto = '<?php echo $opciones_tipos_js; ?>';
-var flatpickr_fechavuelo = null;
+var flatpickr_fechaconsolidado = null;
 var flatpickr_rango_filtro = null;
 
 function messageBox(texto)
@@ -337,6 +355,26 @@ function messageBox(texto)
     $("#id_espera").hide();
     $("#dialog").html(texto);
     $("#dialog").dialog("open");
+    // Si ya habia otro dialogo abierto (GUIAS, MEDIDAS, entrega...), el aviso
+    // nace con un z-index menor y queda DETRAS. moveToTop lo sube por encima
+    // del que este activo. Se arregla aca, en la raiz, para todo el sistema.
+    $("#dialog").dialog("moveToTop");
+    }
+
+// jQuery UI calcula la posicion de un dialogo UNA sola vez, al abrirlo. Si justo
+// despues cambia el alto de la pagina (se vacia el detalle, se reemplaza el
+// listado), esa posicion queda vieja y el dialogo puede terminar fuera de la
+// pantalla: se ve la capa modal gris, no responde nada y el usuario no llega al
+// boton Aceptar. Por eso, cada vez que termina una recarga de contenido se
+// recentra lo que este abierto.
+// La clase ui-dialog-content la pone jQuery UI solo en dialogos ya inicializados,
+// asi que el selector no puede alcanzar un elemento sin dialog().
+function recentrar_dialogos_abiertos()
+    {
+    $(".ui-dialog-content:visible").each(function()
+        {
+        $(this).dialog("option", "position", { my: "center", at: "center", of: window });
+        });
     }
 
 // ===== Filtro local por texto =====
@@ -379,12 +417,12 @@ function devuelve_consolidado(codigo)
             return;
             }
         $("#id_codigo_consolidado").val(datos.CODIGO || "");
-        if(flatpickr_fechavuelo)
+        if(flatpickr_fechaconsolidado)
             {
-            if(datos.FECHAVUELO)
-                flatpickr_fechavuelo.setDate(datos.FECHAVUELO);
+            if(datos.FECHACONSOLIDADO)
+                flatpickr_fechaconsolidado.setDate(datos.FECHACONSOLIDADO);
             else
-                flatpickr_fechavuelo.clear();
+                flatpickr_fechaconsolidado.clear();
             }
         var pais_val = (datos.CODIGOPAIS && parseInt(datos.CODIGOPAIS) > 0) ? datos.CODIGOPAIS.toString() : "0";
         $("#id_codigopais").val(pais_val).trigger('change');
@@ -417,8 +455,8 @@ function devuelve_consolidado(codigo)
             $("#id_codigotruck").val("0").trigger('change.select2');
             }
 
-        // Cargar las guias asociadas a este consolidado.
-        cargar_guias_consolidado(parseInt(datos.CODIGO));
+        // Resumen corto de guias; la gestion esta en el boton GUIAS.
+        cargar_resumen_guias(parseInt(datos.CODIGO));
         cargar_detalle_consolidado(parseInt(datos.CODIGO));
 
         // No hacer focus al campo de fecha (abre el Flatpickr).
@@ -465,12 +503,12 @@ function elimina_consolidado_dsft(codigo)
     }
 
 // ===== Validacion de formulario =====
-// FECHA VUELO y MARCACION son obligatorios. GUIA ya NO es campo del formulario
+// FECHA y MARCACION son obligatorios. GUIA ya NO es campo del formulario
 // (se maneja por la seccion GUIAS separada).
 function valida_formulario()
     {
-    if($("#id_fechavuelo").val().trim() == "")
-        return "Por favor ingrese la FECHA DE VUELO";
+    if($("#id_fechaconsolidado").val().trim() == "")
+        return "Por favor ingrese la FECHA del consolidado";
     var marc_sel = parseInt($("#id_codigomarcacion").val());
     if(isNaN(marc_sel) || marc_sel <= 0)
         return "Por favor seleccione la MARCACION";
@@ -490,7 +528,7 @@ function grabar_consolidado()
     $("#id_espera").show();
     var url = "funciones_ajax.php?funcion=graba_consolidado_dsft"
         + "&parametro1="  + global_codigo_seleccionado
-        + "&parametro2="  + encodeURIComponent($("#id_fechavuelo").val())
+        + "&parametro2="  + encodeURIComponent($("#id_fechaconsolidado").val())
         + "&parametro3="  + $("#id_codigomarcacion").val()
         + "&parametro4="  + $("#id_codigocliente").val()
         + "&parametro5="  + $("#id_codigotruck").val()
@@ -505,9 +543,14 @@ function grabar_consolidado()
         $("#id_espera").hide();
         if(data.substring(0, 2) == "OK")
             {
-            messageBox("Consolidado grabado correctamente");
+            // El aviso va DESPUES de limpiar y recargar: si se abriera antes,
+            // boton_nuevo() vacia el detalle y la recarga reemplaza el listado,
+            // la pagina cambia de alto y el dialogo queda fuera de la pantalla.
             boton_nuevo();
-            actualiza_listado();
+            actualiza_listado(function()
+                {
+                messageBox("Consolidado grabado correctamente");
+                });
             }
         else
             {
@@ -516,113 +559,263 @@ function grabar_consolidado()
         });
     }
 
-// ===== Guias del consolidado (tabla guia_consolidado, NxN con guia) =====
-// Asocia una guia al consolidado actual. Si la usuaria selecciono una guia
-// existente, el value es el CODIGO numerico. Si tipeo una nueva, Select2
-// (tags:true) la manda como id == el texto -> el backend la crea.
-function agregar_guia_consolidado()
+// ===== GUIAS DEL CONSOLIDADO (gestion: alta, edicion y baja) =====
+// Cada guia pertenece a UN solo consolidado. Toda la gestion vive en el dialogo
+// que abre el boton GUIAS; en el formulario queda solo un resumen.
+// OJO con los nombres: dialog_gestion_guias() es ESTE dialogo, y
+// dialog_guias_consolidado(codigo, elemento) es el del icono # del listado, que
+// ASIGNA una guia a todas las cajas. Son dos cosas distintas y antes se
+// llamaban igual: ganaba la declaracion mas tardia, asi que el boton terminaba
+// llamando a la del icono sin argumentos y el codigo llegaba undefined.
+var flatpickr_guia_nueva   = null;
+var flatpickr_guia_filtro  = null;
+
+function dialog_gestion_guias()
     {
-    var codigo_consolidado = global_codigo_seleccionado;
-    if(codigo_consolidado <= 0)
+    if(global_codigo_seleccionado <= 0)
         {
-        messageBox("Primero grabe el consolidado antes de agregar guias.");
+        messageBox("Primero grabe el consolidado antes de agregar guías.");
         return;
         }
-    var select = $("#id_select_guia");
-    var valor  = select.val();
-    // allowClear hace que el valor vacio sea null o "" (no "0").
-    if(!valor || valor == "")
+    cargar_guias_dialogo();
+    $("#id_dialog_guias_consolidado").dialog(
         {
-        messageBox("Seleccione o escriba una guia.");
-        return;
-        }
-
-    // Si es un tag nuevo (no numerico = no es CODIGO de guia existente),
-    // validar: solo numeros y guiones, max 15 chars.
-    var es_nuevo = isNaN(parseInt(valor));
-    if(es_nuevo)
-        {
-        if(valor.length > 15)
-            {
-            messageBox("La guia no puede tener mas de 15 caracteres.");
-            return;
-            }
-        if(!/^[0-9\-]{1,15}$/.test(valor))
-            {
-            messageBox("La guia solo admite numeros y guiones (max 15 caracteres).");
-            return;
-            }
-        }
-
-    var url = "funciones_ajax.php?funcion=agregar_guia_consolidado_dsft"
-        + "&parametro1=" + codigo_consolidado
-        + "&parametro2=" + encodeURIComponent(valor)
-        + "&parametro3=" + global_codigo_usuario;
-    $.get(url, function(data)
-        {
-        if(data == "OK")
-            {
-            cargar_guias_consolidado(codigo_consolidado);
-            // Si era un tag nuevo (valor no numerico), recargar las options del
-            // Select2 para que aparezca en futuras busquedas sin recargar pagina.
-            if(isNaN(parseInt(valor)))
+        modal: true,
+        width: 520,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
                 {
-                $.get("funciones_ajax.php?funcion=opciones_guias_recientes_dsft", function(data_opts)
-                    {
-                    // allowClear necesita una primera <option value=""></option>.
-                    var default_opt = '<option value=""></option>';
-                    $("#id_select_guia").html(default_opt + data_opts).val("").trigger("change.select2");
-                    });
+                text: "CERRAR",
+                class: 'cancelButton',
+                click: function() { $(this).dialog("close"); }
                 }
-            else
-                {
-                select.val("").trigger("change");
-                }
-            actualiza_listado();
-            }
-        else
-            {
-            messageBox(data);
-            }
+            ]
         });
     }
 
-// Desasocia una guia del consolidado actual (no borra de tabla guia).
-function quitar_guia_consolidado(codigo_guia)
+// Trae el contenido del dialogo y engancha los dos Flatpickr, que viven en el
+// HTML que acaba de llegar por AJAX.
+function cargar_guias_dialogo()
     {
-    var codigo_consolidado = global_codigo_seleccionado;
-    if(codigo_consolidado <= 0)
+    var url = "funciones_ajax.php?funcion=render_guias_consolidado_dsft"
+        + "&parametro1=" + global_codigo_seleccionado;
+    $.get(url, function(data)
+        {
+        $("#id_dialog_guias_consolidado").html(data);
+
+        flatpickr_guia_nueva = flatpickr("#id_guia_fecha_nueva",
+            {
+            dateFormat: "Y-m-d",
+            locale: "es",
+            allowInput: false
+            });
+        // Rango desde/hasta, igual que el filtro del listado.
+        flatpickr_guia_filtro = flatpickr("#id_guia_fecha_filtro",
+            {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            locale: "es",
+            allowInput: false,
+            onChange: function(selectedDates)
+                {
+                if(selectedDates.length == 0 || selectedDates.length == 2)
+                    filtrar_guias_por_fecha();
+                },
+            onClose: function(selectedDates)
+                {
+                filtrar_guias_por_fecha();
+                }
+            });
+        });
+    }
+
+// Filtro por RANGO de fechas, en el cliente: compara contra el data-fecha de
+// cada fila. Sin rango se ve todo, incluidas las guias sin fecha; con un rango
+// activo las sin fecha se ocultan, porque no se puede saber si entran.
+// El campo trae "2026-09-01 a 2026-09-30" (o un solo dia mientras se elige).
+function filtrar_guias_por_fecha()
+    {
+    var texto  = $("#id_guia_fecha_filtro").val();
+    var fechas = (texto || "").match(/\d{4}-\d{2}-\d{2}/g);
+    var desde  = "";
+    var hasta  = "";
+    if(fechas && fechas.length >= 2)
+        {
+        desde = fechas[0];
+        hasta = fechas[1];
+        }
+    else if(fechas && fechas.length == 1)
+        {
+        // Un solo dia elegido: se filtra por ese dia.
+        desde = fechas[0];
+        hasta = fechas[0];
+        }
+
+    $("#id_tabla_guias .fila_guia").each(function()
+        {
+        var fila  = $(this);
+        var fecha = fila.attr("data-fecha");
+        if(desde == "")
+            {
+            fila.show();
+            return;
+            }
+        // Las fechas en Y-m-d se comparan bien como texto.
+        if(fecha != "" && fecha >= desde && fecha <= hasta)
+            fila.show();
+        else
+            fila.hide();
+        });
+    }
+
+function limpiar_filtro_guias()
+    {
+    if(flatpickr_guia_filtro)
+        flatpickr_guia_filtro.clear();
+    $("#id_guia_fecha_filtro").val("");
+    filtrar_guias_por_fecha();
+    }
+
+// Validacion identica a la del servidor.
+function valida_numero_guia(numero)
+    {
+    numero = (numero || "").toString().trim();
+    if(numero == "")
+        return "Valor de guía vacío";
+    if(!/^[0-9\-]{1,15}$/.test(numero))
+        return "La guía solo admite números y guiones (máximo 15 caracteres)";
+    return "OK";
+    }
+
+function agregar_guia_dialogo()
+    {
+    var numero  = $("#id_guia_numero_nueva").val();
+    var fecha   = $("#id_guia_fecha_nueva").val();
+    var mensaje = valida_numero_guia(numero);
+    if(mensaje != "OK")
+        {
+        messageBox(mensaje);
         return;
+        }
+    var url = "funciones_ajax.php?funcion=agregar_guia_consolidado_dsft"
+        + "&parametro1=" + global_codigo_seleccionado
+        + "&parametro2=" + encodeURIComponent(numero)
+        + "&parametro3=" + global_codigo_usuario
+        + "&parametro4=" + encodeURIComponent(fecha);
+    $.get(url, function(data)
+        {
+        if(data == "OK")
+            refrescar_por_cambio_de_guias();
+        else
+            messageBox(data);
+        });
+    }
+
+// Edicion en un mini dialogo con numero + fecha.
+function editar_guia_dialogo(codigo_guia, numero, fecha)
+    {
+    $("#id_dialog_confirma_factura").html(
+        '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">'
+        + '<input type="text" id="id_guia_numero_edit" maxlength="15" value="' + numero + '"'
+        + ' style="width:150px; font-size:12px;" />'
+        + '<input type="text" id="id_guia_fecha_edit" placeholder="Sin fecha" readonly value="' + fecha + '"'
+        + ' style="width:120px; font-size:12px; background:#fff; cursor:pointer;" />'
+        + '<a onclick="$(\'#id_guia_fecha_edit\').val(\'\');" style="cursor:pointer; color:#88010e;"'
+        + ' title="Dejar sin fecha"><i class="icon-remove"></i></a>'
+        + '</div>');
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 400,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "GUARDAR",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    var numero_nuevo = $("#id_guia_numero_edit").val();
+                    var fecha_nueva  = $("#id_guia_fecha_edit").val();
+                    var mensaje      = valida_numero_guia(numero_nuevo);
+                    if(mensaje != "OK")
+                        {
+                        messageBox(mensaje);
+                        return;
+                        }
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=editar_guia_dsft"
+                        + "&parametro1=" + codigo_guia
+                        + "&parametro2=" + global_codigo_seleccionado
+                        + "&parametro3=" + encodeURIComponent(numero_nuevo)
+                        + "&parametro4=" + encodeURIComponent(fecha_nueva)
+                        + "&parametro5=" + global_codigo_usuario;
+                    $.get(url, function(data)
+                        {
+                        if(data == "OK")
+                            refrescar_por_cambio_de_guias();
+                        else
+                            messageBox(data);
+                        });
+                    }
+                },
+                {
+                text: "CANCELAR",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    flatpickr("#id_guia_fecha_edit",
+        {
+        dateFormat: "Y-m-d",
+        locale: "es",
+        allowInput: false
+        });
+    }
+
+function quitar_guia_dialogo(codigo_guia, numero)
+    {
     var url = "funciones_ajax.php?funcion=quitar_guia_consolidado_dsft"
-        + "&parametro1=" + codigo_consolidado
+        + "&parametro1=" + global_codigo_seleccionado
         + "&parametro2=" + codigo_guia;
     $.get(url, function(data)
         {
         if(data == "OK")
-            {
-            cargar_guias_consolidado(codigo_consolidado);
-            actualiza_listado();
-            }
+            refrescar_por_cambio_de_guias();
         else
-            {
             messageBox(data);
-            }
         });
     }
 
-// Trae el HTML de los badges con las guias del consolidado y lo pinta.
-function cargar_guias_consolidado(codigo_consolidado)
+// Tras agregar, editar o quitar: el dialogo, el resumen del formulario, el
+// detalle (titles e iconos de guia) y el listado (su columna de guias).
+function refrescar_por_cambio_de_guias()
+    {
+    cargar_guias_dialogo();
+    cargar_resumen_guias(global_codigo_seleccionado);
+    cargar_detalle_consolidado(global_codigo_seleccionado);
+    actualiza_listado();
+    }
+
+// Resumen corto para el formulario: "3 guias".
+function cargar_resumen_guias(codigo_consolidado)
     {
     if(codigo_consolidado <= 0)
         {
-        $("#id_lista_guias_consolidado").html("");
+        $("#id_resumen_guias_consolidado").html("&mdash;");
         return;
         }
-    var url = "funciones_ajax.php?funcion=lista_guias_consolidado_dsft"
-        + "&parametro1=" + codigo_consolidado;
+    var url = "funciones_ajax.php?funcion=render_guias_asignar_dsft"
+        + "&parametro1=" + codigo_consolidado
+        + "&parametro2=resumen"
+        + "&parametro3=0";
     $.get(url, function(data)
         {
-        $("#id_lista_guias_consolidado").html(data);
+        var cuantas = $("<div>").html(data).find("a[onclick^='elegir_guia_asignar']").length;
+        $("#id_resumen_guias_consolidado").html(
+            (cuantas == 0) ? "Sin gu&iacute;as"
+                           : cuantas + ((cuantas == 1) ? " gu&iacute;a" : " gu&iacute;as"));
         });
     }
 
@@ -872,6 +1065,276 @@ function desconfirmar_entrega_factura(codigo_ff, elemento)
         });
     }
 
+// ===== BORRAR UNA CAJA COMPLETA =====
+// El icono vive en la primera linea de la caja, junto al camion y a la guia.
+// Los conteos y el estado de entrega/guia vienen en los data- del propio icono,
+// que los puso el servidor al dibujar el grid: no hace falta otra consulta para
+// armar el texto de la confirmacion.
+function borrar_caja_detalle(codigo_ff, numero_caja, elemento)
+    {
+    var icono  = $(elemento);
+    var lineas = parseInt(icono.attr("data-lineas"));
+    var tallos = parseInt(icono.attr("data-tallos"));
+    var entregada = (icono.attr("data-entregada") == "1");
+    var guia      = icono.attr("data-guia");
+    if(isNaN(lineas)) lineas = 0;
+    if(isNaN(tallos)) tallos = 0;
+
+    // El verbo concuerda con la cantidad: "Se eliminara 1 linea" / "Se eliminaran 4 lineas".
+    var texto = "<p>&iquest;Borrar la caja <strong>" + numero_caja + "</strong> completa?"
+        + " Se eliminar&aacute;" + ((lineas == 1) ? "" : "n")
+        + " <strong>" + lineas + "</strong> l&iacute;nea" + ((lineas == 1) ? "" : "s")
+        + " (" + tallos + " tallo" + ((tallos == 1) ? "" : "s") + ").</p>";
+
+    // Si la caja ya estaba entregada o tenia guia, se avisa en el mismo texto.
+    var avisos = [];
+    if(entregada)
+        avisos.push("est&aacute; marcada como entregada");
+    if(guia && guia != "")
+        avisos.push("tiene asignada la gu&iacute;a " + guia);
+    if(avisos.length > 0)
+        texto += "<p style='color:#88010e;'><strong>Atenci&oacute;n:</strong> esta caja "
+              + avisos.join(" y ") + ".</p>";
+
+    $("#id_dialog_confirma_factura").html(texto);
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 420,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "SI",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=borrar_caja_detalle_dsft"
+                        + "&parametro1=" + codigo_ff
+                        + "&parametro2=" + numero_caja
+                        + "&parametro3=" + global_codigo_usuario;
+                    $.get(url, function(data)
+                        {
+                        if(data.substring(0, 2) != "OK")
+                            {
+                            messageBox(data);
+                            return;
+                            }
+                        aviso_breve("Caja " + numero_caja + " eliminada", elemento);
+                        // Refresca grid, contador de entregas e icono de guia.
+                        recargar_grid_factura_por_codigo(codigo_ff);
+                        // Y el listado, porque el color del icono de guia del
+                        // consolidado depende de todas sus cajas.
+                        actualiza_listado();
+                        });
+                    }
+                },
+                {
+                text: "NO",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    }
+
+// ===== MODO SELECCION: pasar varias lineas a otra medida =====
+// Para corregir rapido las medidas que la IA leyo mal. Solo UNA factura puede
+// estar en modo seleccion a la vez. Cambia solo el LARGO: precio, tallos y caja
+// quedan iguales.
+var global_seleccion_ff     = 0;    // factura en modo seleccion (0 = ninguna)
+var global_seleccion_lineas = [];   // CODIGO de detalle marcados, en orden
+var global_seleccion_ultima = 0;    // ultima marcada, para el Shift+clic
+
+// true si el elemento pertenece al grid de la factura que esta en modo
+// seleccion. Lo usan los handlers de edicion para no abrir el editor.
+function en_modo_seleccion(elemento)
+    {
+    if(global_seleccion_ff <= 0)
+        return false;
+    return $(elemento).closest("#id_grid_factura_" + global_seleccion_ff).length > 0;
+    }
+
+function grid_seleccion()
+    {
+    return $("#id_grid_factura_" + global_seleccion_ff + " .grid_factura_detalle");
+    }
+
+// Apaga el modo en la factura que lo tenga y borra su seleccion.
+function limpiar_modo_seleccion()
+    {
+    if(global_seleccion_ff > 0)
+        {
+        grid_seleccion().removeClass("modo_seleccion");
+        grid_seleccion().find("tr").removeClass("fila_seleccionada");
+        grid_seleccion().find("th.th_cm_sel").removeClass("th_cm_activa");
+        $("#id_chk_seleccion_" + global_seleccion_ff).prop("checked", false);
+        $("#id_ayuda_seleccion_" + global_seleccion_ff).html("");
+        }
+    global_seleccion_ff     = 0;
+    global_seleccion_lineas = [];
+    global_seleccion_ultima = 0;
+    }
+
+function toggle_modo_seleccion(codigo_ff, elemento)
+    {
+    var encender = $(elemento).is(":checked");
+
+    // Solo una factura a la vez: al encender en otra, se apaga la anterior.
+    if(global_seleccion_ff > 0 && global_seleccion_ff != codigo_ff)
+        limpiar_modo_seleccion();
+
+    if(!encender)
+        {
+        limpiar_modo_seleccion();
+        return;
+        }
+
+    global_seleccion_ff     = codigo_ff;
+    global_seleccion_lineas = [];
+    global_seleccion_ultima = 0;
+    $("#id_chk_seleccion_" + codigo_ff).prop("checked", true);
+    grid_seleccion().addClass("modo_seleccion");
+    actualizar_ayuda_seleccion();
+    }
+
+function actualizar_ayuda_seleccion()
+    {
+    if(global_seleccion_ff <= 0)
+        return;
+    var cuantas = global_seleccion_lineas.length;
+    var texto   = (cuantas == 0)
+                ? "Toque las l&iacute;neas y luego la medida destino"
+                : cuantas + ((cuantas == 1) ? " seleccionada" : " seleccionadas");
+    $("#id_ayuda_seleccion_" + global_seleccion_ff).html(texto);
+
+    // Las cabeceras de cm solo se vuelven clicables con algo marcado.
+    if(cuantas > 0)
+        grid_seleccion().find("th.th_cm_sel").addClass("th_cm_activa");
+    else
+        grid_seleccion().find("th.th_cm_sel").removeClass("th_cm_activa");
+    }
+
+// Marca o desmarca una linea y repinta la fila.
+function marcar_linea_seleccion(codigo_linea, fila, forzar_marcada)
+    {
+    var pos = global_seleccion_lineas.indexOf(codigo_linea);
+    var marcar = (typeof forzar_marcada === "boolean") ? forzar_marcada : (pos < 0);
+
+    if(marcar && pos < 0)
+        {
+        global_seleccion_lineas.push(codigo_linea);
+        fila.addClass("fila_seleccionada");
+        }
+    else if(!marcar && pos >= 0)
+        {
+        global_seleccion_lineas.splice(pos, 1);
+        fila.removeClass("fila_seleccionada");
+        }
+    }
+
+// Clic sobre una linea del grid de la factura en modo seleccion.
+$(document).on("click", ".grid_factura_detalle.modo_seleccion tr[data-codigo]", function(e)
+    {
+    // Los iconos y controles de la linea siguen funcionando normal.
+    if($(e.target).closest("a, button, input, select, textarea").length > 0)
+        return;
+
+    var fila         = $(this);
+    var codigo_linea = parseInt(fila.data("codigo"));
+    if(isNaN(codigo_linea) || codigo_linea <= 0)
+        return;
+
+    // Shift+clic: marca el rango desde la ultima marcada.
+    if(e.shiftKey && global_seleccion_ultima > 0)
+        {
+        var filas = grid_seleccion().find("tr[data-codigo]");
+        var desde = filas.index(grid_seleccion().find("tr[data-codigo='" + global_seleccion_ultima + "']"));
+        var hasta = filas.index(fila);
+        if(desde >= 0 && hasta >= 0)
+            {
+            var ini = (desde < hasta) ? desde : hasta;
+            var fin = (desde < hasta) ? hasta : desde;
+            for(var k = ini; k <= fin; k++)
+                {
+                var f = filas.eq(k);
+                marcar_linea_seleccion(parseInt(f.data("codigo")), f, true);
+                }
+            actualizar_ayuda_seleccion();
+            return;
+            }
+        }
+
+    marcar_linea_seleccion(codigo_linea, fila);
+    global_seleccion_ultima = codigo_linea;
+    actualizar_ayuda_seleccion();
+    });
+
+// Clic en la cabecera de una medida: pasa las lineas marcadas a esa medida.
+$(document).on("click", ".grid_factura_detalle th.th_cm_sel.th_cm_activa", function()
+    {
+    var th        = $(this);
+    var medida    = parseInt(th.data("cm"));
+    var codigo_ff = parseInt(th.data("ff"));
+    if(isNaN(medida) || medida <= 0 || codigo_ff != global_seleccion_ff)
+        return;
+    if(global_seleccion_lineas.length == 0)
+        return;
+
+    var cuantas = global_seleccion_lineas.length;
+    var lineas  = global_seleccion_lineas.join(",");
+    var origen  = this;
+
+    $("#id_dialog_confirma_factura").html(
+        "<p>&iquest;Pasar <strong>" + cuantas + "</strong> l&iacute;nea"
+        + ((cuantas == 1) ? "" : "s") + " a <strong>" + medida + " cm</strong>?</p>");
+    $("#id_dialog_confirma_factura").dialog(
+        {
+        modal: true,
+        width: 380,
+        dialogClass: 'myTitleClass',
+        buttons:
+            [
+                {
+                text: "SI",
+                class: 'cancelButton',
+                click: function()
+                    {
+                    $(this).dialog("close");
+                    var url = "funciones_ajax.php?funcion=mover_lineas_medida_dsft"
+                        + "&parametro1=" + codigo_ff
+                        + "&parametro2=" + lineas
+                        + "&parametro3=" + medida
+                        + "&parametro4=" + global_codigo_usuario;
+                    $.get(url, function(data)
+                        {
+                        if(data.substring(0, 2) != "OK")
+                            {
+                            messageBox(data);
+                            return;
+                            }
+                        aviso_breve(cuantas + ((cuantas == 1) ? " linea pasada a " : " lineas pasadas a ")
+                            + medida + " cm", origen);
+                        limpiar_modo_seleccion();
+                        recargar_grid_factura_por_codigo(codigo_ff);
+                        });
+                    }
+                },
+                {
+                text: "NO",
+                click: function() { $(this).dialog("close"); }
+                }
+            ]
+        });
+    });
+
+// Esc borra la seleccion y apaga el modo.
+$(document).on("keydown", function(e)
+    {
+    if(e.which == 27 && global_seleccion_ff > 0)
+        limpiar_modo_seleccion();
+    });
+
 // ===== GUIA (AWB) POR CAJA =====
 // Cada caja queda asignada a UNA guia, elegida entre las que ya tiene su
 // consolidado. El mismo dialogo sirve en los tres niveles (caja, factura y
@@ -890,7 +1353,7 @@ function dialog_guias_caja(codigo_ff, numero_caja, codigo_consolidado, codigo_gu
     global_guia_numero_caja = numero_caja;
     global_guia_consolidado = codigo_consolidado;
     global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "caja", codigo_guia_actual, "Guia de la caja " + numero_caja);
+    abrir_dialog_guias(codigo_consolidado, "caja", codigo_guia_actual, "Guía de la caja " + numero_caja);
     }
 
 function dialog_guias_factura(codigo_ff, codigo_consolidado, elemento)
@@ -900,7 +1363,7 @@ function dialog_guias_factura(codigo_ff, codigo_consolidado, elemento)
     global_guia_numero_caja = 0;
     global_guia_consolidado = codigo_consolidado;
     global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "factura", 0, "Guia de la factura " + codigo_ff);
+    abrir_dialog_guias(codigo_consolidado, "factura", 0, "Guía de la factura " + codigo_ff);
     }
 
 function dialog_guias_consolidado(codigo_consolidado, elemento)
@@ -910,7 +1373,7 @@ function dialog_guias_consolidado(codigo_consolidado, elemento)
     global_guia_numero_caja = 0;
     global_guia_consolidado = codigo_consolidado;
     global_guia_origen      = elemento;
-    abrir_dialog_guias(codigo_consolidado, "consolidado", 0, "Guia del consolidado " + codigo_consolidado);
+    abrir_dialog_guias(codigo_consolidado, "consolidado", 0, "Guía del consolidado " + codigo_consolidado);
     }
 
 function abrir_dialog_guias(codigo_consolidado, contexto, codigo_guia_actual, titulo)
@@ -1013,9 +1476,9 @@ function guardar_guia_caja(destino, codigo_guia, numero_guia)
         if(data == "OK")
             {
             if(codigo_guia > 0)
-                aviso_breve("Caja " + numero_caja + " asignada a la guia " + numero_guia, origen);
+                aviso_breve("Caja " + numero_caja + " asignada a la guía " + numero_guia, origen);
             else
-                aviso_breve("Caja " + numero_caja + " sin guia", origen);
+                aviso_breve("Caja " + numero_caja + " sin guía", origen);
             recargar_grid_factura_por_codigo(codigo_ff);
             // El color de la fila del listado depende de TODAS las cajas del
             // consolidado, asi que tambien cambia al tocar una sola.
@@ -1069,9 +1532,9 @@ function guardar_guia_masivo(destino, codigo_guia, numero_guia)
         if(contexto == "factura")
             {
             if(codigo_guia > 0)
-                aviso_breve("Factura asignada a la guia " + numero_guia, origen);
+                aviso_breve("Factura asignada a la guía " + numero_guia, origen);
             else
-                aviso_breve("Guia quitada de la factura", origen);
+                aviso_breve("Guía quitada de la factura", origen);
             recargar_grid_factura_por_codigo(codigo_ff);
             actualiza_listado();
             return;
@@ -1080,9 +1543,9 @@ function guardar_guia_masivo(destino, codigo_guia, numero_guia)
         // Consolidado: cambio en todas las facturas, asi que se redibuja el
         // detalle completo, y el listado para que se actualice el color de la fila.
         if(codigo_guia > 0)
-            aviso_breve("Consolidado asignado a la guia " + numero_guia, origen);
+            aviso_breve("Consolidado asignado a la guía " + numero_guia, origen);
         else
-            aviso_breve("Guia quitada de todas las cajas", origen);
+            aviso_breve("Guía quitada de todas las cajas", origen);
         if(global_codigo_seleccionado == codigo_co)
             cargar_detalle_consolidado(codigo_co);
         actualiza_listado();
@@ -1219,6 +1682,8 @@ function cargar_detalle_consolidado(codigo_consolidado)
     $.get(url, function(data)
         {
         $("#id_detalle_consolidado").html(data);
+        // El detalle acaba de cambiar de alto: reubicar lo que este abierto.
+        recentrar_dialogos_abiertos();
         // Inicializar Select2 en los selects de finca de cada tarjeta.
         $("[id^='id_select_finca_']").select2(
             {
@@ -2212,6 +2677,9 @@ function ejecutar_regeneracion(codigo_ff, codigo_adj, nombre_adj)
 // Al elegir, cambia el PRODUCTO de TODAS las lineas de esa caja.
 $(document).on("dblclick", ".celda_prod", function()
     {
+    // En modo seleccion el clic marca la linea: no se abre el editor.
+    if(en_modo_seleccion(this))
+        return;
     var td = $(this);
     if(td.find("select").length > 0)
         return; // ya editando
@@ -2259,6 +2727,8 @@ $(document).on("change", ".select_prod_inline", function()
 // se manejan con dblclick (no con click simple), asi que retornamos.
 $(document).on("click", ".celda_editable", function()
     {
+    if(en_modo_seleccion(this))
+        return;
     var td = $(this);
     if(td.data("field") == "CM")
         return; // CM se maneja con dblclick
@@ -2286,6 +2756,8 @@ $(document).on("click", ".celda_editable", function()
 // valor en otra columna cm, lo mueve a la columna del dblclick.
 $(document).on("dblclick", ".celda_cm", function()
     {
+    if(en_modo_seleccion(this))
+        return;
     var td = $(this);
     if(td.find("input").length > 0)
         return; // ya editando
@@ -2446,7 +2918,7 @@ function ordenar_por(campo)
     }
 
 // ===== Trae el listado y lo pega en el div =====
-function actualiza_listado()
+function actualiza_listado(callback_post)
     {
     $("#id_espera").show();
 
@@ -2476,6 +2948,10 @@ function actualiza_listado()
         $("#id_listado_consolidados").html(data);
         // Reaplicar el filtro de texto si el usuario tenia algo escrito.
         filtrar_listado_local_consolidado();
+        // El listado acaba de cambiar de alto: reubicar lo que este abierto.
+        recentrar_dialogos_abiertos();
+        if(typeof callback_post === "function")
+            callback_post();
         });
     }
 
@@ -2484,8 +2960,8 @@ function boton_nuevo()
     {
     global_codigo_seleccionado = 0;
     $("#id_codigo_consolidado").val("");
-    if(flatpickr_fechavuelo)
-        flatpickr_fechavuelo.clear();
+    if(flatpickr_fechaconsolidado)
+        flatpickr_fechaconsolidado.clear();
     // CLIENTE a 0 sin disparar el handler (para no encadenar un AJAX inutil).
     $("#id_codigocliente").val("0").trigger('change.select2');
     // MARCACION vuelve a solo "-- SELECCIONE --" (sin opciones de ningun cliente).
@@ -2497,9 +2973,8 @@ function boton_nuevo()
     // Nuevo registro = activo por defecto.
     $("#id_estado_consolidado").prop("checked", true);
     $("#id_listado_consolidados .grupo_consolidado").removeClass("grupo_consolidado_seleccionado");
-    // Limpiar la seccion GUIAS (allowClear necesita value = "").
-    $("#id_lista_guias_consolidado").html("");
-    $("#id_select_guia").val("").trigger('change.select2');
+    // Limpiar el resumen de guias del formulario.
+    $("#id_resumen_guias_consolidado").html("&mdash;");
     // Ocultar el detalle inferior de facturas.
     $("#id_detalle_consolidado").hide().html("");
     // No hacer focus al campo de fecha (abre el Flatpickr).
@@ -2517,9 +2992,9 @@ $(document).ready(function()
         dialogClass: 'myTitleClass'
         });
 
-    // Flatpickr para FECHA VUELO (formulario). clickOpens controla que solo
+    // Flatpickr para FECHA del consolidado (formulario). clickOpens controla que solo
     // se abra al clickear el input, no al recibir focus programatico.
-    flatpickr_fechavuelo = flatpickr("#id_fechavuelo",
+    flatpickr_fechaconsolidado = flatpickr("#id_fechaconsolidado",
         {
         dateFormat: "Y-m-d",
         locale: "es",
@@ -2527,7 +3002,7 @@ $(document).ready(function()
         allowInput: false
         });
 
-    // Flatpickr modo range para filtrar el grid por FECHAVUELO.
+    // Flatpickr modo range para filtrar el grid por FECHACONSOLIDADO.
     // Al elegir 2 fechas o al limpiar, redispara actualiza_listado().
     flatpickr_rango_filtro = flatpickr("#id_rango_filtro_consolidado",
         {
@@ -2561,41 +3036,9 @@ $(document).ready(function()
         });
     $('#id_codigopais').select2(     {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
     $('#id_codigoagencia').select2(  {width: '100%', minimumResultsForSearch: 3, placeholder: "-- SELECCIONE --"});
-    // Select2 de guias con tags:true para permitir crear una guia nueva
-    // escribiendo el NUMEROGUIA en el cuadro de busqueda.
-    // createTag filtra el texto a numeros/guiones y limita a 15 chars antes
-    // de aceptar el tag.
-    $('#id_select_guia').select2(
-        {
-        width: '220px',
-        tags: true,
-        allowClear: true,
-        placeholder: '-- Buscar o crear guia --',
-        minimumResultsForSearch: 1,
-        createTag: function(params)
-            {
-            var term = params.term.replace(/[^0-9\-]/g, '');
-            if(term == '' || term.length > 15)
-                return null;
-            return { id: term, text: term, newTag: true };
-            }
-        });
-
-    // Mascara: en el campo de busqueda del Select2, bloquear caracteres
-    // distintos de numeros y guiones, y limitar a 15 chars.
-    $('#id_select_guia').on('select2:open', function()
-        {
-        var searchField = document.querySelector('.select2-search__field');
-        if(searchField)
-            {
-            searchField.setAttribute('maxlength', '15');
-            searchField.setAttribute('autocomplete', 'off');
-            searchField.addEventListener('input', function()
-                {
-                this.value = this.value.replace(/[^0-9\-]/g, '');
-                });
-            }
-        });
+    // El Select2 de guias se quito junto con el bloque del formulario: ahora el
+    // numero se escribe en el dialogo GUIAS, en un input con datalist de
+    // sugerencias (numeros_guia_recientes_dsft).
 
     // Cuando cambia CLIENTE: cargar marcaciones de ese cliente via AJAX,
     // limpiar TRUCK. Si cliente == 0, vaciar marcaciones.
@@ -2691,11 +3134,11 @@ $(document).ready(function()
                         <col style="width: 65px;">
                         <col style="width: 50%;"> 
                     </colgroup>
-                    <!-- Fila 1: VUELO + ACTIVO (checkbox) -->
+                    <!-- Fila 1: FECHA + ACTIVO (checkbox) -->
                     <tr>
-                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">VUELO:</td>
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">FECHA:</td>
                         <td style="padding-right: 6px; padding-bottom: 5px;">
-                            <input type="text" id="id_fechavuelo" autocomplete="off" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
+                            <input type="text" id="id_fechaconsolidado" autocomplete="off" class="input_pequeno" placeholder="aaaa-mm-dd" style="background-color:#fff; cursor:pointer; text-transform: none;" />
                         </td>
                         <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">ACTIVO:</td>
                         <td style="padding-bottom: 5px;">
@@ -2770,28 +3213,11 @@ $(document).ready(function()
                                 style="width: 100%; text-transform: uppercase; font-size: 12px; padding: 5px 6px; border: 1px solid #c0c0c0; border-radius: 2px; box-sizing: border-box; resize: none; font-family: inherit;"></textarea>
                         </td>
                     </tr>
-                    <!-- Fila 5: AWB ocupa el ancho completo (colspan=3) -->
+                    <!-- Fila 5: resumen de guias. La gestion esta en el boton GUIAS. -->
                     <tr>
-                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; vertical-align: top; white-space: nowrap;">AWB:</td>
+                        <td style="text-align: right; padding-right: 4px; padding-bottom: 5px; white-space: nowrap;">AWB:</td>
                         <td colspan="3" style="padding-bottom: 5px;">
-                            <div style="white-space: nowrap;">
-                                <select id="id_select_guia" style="width: 220px;">
-                                    <option value=""></option>
-                                    <?php
-                                    for($i=0; $i<$numero_guias; $i++)
-                                        {
-                                        echo '<option value="'.(int)$arreglo_guias[$i]['CODIGO'].'">'.htmlspecialchars((string)$arreglo_guias[$i]['NUMEROGUIA'], ENT_QUOTES, 'UTF-8').'</option>';
-                                        }
-                                    ?>
-                                </select>
-                                <a onclick="agregar_guia_consolidado();" title="Agregar guia"
-                                    style="cursor:pointer; color:#88010e; margin-left:6px; font-size:16px; vertical-align:middle; display:inline-block;">
-                                    <i class="icon-plus"></i>
-                                </a>
-                            </div> 
-                            <div id="id_lista_guias_consolidado" style="height:100px; overflow-y:auto; padding:2px 0;">
-                                <!-- Llenado por cargar_guias_consolidado() cuando se selecciona un consolidado. -->
-                            </div> 
+                            <span id="id_resumen_guias_consolidado" style="font-size:12px; color:#555;">&mdash;</span>
                         </td>
                     </tr>
                 </table>
@@ -2799,6 +3225,7 @@ $(document).ready(function()
                 <!-- Botones MEDIDAS / GRABAR / NUEVO -->
                 <div style="text-align: right; margin-top: 10px;">
                     <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="dialog_medidas_consolidado();">MEDIDAS</button>
+                    <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="dialog_gestion_guias();" style="margin-left: 5px;">GUÍAS</button>
                     <button type="button" class="button bg-darkRed bg-hover-red fg-white" onclick="grabar_consolidado();" style="margin-left: 5px;">GRABAR</button>
                     <button type="button" class="button bg-gray bg-hover-darkGray fg-white" onclick="boton_nuevo();" style="margin-left: 5px;">NUEVO</button>
                 </div>
@@ -2816,7 +3243,8 @@ $(document).ready(function()
     <div id="id_dialog_confirma_factura" title="Confirmar"></div>
     <div id="id_dialog_invoice_cliente" title="Invoice Cliente"></div>
     <div id="id_dialog_medidas" title="Medidas (cm) del consolidado"></div>
-    <div id="id_dialog_guias" title="Guias"></div>
+    <div id="id_dialog_guias" title="Guías"></div>
+    <div id="id_dialog_guias_consolidado" title="Guías del consolidado"></div>
     <div id="id_espera"><strong><i class="icon-clock fg-white"></i></strong></div>
 
     <!-- Mini-menu flotante de formato (Excel / PDF) del icono puzzle. -->
